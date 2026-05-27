@@ -64,7 +64,7 @@ export default function TermsPage() {
             },
             {
               title: '12. Contact',
-              body: 'Questions about these Terms: hello@verityprive.com · Mintploy, Inc. · Los Angeles, CA 90001',
+              body: 'Questions about these Terms: verity@mintploy.com · Mintploy, Inc. · Los Angeles, CA 90001',
             },
           ].map((section, i) => (
             <div key={i} style={{ marginBottom: 40 }}>

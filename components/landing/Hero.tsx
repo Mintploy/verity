@@ -50,12 +50,10 @@ export function Hero() {
             Drop in a phone number. Get back the full picture — quietly, in seconds.
           </p>
 
-          <div style={{
+          <div className="v-hero-pill" style={{
             marginTop: 36, padding: 8,
             background: 'var(--pearl)', borderRadius: 'var(--r-pill)',
             boxShadow: 'var(--shadow-lg)',
-            display: 'flex', alignItems: 'center', gap: 8,
-            width: '100%', maxWidth: 520,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', flex: 1, minWidth: 0 }}>
               <span style={{
@@ -71,16 +69,15 @@ export function Hero() {
                 style={{
                   flex: 1, border: 'none', background: 'transparent', outline: 'none',
                   fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)',
-                  fontVariantNumeric: 'tabular-nums',
+                  fontVariantNumeric: 'tabular-nums', minWidth: 0, width: '100%',
                 }}
               />
             </div>
-            <button onClick={handleSearch} style={{
+            <button onClick={handleSearch} className="v-hero-pill-btn" style={{
               padding: '16px 28px', borderRadius: 'var(--r-pill)',
               background: 'var(--primary)', color: 'var(--ivory)', border: 'none', cursor: 'pointer',
               fontFamily: 'var(--serif)', fontSize: 17, fontWeight: 500,
               display: 'flex', alignItems: 'center', gap: 6,
-              whiteSpace: 'nowrap',
               boxShadow: 'var(--shadow-pop)',
             }}>
               Get the report <em style={{ fontWeight: 300, marginLeft: 2 }}>→</em>

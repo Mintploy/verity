@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           {[
             {
               title: '1. Who we are',
-              body: 'Verity is a product of Mintploy, Inc. ("we," "us," "our"). We operate verityprive.com, a background research platform exclusively for verified women. Questions: hello@verityprive.com.',
+              body: 'Verity is a product of Mintploy, Inc. ("we," "us," "our"). We operate verityprive.com, a background research platform exclusively for verified women. Questions: verity@mintploy.com.',
             },
             {
               title: '2. What we collect',
@@ -48,12 +48,12 @@ export default function PrivacyPage() {
             },
             {
               title: '8. Data retention',
-              body: 'We retain your email and Stripe customer ID for as long as your account is active. You may request deletion of your account at any time by emailing hello@verityprive.com. We will process deletion requests within 30 days.',
+              body: 'We retain your email and Stripe customer ID for as long as your account is active. You may request deletion of your account at any time by emailing verity@mintploy.com. We will process deletion requests within 30 days.',
             },
             {
               id: 'do-not-sell',
               title: '9. Do not sell my personal information',
-              body: 'We do not sell your personal information. If you are a California resident, you have the right under CCPA to request disclosure of what personal information we collect and to request deletion. Contact hello@verityprive.com to exercise these rights.',
+              body: 'We do not sell your personal information. If you are a California resident, you have the right under CCPA to request disclosure of what personal information we collect and to request deletion. Contact verity@mintploy.com to exercise these rights.',
             },
             {
               title: '10. Security',
@@ -82,8 +82,8 @@ export default function PrivacyPage() {
           }}>
             <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', margin: 0, fontWeight: 300, lineHeight: 1.6 }}>
               Questions about this policy? Contact us at{' '}
-              <a href="mailto:hello@verityprive.com" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-                hello@verityprive.com
+              <a href="mailto:verity@mintploy.com" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                verity@mintploy.com
               </a>
               . See also our{' '}
               <Link href="/terms" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Terms of Service</Link>

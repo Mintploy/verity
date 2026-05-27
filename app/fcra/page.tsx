@@ -55,7 +55,7 @@ export default function FcraPage() {
             },
             {
               title: 'Questions',
-              body: 'If you have questions about appropriate use of Verity, contact us at hello@verityprive.com. If you believe you have found a use case that requires FCRA compliance, do not use Verity for that purpose — consult a qualified FCRA-compliant consumer reporting agency instead.',
+              body: 'If you have questions about appropriate use of Verity, contact us at verity@mintploy.com. If you believe you have found a use case that requires FCRA compliance, do not use Verity for that purpose — consult a qualified FCRA-compliant consumer reporting agency instead.',
             },
           ].map((section, i) => (
             <div key={i} style={{ marginBottom: 40 }}>

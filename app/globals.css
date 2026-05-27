@@ -112,6 +112,11 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
 
 /* ── Sticky helpers ──────────────────────────────────────── */
 .v-feature-sticky { position: sticky; top: 100px; }
+.v-show-mobile { display: none !important; }
+
+/* ── Hero search pill ────────────────────────────────────── */
+.v-hero-pill { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 520px; }
+.v-hero-pill-btn { white-space: nowrap; flex-shrink: 0; }
 
 /* ── Mobile breakpoint (≤768px) ──────────────────────────── */
 @media (max-width: 768px) {
@@ -134,8 +139,12 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
   .v-display-sm { font-size: 26px; line-height: 1.1; }
 
   .v-hide-mobile { display: none !important; }
+  .v-show-mobile { display: flex !important; }
   .v-stack-mobile { flex-direction: column !important; }
   .v-feature-sticky { position: static; }
+
+  .v-hero-pill { flex-wrap: wrap; border-radius: var(--r-xl) !important; }
+  .v-hero-pill-btn { width: 100%; justify-content: center; }
 }
 
 /* ── Tablet breakpoint (769–1024px) ─────────────────────── */

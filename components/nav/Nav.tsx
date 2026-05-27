@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Sparkle } from '@/components/ui/Sparkle';
 
@@ -9,6 +10,22 @@ interface NavProps {
 }
 
 export function Nav({ showCompare, onCompare }: NavProps) {
+  const router = useRouter();
+  const handleCompare = () => onCompare ? onCompare() : router.push('/compare');
+
+  const compareBtn = showCompare ? (
+    <button onClick={handleCompare} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '5px 12px', borderRadius: 'var(--r-pill)',
+      background: 'var(--gold-pale)', color: 'var(--gold-deep)',
+      border: 0, cursor: 'pointer',
+      fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, fontWeight: 500,
+    }}>
+      <Sparkle size={9} color="var(--gold-deep)" />
+      Compare
+    </button>
+  ) : null;
+
   return (
     <nav className="v-nav" style={{
       position: 'sticky', top: 0, zIndex: 50,
@@ -30,21 +47,16 @@ export function Nav({ showCompare, onCompare }: NavProps) {
               textDecoration: 'none', letterSpacing: 0.2,
             }}>{label}</Link>
           ))}
-          {showCompare && (
-            <button onClick={onCompare} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', borderRadius: 'var(--r-pill)',
-              background: 'var(--gold-pale)', color: 'var(--gold-deep)',
-              border: 0, cursor: 'pointer',
-              fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, fontWeight: 500,
-            }}>
-              <Sparkle size={9} color="var(--gold-deep)" />
-              Compare
-            </button>
-          )}
+          {compareBtn}
         </div>
       </div>
       <div className="v-nav-actions">
+        {/* Compare visible on mobile only */}
+        {showCompare && (
+          <span className="v-show-mobile">
+            {compareBtn}
+          </span>
+        )}
         <Link href="/login" style={{
           fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
           textDecoration: 'none',

@@ -68,7 +68,7 @@ function SearchContent() {
       <div style={{ width: '100%', maxWidth: 600 }}>
         <span className="v-eyebrow" style={{ display: 'block', marginBottom: 16 }}>New search</span>
         <h1 style={{
-          fontFamily: 'var(--serif)', fontSize: 64, lineHeight: 1, fontWeight: 400,
+          fontFamily: 'var(--serif)', fontSize: 'clamp(36px, 9vw, 64px)', lineHeight: 1, fontWeight: 400,
           color: 'var(--dark)', margin: '0 0 48px', letterSpacing: -0.8,
         }}>
           Who are you<br />

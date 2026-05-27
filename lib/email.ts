@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-const FROM = 'Verity <hello@verityprive.com>';
+const FROM = 'Verity <verity@mintploy.com>';
 const BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://verityprive.com';
 
 const wrap = (body: string) => `

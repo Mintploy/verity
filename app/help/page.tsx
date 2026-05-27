@@ -75,7 +75,7 @@ const faqs = [
       },
       {
         q: 'What if my verification is declined?',
-        a: "Stripe Identity may decline if the document is unclear, the selfie does not match, or the document is expired. You can re-attempt the verification from the same link. If you continue to have trouble, contact us at hello@verityprive.com.",
+        a: "Stripe Identity may decline if the document is unclear, the selfie does not match, or the document is expired. You can re-attempt the verification from the same link. If you continue to have trouble, contact us at verity@mintploy.com.",
       },
     ],
   },
@@ -103,7 +103,7 @@ const faqs = [
     items: [
       {
         q: 'Media inquiries',
-        a: "For press inquiries, interviews, or partnership opportunities, please reach out to hello@verityprive.com with the subject line \"Press.\" We're based in Los Angeles and happy to speak on background.",
+        a: "For press inquiries, interviews, or partnership opportunities, please reach out to verity@mintploy.com with the subject line \"Press.\" We're based in Los Angeles and happy to speak on background.",
       },
     ],
   },
@@ -113,7 +113,7 @@ const faqs = [
     items: [
       {
         q: 'Enterprise and partnership opportunities',
-        a: "We work with select women's platforms, safety organizations, and media brands on integration and co-branded experiences. Reach us at hello@verityprive.com with the subject line \"Partnership.\"",
+        a: "We work with select women's platforms, safety organizations, and media brands on integration and co-branded experiences. Reach us at verity@mintploy.com with the subject line \"Partnership.\"",
       },
     ],
   },
@@ -133,8 +133,8 @@ export default function HelpPage() {
           </h1>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.7, margin: '0 0 32px', fontWeight: 300 }}>
             Can't find what you need? Email us at{' '}
-            <a href="mailto:hello@verityprive.com" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-              hello@verityprive.com
+            <a href="mailto:verity@mintploy.com" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+              verity@mintploy.com
             </a>
             . We respond within one business day.
           </p>
@@ -182,7 +182,7 @@ export default function HelpPage() {
               We're a small team and we read every message.
             </p>
           </div>
-          <a href="mailto:hello@verityprive.com" style={{
+          <a href="mailto:verity@mintploy.com" style={{
             padding: '14px 28px', borderRadius: 'var(--r-pill)',
             background: 'var(--primary)', color: 'var(--ivory)',
             textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 16,
