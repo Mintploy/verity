@@ -2,17 +2,18 @@ export function PressStrip() {
   const press = ['Vogue', 'The Cut', 'Refinery29', 'Goop', 'New York Times', 'Bustle'];
   return (
     <section style={{
-      borderTop: '1px solid var(--ivory-deep)', borderBottom: '1px solid var(--ivory-deep)',
-      padding: '24px 56px', background: 'var(--ivory-warm)',
+      borderTop: '1px solid var(--gold-pale)', borderBottom: '1px solid var(--gold-pale)',
+      padding: '24px 20px', background: 'var(--ivory-warm)',
+      overflowX: 'auto',
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 40, maxWidth: 1280, margin: '0 auto',
+        flexWrap: 'wrap', gap: 24, maxWidth: 1280, margin: '0 auto',
       }}>
-        <span className="v-eyebrow" style={{ color: 'var(--plum-soft)' }}>As featured in</span>
+        <span className="v-eyebrow">As featured in</span>
         {press.map((p) => (
           <span key={p} style={{
-            fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--plum)',
+            fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--primary-deep)',
             opacity: 0.7, letterSpacing: 0.5,
           }}>{p}</span>
         ))}

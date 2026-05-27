@@ -4,67 +4,59 @@ import { Wordmark } from '@/components/ui/Wordmark';
 import { Sparkle } from '@/components/ui/Sparkle';
 
 interface NavProps {
-  onSearch?: () => void;
   showCompare?: boolean;
   onCompare?: () => void;
 }
 
-export function Nav({ onSearch, showCompare, onCompare }: NavProps) {
+export function Nav({ showCompare, onCompare }: NavProps) {
   return (
-    <nav style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 50,
-      padding: '20px 56px',
-      background: 'rgba(255, 244, 244, 0.85)',
+    <nav className="v-nav" style={{
+      position: 'sticky', top: 0, zIndex: 50,
+      background: 'rgba(255,244,244,0.9)',
       backdropFilter: 'blur(20px) saturate(180%)',
-      borderBottom: '1px solid var(--ivory-deep)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      borderBottom: '1px solid var(--gold-pale)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
-        <Link href="/">
-          <Wordmark size={26} color="var(--plum)" />
-        </Link>
-        <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
-          {['How it works', 'Stories', 'Trust & safety', 'Help'].map((label) => (
+        <Link href="/"><Wordmark size={26} color="var(--dark)" /></Link>
+        <div className="v-nav-links">
+          {['How it works', 'Stories', 'Help'].map((label) => (
             <Link key={label} href="#" style={{
-              fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--plum-soft)',
-              textDecoration: 'none', letterSpacing: 0.2, whiteSpace: 'nowrap',
-            }}>
-              {label}
-            </Link>
+              fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
+              textDecoration: 'none', letterSpacing: 0.2,
+            }}>{label}</Link>
           ))}
           {showCompare && (
             <button onClick={onCompare} style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '5px 12px', borderRadius: 'var(--r-pill)',
-              background: 'var(--blush-pale)', color: 'var(--wine)',
+              background: 'var(--gold-pale)', color: 'var(--gold-deep)',
               border: 0, cursor: 'pointer',
               fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, fontWeight: 500,
-              whiteSpace: 'nowrap',
             }}>
-              <Sparkle size={9} color="var(--wine)" />
+              <Sparkle size={9} color="var(--gold-deep)" />
               Compare
             </button>
           )}
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <Link href="/verify" style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--plum-soft)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+      <div className="v-nav-actions">
+        <Link href="/login" style={{
+          fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
+          textDecoration: 'none',
+        }} className="v-hide-mobile">
           Sign in
         </Link>
         <Link href="/verify" style={{
-          padding: '10px 22px', borderRadius: 'var(--r-pill)',
+          padding: '10px 20px', borderRadius: 'var(--r-pill)',
           background: 'var(--primary)', color: 'var(--ivory)',
           textDecoration: 'none',
-          fontFamily: 'var(--serif)', fontSize: 15, letterSpacing: 0.3,
+          fontFamily: 'var(--serif)', fontSize: 14, letterSpacing: 0.3,
           fontWeight: 500, whiteSpace: 'nowrap',
           boxShadow: 'var(--shadow-pop)',
-          display: 'inline-flex', alignItems: 'center', gap: 6,
+          display: 'inline-flex', alignItems: 'center', gap: 5,
         }}>
-          Begin <em style={{ fontWeight: 300 }}>verification</em>
+          Get started
         </Link>
       </div>
     </nav>

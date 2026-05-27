@@ -6,40 +6,39 @@ export function HowItWorks() {
       num: '01',
       title: 'Verify yourself, once',
       body: 'A 90-second ID check (Stripe Identity). Verity is exclusively for women. The gate exists so the room stays safe.',
-      accent: 'var(--blush-pale)',
+      accent: 'var(--gold-pale)',
     },
     {
       num: '02',
       title: 'Drop in a number',
       body: "His phone is the only thing we truly need. A name sharpens the picture. He will never know you searched.",
-      accent: 'var(--champagne)',
+      accent: 'var(--primary-pale)',
     },
     {
       num: '03',
       title: 'Read the room',
       body: "A score, a verdict, and seven sections of cross-referenced public record. Plus what we'd do next, in your shoes.",
-      accent: 'var(--sage-pale)',
+      accent: 'var(--champagne)',
     },
   ];
 
   return (
-    <section style={{ padding: '120px 56px', position: 'relative' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 60 }}>
+    <section className="v-section" style={{ background: 'var(--ivory)', position: 'relative' }}>
+      <div className="v-max">
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 60, flexWrap: 'wrap', gap: 24 }}>
           <div>
             <span className="v-eyebrow" style={{ marginBottom: 14, display: 'block' }}>How it works</span>
-            <h2 style={{
-              fontFamily: 'var(--serif)', fontSize: 64, lineHeight: 1, fontWeight: 400,
-              color: 'var(--plum)', margin: 0, letterSpacing: -0.6, maxWidth: 700,
+            <h2 className="v-display-lg v-serif" style={{
+              fontWeight: 400, color: 'var(--primary-deep)', margin: 0, maxWidth: 700,
             }}>
               Three steps, ninety seconds,{' '}
-              <em style={{ color: 'var(--rose)' }}>peace of mind</em> for as long as you'd like it.
+              <em style={{ color: 'var(--primary)' }}>peace of mind</em> for as long as you'd like it.
             </h2>
           </div>
           <Floret size={48} color="var(--blush-deep)" center="var(--ivory)" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+        <div className="v-grid-3">
           {steps.map((s, i) => (
             <div key={i} style={{
               padding: '40px 32px 36px', borderRadius: 'var(--r-xl)',
@@ -52,15 +51,15 @@ export function HowItWorks() {
               }} />
               <div style={{ position: 'relative', zIndex: 1 }}>
                 <div style={{
-                  fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 64, color: 'var(--rose)',
+                  fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 64, color: 'var(--gold)',
                   fontWeight: 300, lineHeight: 1, marginBottom: 16, opacity: 0.55,
                 }}>{s.num}</div>
                 <h3 style={{
-                  fontFamily: 'var(--serif)', fontSize: 28, fontWeight: 400, color: 'var(--plum)',
+                  fontFamily: 'var(--serif)', fontSize: 28, fontWeight: 400, color: 'var(--primary-deep)',
                   margin: 0, lineHeight: 1.1, letterSpacing: -0.3,
                 }}>{s.title}</h3>
                 <p style={{
-                  fontFamily: 'var(--sans)', fontSize: 14.5, color: 'var(--plum-soft)', lineHeight: 1.6,
+                  fontFamily: 'var(--sans)', fontSize: 14.5, color: 'var(--dark-soft)', lineHeight: 1.6,
                   margin: '14px 0 0', fontWeight: 300,
                 }}>{s.body}</p>
               </div>

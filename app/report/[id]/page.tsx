@@ -18,7 +18,7 @@ export default function ReportPage() {
 function LoadingState() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 22, color: 'var(--plum-soft)' }}>Loading report...</p>
+      <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 22, color: 'var(--dark-soft)' }}>Loading report...</p>
     </div>
   );
 }
@@ -42,7 +42,7 @@ function ReportContent() {
   if (notFound) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 24 }}>
-        <p style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--plum)' }}>Report not found</p>
+        <p style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--dark)' }}>Report not found</p>
         <Link href="/search" style={{ padding: '14px 28px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 16 }}>
           Run a new search
         </Link>
@@ -55,9 +55,8 @@ function ReportContent() {
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
-      <div style={{
-        display: 'grid', gridTemplateColumns: '280px 1fr 320px', gap: 32,
-        padding: '40px 56px 80px', maxWidth: 1480, margin: '0 auto',
+      <div className="v-grid-report" style={{
+        padding: 'clamp(20px, 4vw, 56px)', maxWidth: 1480, margin: '0 auto',
       }}>
         <ReportSidebar report={report} onCompare={() => router.push('/compare')} />
         <ReportMain report={report} />
@@ -70,11 +69,11 @@ function ReportContent() {
 function ReportSidebar({ report, onCompare }: { report: Report; onCompare: () => void }) {
   const sections = ['Safety score', 'Phone intelligence', 'Identity', 'Address history', 'Relationships', 'Professional', 'Public records', 'Social footprint', 'Recommendations'];
   return (
-    <aside style={{ position: 'sticky', top: 92, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <aside className="v-hide-mobile" style={{ position: 'sticky', top: 92, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <button onClick={() => history.back()} style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
         border: 0, background: 'transparent', cursor: 'pointer', alignSelf: 'flex-start',
-        fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum-soft)',
+        fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)',
       }}>
         ← New search
       </button>
@@ -83,7 +82,7 @@ function ReportSidebar({ report, onCompare }: { report: Report; onCompare: () =>
         <div className="v-eyebrow" style={{ marginBottom: 10 }}>Jump to</div>
         {sections.map((s, i) => (
           <a key={i} href={`#sec-${i}`} style={{
-            fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum-soft)',
+            fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)',
             textDecoration: 'none', padding: '8px 10px', borderRadius: 8,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
@@ -95,7 +94,7 @@ function ReportSidebar({ report, onCompare }: { report: Report; onCompare: () =>
 
       <div style={{ padding: 18, borderRadius: 'var(--r-lg)', background: 'var(--ivory-warm)' }}>
         <div className="v-eyebrow" style={{ marginBottom: 12 }}>Report ID</div>
-        <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--plum-soft)', letterSpacing: 0.3 }}>{report.searchId}</div>
+        <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)', letterSpacing: 0.3 }}>{report.searchId}</div>
         <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', marginTop: 6 }}>
           {new Date(report.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </div>
@@ -116,9 +115,9 @@ function ReportMain({ report }: { report: Report }) {
           <span className="v-eyebrow">Verity report · {report.searchId}</span>
           <h1 style={{
             fontFamily: 'var(--serif)', fontSize: 44, lineHeight: 1.05, fontWeight: 400,
-            color: 'var(--plum)', margin: '6px 0 0', letterSpacing: -0.4,
+            color: 'var(--dark)', margin: '6px 0 0', letterSpacing: -0.4,
           }}>
-            <em style={{ color: 'var(--rose)' }}>On</em> {report.subject.name}
+            <em style={{ color: 'var(--gold)' }}>On</em> {report.subject.name}
           </h1>
         </div>
         <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--mauve-deep)', textAlign: 'right' }}>
@@ -154,7 +153,7 @@ function ReportMain({ report }: { report: Report }) {
                 width: 52, height: 52, borderRadius: '50%',
                 background: 'linear-gradient(135deg, var(--ivory-warm), var(--champagne))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20, color: 'var(--plum-soft)',
+                fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20, color: 'var(--dark-soft)',
                 boxShadow: `0 0 0 3px ${scoreConfig.bg}, 0 0 0 4px ${scoreConfig.deep}33`,
               }}>{initials}</div>
               <div>
@@ -170,16 +169,16 @@ function ReportMain({ report }: { report: Report }) {
         <div style={{ padding: '36px 36px 32px', background: 'var(--pearl)', display: 'flex', flexDirection: 'column' }}>
           <div className="v-eyebrow" style={{ marginBottom: 16 }}>Verity's verdict</div>
           <div style={{
-            fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, lineHeight: 1.1, color: 'var(--plum)',
+            fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, lineHeight: 1.1, color: 'var(--dark)',
             fontStyle: 'italic', letterSpacing: -0.3,
           }}>
             "{report.headline}"
           </div>
-          <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.65, color: 'var(--plum)', margin: '20px 0 0', fontWeight: 300 }}>
+          <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.65, color: 'var(--dark)', margin: '20px 0 0', fontWeight: 300 }}>
             {report.summary}
           </p>
           <div style={{ flex: 1 }} />
-          <div style={{ marginTop: 24, display: 'flex', gap: 24, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--plum-soft)', letterSpacing: 0.3 }}>
+          <div style={{ marginTop: 24, display: 'flex', gap: 24, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)', letterSpacing: 0.3 }}>
             <span><span style={{ opacity: 0.6 }}>CONFIDENCE</span> {report.confidence}%</span>
             <span><span style={{ opacity: 0.6 }}>SOURCES</span> {report.sources}</span>
             <span><span style={{ opacity: 0.6 }}>GENERATED</span> JUST NOW</span>
@@ -211,7 +210,7 @@ function ReportMain({ report }: { report: Report }) {
       <Section id="sec-3" eyebrow="03" title="Address history">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px 32px' }}>
           {report.addresses.map((a, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderTop: i >= 2 ? '1px solid var(--ivory-deep)' : 'none' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderTop: i >= 2 ? '1px solid var(--gold-pale)' : 'none' }}>
               <div style={{
                 width: 10, height: 10, borderRadius: '50%', marginTop: 8, flexShrink: 0,
                 background: a.flag ? 'var(--deeprose)' : a.current ? 'var(--rose)' : 'var(--mauve)',
@@ -220,10 +219,10 @@ function ReportMain({ report }: { report: Report }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>{a.years}</span>
-                  {a.current && <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 13, color: 'var(--rose)' }}>· current</span>}
+                  {a.current && <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 13, color: 'var(--gold)' }}>· current</span>}
                 </div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--plum)', lineHeight: 1.2 }}>{a.addr}</div>
-                <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: a.flag ? 'var(--deeprose-deep)' : 'var(--plum-soft)', marginTop: 4, fontWeight: a.flag ? 500 : 300 }}>{a.detail}</div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.2 }}>{a.addr}</div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: a.flag ? 'var(--deeprose-deep)' : 'var(--dark-soft)', marginTop: 4, fontWeight: a.flag ? 500 : 300 }}>{a.detail}</div>
               </div>
             </div>
           ))}
@@ -244,10 +243,10 @@ function ReportMain({ report }: { report: Report }) {
 
         <Section id="sec-5" eyebrow="05" title="Professional">
           <div style={{ padding: '14px 16px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', marginBottom: 14 }}>
-            <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--plum)', lineHeight: 1.2 }}>
+            <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--dark)', lineHeight: 1.2 }}>
               {report.professional.title}
             </div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--plum-soft)', marginTop: 4 }}>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 4 }}>
               {report.professional.company} · {report.professional.tenure}
             </div>
           </div>
@@ -256,7 +255,7 @@ function ReportMain({ report }: { report: Report }) {
             <Stat label="Est. net worth" value={report.professional.networth} />
           </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase', marginTop: 14, marginBottom: 6 }}>Business entities</div>
-          <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum)', lineHeight: 1.5, fontWeight: 300 }}>{report.professional.llcs}</div>
+          <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, fontWeight: 300 }}>{report.professional.llcs}</div>
         </Section>
       </div>
 
@@ -264,7 +263,7 @@ function ReportMain({ report }: { report: Report }) {
       <Section id="sec-6" eyebrow="06" title="Public record flags" accent={report.score === 'red' ? 'var(--deeprose-pale)' : 'var(--blush-pale)'}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 32px' }}>
           {report.publicRecords.map((p, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderTop: i >= 2 ? '1px solid var(--ivory-deep)' : 'none' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderTop: i >= 2 ? '1px solid var(--gold-pale)' : 'none' }}>
               <div style={{
                 width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1,
                 background: p.good ? 'var(--sage-pale)' : p.flag ? 'var(--deeprose-pale)' : 'var(--ivory-warm)',
@@ -276,7 +275,7 @@ function ReportMain({ report }: { report: Report }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 3 }}>{p.label}</div>
-                <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, lineHeight: 1.4, color: p.flag ? 'var(--deeprose-deep)' : 'var(--plum)', fontWeight: p.flag ? 500 : 300 }}>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, lineHeight: 1.4, color: p.flag ? 'var(--deeprose-deep)' : 'var(--dark)', fontWeight: p.flag ? 500 : 300 }}>
                   {p.value}
                 </div>
               </div>
@@ -292,13 +291,13 @@ function ReportMain({ report }: { report: Report }) {
             <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase', marginBottom: 10 }}>Known handles</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {report.social.handles.map((h, i) => (
-                <div key={i} style={{ padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum)' }}>{h}</div>
+                <div key={i} style={{ padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)' }}>{h}</div>
               ))}
             </div>
           </div>
           <div>
             <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase', marginBottom: 10 }}>Presence</div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--plum)', lineHeight: 1.6, fontWeight: 300 }}>{report.social.presence}</div>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.6, fontWeight: 300 }}>{report.social.presence}</div>
             {report.social.inconsistency !== 'None flagged.' && (
               <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.social.inconsistency}</FlagNote>
             )}
@@ -308,7 +307,7 @@ function ReportMain({ report }: { report: Report }) {
 
       {/* Footer note */}
       <div style={{ textAlign: 'center', marginTop: 12, padding: '16px 0' }}>
-        <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--plum-soft)', lineHeight: 1.5 }}>
+        <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.5 }}>
           Verity does not predict the future.<br />
           It tells you what's true today, so you can decide tomorrow.
         </div>
