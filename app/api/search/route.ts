@@ -1,8 +1,19 @@
 import type { NextRequest } from 'next/server';
 import { generateReport } from '@/lib/apis/index';
+import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    // Verify session and extract user context
+    const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
+    if (!sessionToken) {
+      return Response.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    const session = await verifySessionToken(sessionToken).catch(() => null);
+    if (!session) {
+      return Response.json({ error: 'Session expired' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { phone, name } = body;
 
@@ -10,13 +21,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
-    // TODO: Verify user has active membership before allowing search
-    // const session = await getServerSession(authOptions);
-    // if (!session?.user?.membershipActive) {
-    //   return Response.json({ error: 'Active membership required' }, { status: 403 });
-    // }
-
-    const report = await generateReport({ phone, name });
+    const report = await generateReport({ phone, name, userId: session.email });
 
     return Response.json({ report, searchId: report.searchId });
   } catch (err: any) {
