@@ -325,7 +325,7 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
       {/* Recommendations */}
       <div id="sec-8" style={{
         padding: '24px 22px', borderRadius: 'var(--r-lg)',
-        background: 'linear-gradient(160deg, var(--primary-deep) 0%, var(--plum) 100%)',
+        background: 'linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%)',
         color: 'var(--ivory)', position: 'relative', overflow: 'hidden',
       }}>
         <div style={{
@@ -389,11 +389,11 @@ function Section({ id, eyebrow, title, children, accent = 'var(--blush-pale)' }:
           width: 42, height: 42, borderRadius: '50%', background: accent,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--rose)', fontWeight: 300 }}>{eyebrow}</span>
+          <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--gold)', fontWeight: 300 }}>{eyebrow}</span>
         </div>
         <div>
           <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>Section {eyebrow}</div>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--plum)', lineHeight: 1.1, fontWeight: 400 }}>{title}</div>
+          <div style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--dark)', lineHeight: 1.1, fontWeight: 400 }}>{title}</div>
         </div>
       </div>
       <div style={{ padding: '0 28px 24px' }}>{children}</div>
@@ -403,9 +403,9 @@ function Section({ id, eyebrow, title, children, accent = 'var(--blush-pale)' }:
 
 function KVRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--ivory-deep)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--gold-pale)' }}>
       <span className="v-eyebrow" style={{ fontSize: 10 }}>{label}</span>
-      <span style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--plum)' }}>{value}</span>
+      <span style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)' }}>{value}</span>
     </div>
   );
 }
@@ -414,7 +414,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ padding: '14px 16px', background: 'var(--ivory)', borderRadius: 'var(--r-md)' }}>
       <div className="v-eyebrow" style={{ fontSize: 9.5, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--plum)', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', lineHeight: 1.1 }}>{value}</div>
     </div>
   );
 }
