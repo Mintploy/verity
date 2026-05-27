@@ -425,7 +425,7 @@ function TagList({ items }: { items: string[] }) {
       {items.map((item, i) => (
         <span key={i} style={{
           padding: '5px 12px', background: 'var(--ivory)', borderRadius: 'var(--r-pill)',
-          fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--plum)',
+          fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)',
         }}>{item}</span>
       ))}
     </div>
@@ -448,7 +448,7 @@ function ActionButton({ icon, label, onClick }: { icon: string; label: string; o
       display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
       border: 0, background: 'transparent', cursor: 'pointer',
       borderRadius: 8, textAlign: 'left',
-      fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum)', width: '100%',
+      fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', width: '100%',
     }}>
       <span style={{ width: 14, opacity: 0.6 }}>
         {icon === 'compare' && '⊕'}

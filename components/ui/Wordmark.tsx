@@ -1,4 +1,4 @@
-export function Wordmark({ size = 24, color = 'var(--plum)' }: { size?: number; color?: string }) {
+export function Wordmark({ size = 24, color = 'var(--dark)' }: { size?: number; color?: string }) {
   return (
     <span style={{
       fontFamily: 'var(--logo)',

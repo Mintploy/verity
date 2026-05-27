@@ -7,8 +7,8 @@ interface PrimaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function PrimaryButton({ children, variant = 'primary', fullWidth = false, style, ...props }: PrimaryButtonProps) {
-  const bg = variant === 'primary' ? 'var(--primary)' : variant === 'blush' ? 'var(--blush)' : 'var(--plum)';
-  const fg = variant === 'blush' ? 'var(--plum)' : 'var(--ivory)';
+  const bg = variant === 'primary' ? 'var(--primary)' : variant === 'blush' ? 'var(--blush)' : 'var(--dark)';
+  const fg = variant === 'blush' ? 'var(--dark)' : 'var(--ivory)';
   const shadow = variant === 'primary' ? 'var(--shadow-pop)' : '0 8px 24px rgba(44,14,38,0.18)';
 
   return (

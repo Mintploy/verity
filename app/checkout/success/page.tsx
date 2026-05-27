@@ -10,7 +10,7 @@ export default function CheckoutSuccessPage() {
     }}>
       <div style={{ width: '100%', maxWidth: 520, textAlign: 'center' }}>
         <div style={{ marginBottom: 40 }}>
-          <Wordmark size={32} color="var(--plum)" />
+          <Wordmark size={32} color="var(--dark)" />
         </div>
 
         <div style={{
@@ -23,7 +23,7 @@ export default function CheckoutSuccessPage() {
 
           <h1 style={{
             fontFamily: 'var(--serif)', fontSize: 48, lineHeight: 1.05, fontWeight: 400,
-            color: 'var(--plum)', margin: '0 0 16px', letterSpacing: -0.5,
+            color: 'var(--dark)', margin: '0 0 16px', letterSpacing: -0.5,
           }}>
             You're in.
           </h1>
@@ -36,7 +36,7 @@ export default function CheckoutSuccessPage() {
           </p>
 
           <p style={{
-            fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--plum-soft)',
+            fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)',
             lineHeight: 1.6, margin: '0 0 40px', fontWeight: 300,
           }}>
             Your membership is active. You can now run unlimited reports.

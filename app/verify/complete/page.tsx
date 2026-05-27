@@ -50,7 +50,7 @@ function VerifyCompleteContent() {
     }}>
       <div style={{ width: '100%', maxWidth: 480, textAlign: 'center' }}>
         <div style={{ marginBottom: 48 }}>
-          <Wordmark size={32} color="var(--plum)" />
+          <Wordmark size={32} color="var(--dark)" />
         </div>
 
         <div style={{
@@ -67,7 +67,7 @@ function VerifyCompleteContent() {
               }}>
                 <Sparkle size={28} color={status === 'redirecting' ? 'var(--sage-deep)' : 'var(--primary)'} />
               </div>
-              <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 26, color: 'var(--plum)', margin: 0 }}>
+              <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 26, color: 'var(--dark)', margin: 0 }}>
                 {status === 'redirecting' ? 'One moment...' : 'Checking your verification...'}
               </p>
             </>
@@ -85,10 +85,10 @@ function VerifyCompleteContent() {
                   <path d="M6 14l5 5 11-11" stroke="var(--sage-deep)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
-              <p style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--plum)', margin: '0 0 12px' }}>
+              <p style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--dark)', margin: '0 0 12px' }}>
                 Identity verified.
               </p>
-              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--plum-soft)', margin: 0, fontWeight: 300 }}>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: 0, fontWeight: 300 }}>
                 Taking you to complete your membership...
               </p>
             </>
@@ -96,10 +96,10 @@ function VerifyCompleteContent() {
 
           {status === 'failed' && (
             <>
-              <p style={{ fontFamily: 'var(--serif)', fontSize: 26, color: 'var(--plum)', margin: '0 0 16px' }}>
+              <p style={{ fontFamily: 'var(--serif)', fontSize: 26, color: 'var(--dark)', margin: '0 0 16px' }}>
                 Verification incomplete
               </p>
-              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--plum-soft)', margin: '0 0 32px', fontWeight: 300 }}>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '0 0 32px', fontWeight: 300 }}>
                 We weren't able to complete your ID verification. Please try again.
               </p>
               <button

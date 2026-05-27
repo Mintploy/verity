@@ -51,10 +51,10 @@ function SearchContent() {
           <Sparkle size={36} color="var(--primary)" />
         </div>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 28, color: 'var(--plum)', margin: 0 }}>
+          <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 28, color: 'var(--dark)', margin: 0 }}>
             Pulling the file...
           </p>
-          <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--plum-soft)', margin: '12px 0 0', fontWeight: 300 }}>
+          <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '12px 0 0', fontWeight: 300 }}>
             Cross-referencing 7 sources. Usually about 14 seconds.
           </p>
         </div>
@@ -64,12 +64,12 @@ function SearchContent() {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 56px' }}>
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(40px, 8vw, 80px) clamp(20px, 5vw, 56px)' }}>
       <div style={{ width: '100%', maxWidth: 600 }}>
         <span className="v-eyebrow" style={{ display: 'block', marginBottom: 16 }}>New search</span>
         <h1 style={{
           fontFamily: 'var(--serif)', fontSize: 64, lineHeight: 1, fontWeight: 400,
-          color: 'var(--plum)', margin: '0 0 48px', letterSpacing: -0.8,
+          color: 'var(--dark)', margin: '0 0 48px', letterSpacing: -0.8,
         }}>
           Who are you<br />
           <em style={{ color: 'var(--rose)', fontWeight: 300 }}>researching?</em>
@@ -90,7 +90,7 @@ function SearchContent() {
               placeholder="(•••) ••• ••••"
               style={{
                 width: '100%', border: 'none', background: 'transparent', outline: 'none',
-                fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--plum)',
+                fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)',
                 fontVariantNumeric: 'tabular-nums',
               }}
             />
@@ -110,7 +110,7 @@ function SearchContent() {
               placeholder="First and last name"
               style={{
                 width: '100%', border: 'none', background: 'transparent', outline: 'none',
-                fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--plum)',
+                fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)',
               }}
             />
           </div>

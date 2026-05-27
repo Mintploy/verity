@@ -39,7 +39,7 @@ export default function CheckoutPage() {
     }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <Wordmark size={32} color="var(--plum)" />
+          <Wordmark size={32} color="var(--dark)" />
         </div>
 
         <div style={{
@@ -52,7 +52,7 @@ export default function CheckoutPage() {
 
           <h1 style={{
             fontFamily: 'var(--serif)', fontSize: 44, lineHeight: 1.05, fontWeight: 400,
-            color: 'var(--plum)', margin: '0 0 20px', letterSpacing: -0.5,
+            color: 'var(--dark)', margin: '0 0 20px', letterSpacing: -0.5,
           }}>
             One year of<br />
             <em style={{ color: 'var(--rose)', fontWeight: 300 }}>clarity.</em>
@@ -63,10 +63,10 @@ export default function CheckoutPage() {
             borderRadius: 'var(--r-lg)', marginBottom: 28,
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-              <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--plum)' }}>
+              <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)' }}>
                 Verity Annual Membership
               </span>
-              <span style={{ fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--plum)', fontWeight: 400 }}>
+              <span style={{ fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)', fontWeight: 400 }}>
                 $99
               </span>
             </div>
@@ -87,7 +87,7 @@ export default function CheckoutPage() {
                       <path d="M1.5 4.5l2 2 4-4" stroke="var(--sage-deep)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </div>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--plum)', fontWeight: 300 }}>{item}</span>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', fontWeight: 300 }}>{item}</span>
                 </div>
               ))}
             </div>

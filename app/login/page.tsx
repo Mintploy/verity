@@ -33,16 +33,16 @@ export default function LoginPage() {
     <div style={{ minHeight: '100vh', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
       <div style={{ width: '100%', maxWidth: 440 }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <Link href="/"><Wordmark size={32} color="var(--plum)" /></Link>
+          <Link href="/"><Wordmark size={32} color="var(--dark)" /></Link>
         </div>
 
         <div style={{ background: 'var(--pearl)', borderRadius: 'var(--r-xl)', padding: '48px 40px', boxShadow: 'var(--shadow-lg)' }}>
           {(step === 'form' || step === 'sending') && (
             <>
-              <h1 style={{ fontFamily: 'var(--serif)', fontSize: 40, fontWeight: 400, color: 'var(--plum)', margin: '0 0 12px', letterSpacing: -0.4, lineHeight: 1.05 }}>
+              <h1 style={{ fontFamily: 'var(--serif)', fontSize: 40, fontWeight: 400, color: 'var(--dark)', margin: '0 0 12px', letterSpacing: -0.4, lineHeight: 1.05 }}>
                 Welcome back.
               </h1>
-              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--plum-soft)', margin: '0 0 32px', fontWeight: 300, lineHeight: 1.6 }}>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '0 0 32px', fontWeight: 300, lineHeight: 1.6 }}>
                 We'll send a sign-in link to your email. No password needed.
               </p>
               <input
@@ -53,7 +53,7 @@ export default function LoginPage() {
                 style={{
                   width: '100%', padding: '15px 18px', borderRadius: 'var(--r-pill)',
                   border: '1.5px solid var(--ivory-deep)', background: 'var(--ivory)',
-                  fontFamily: 'var(--serif)', fontSize: 19, color: 'var(--plum)',
+                  fontFamily: 'var(--serif)', fontSize: 19, color: 'var(--dark)',
                   marginBottom: 14, outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -72,7 +72,7 @@ export default function LoginPage() {
                 {step === 'sending' ? 'Sending...' : 'Send sign-in link →'}
               </button>
               <div style={{ textAlign: 'center', marginTop: 24 }}>
-                <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum-soft)' }}>
+                <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)' }}>
                   New here?{' '}
                   <Link href="/verify" style={{ color: 'var(--rose)', textDecoration: 'underline' }}>Start verification</Link>
                 </span>
@@ -87,19 +87,19 @@ export default function LoginPage() {
                   <path d="M4 14l6 6L24 8" stroke="var(--sage-deep)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
-              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, color: 'var(--plum)', margin: '0 0 12px' }}>Check your inbox.</h2>
-              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--plum-soft)', lineHeight: 1.6, fontWeight: 300, margin: 0 }}>
-                We sent a sign-in link to <strong style={{ color: 'var(--plum)' }}>{email}</strong>.<br />Expires in 15 minutes.
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, color: 'var(--dark)', margin: '0 0 12px' }}>Check your inbox.</h2>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', lineHeight: 1.6, fontWeight: 300, margin: 0 }}>
+                We sent a sign-in link to <strong style={{ color: 'var(--dark)' }}>{email}</strong>.<br />Expires in 15 minutes.
               </p>
             </div>
           )}
 
           {step === 'error' && (
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--plum)', margin: '0 0 12px' }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--dark)', margin: '0 0 12px' }}>
                 {error?.includes('No account') ? 'No account found.' : error?.includes('membership') ? 'No active membership.' : 'Something went wrong.'}
               </h2>
-              <p style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--plum-soft)', margin: '0 0 28px', fontWeight: 300, lineHeight: 1.6 }}>{error}</p>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', margin: '0 0 28px', fontWeight: 300, lineHeight: 1.6 }}>{error}</p>
               {error?.includes('membership') || error?.includes('No account') ? (
                 <Link href="/verify" style={{ display: 'inline-block', padding: '14px 28px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 16 }}>
                   Sign up →

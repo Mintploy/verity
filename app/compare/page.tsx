@@ -144,26 +144,26 @@ export default function ComparePage() {
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
 
-      <div style={{ maxWidth: 1480, margin: '0 auto', padding: '40px 56px 80px' }}>
+      <div style={{ maxWidth: 1480, margin: '0 auto', padding: 'clamp(20px, 4vw, 56px)' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24, marginBottom: 36 }}>
           <div style={{ maxWidth: 720 }}>
             <Link href="/search" style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--plum-soft)',
+              fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)',
               textDecoration: 'none', marginBottom: 14,
             }}>
               ← Back to search
             </Link>
             <div className="v-eyebrow" style={{ marginBottom: 12 }}>Your shortlist · {ranked.length} men · the honest math</div>
-            <h1 style={{
-              fontFamily: 'var(--serif)', fontSize: 64, lineHeight: 1.0, fontWeight: 400,
-              color: 'var(--plum)', margin: 0, letterSpacing: -0.6,
+            <h1 className="v-display-lg v-serif" style={{
+              fontWeight: 400,
+              color: 'var(--dark)', margin: 0,
             }}>
               Where each of them <em style={{ color: 'var(--rose)' }}>actually</em> lands.
             </h1>
             <p style={{
-              fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--plum-soft)', lineHeight: 1.6,
+              fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.6,
               margin: '18px 0 0', maxWidth: 580, fontWeight: 300,
             }}>
               Each man modeled on his archetype — tech founder versus partner-track attorney versus
@@ -184,10 +184,10 @@ export default function ComparePage() {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, lineHeight: 1 }}>
               <div style={{
                 fontFamily: 'var(--serif)', fontSize: 88, lineHeight: 0.9, fontWeight: 400,
-                color: 'var(--plum)', letterSpacing: -2, fontVariantNumeric: 'tabular-nums',
+                color: 'var(--dark)', letterSpacing: -2, fontVariantNumeric: 'tabular-nums',
               }}>{year}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 22, color: 'var(--rose)', fontWeight: 300, whiteSpace: 'nowrap' }}>
+                <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 22, color: 'var(--gold)', fontWeight: 300, whiteSpace: 'nowrap' }}>
                   {year === 1 ? 'year out' : 'years out'}
                 </div>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>
@@ -217,7 +217,7 @@ export default function ComparePage() {
         </div>
 
         {/* Rank cards + chart */}
-        <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32, alignItems: 'start' }}>
+        <div className="v-grid-compare">
           {/* Rank cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {ranked.map((person, i) => {
@@ -248,17 +248,17 @@ export default function ComparePage() {
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                         <span style={{
                           fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 32,
-                          color: 'var(--rose)', fontWeight: 300, lineHeight: 1,
+                          color: 'var(--gold)', fontWeight: 300, lineHeight: 1,
                         }}>#{i + 1}</span>
-                        <span style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--plum)' }}>{person.name}</span>
+                        <span style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)' }}>{person.name}</span>
                       </div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--plum-soft)', marginTop: 2 }}>
+                      <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--dark-soft)', marginTop: 2 }}>
                         {person.role} · {person.archetype}
                       </div>
                     </div>
 
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontFamily: 'var(--serif)', fontSize: 26, color: 'var(--plum)', fontWeight: 400, lineHeight: 1 }}>
+                      <div style={{ fontFamily: 'var(--serif)', fontSize: 26, color: 'var(--dark)', fontWeight: 400, lineHeight: 1 }}>
                         {fmtMoney(person.proj.expected)}
                       </div>
                       <div style={{ fontFamily: 'var(--sans)', fontSize: 10.5, color: 'var(--mauve-deep)', marginTop: 3, letterSpacing: 0.2 }}>
@@ -271,8 +271,8 @@ export default function ComparePage() {
                   <MiniSparkline person={person} year={year} />
 
                   {isExpanded && (
-                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--ivory-deep)' }}>
-                      <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--plum)', lineHeight: 1.6, margin: '0 0 12px', fontWeight: 300 }}>
+                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--gold-pale)' }}>
+                      <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.6, margin: '0 0 12px', fontWeight: 300 }}>
                         {person.summary}
                       </p>
                       {note && (
@@ -373,7 +373,7 @@ function TrajectoryChart({ men, year }: { men: ComparePerson[]; year: number }) 
             {men.map(m => (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 20, height: 2, background: m.color, borderRadius: 1 }} />
-                <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--plum-soft)' }}>{m.name.split(' ')[0]}</span>
+                <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)' }}>{m.name.split(' ')[0]}</span>
               </div>
             ))}
           </div>
