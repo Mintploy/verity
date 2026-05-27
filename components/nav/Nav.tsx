@@ -20,8 +20,12 @@ export function Nav({ showCompare, onCompare }: NavProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
         <Link href="/"><Wordmark size={26} color="var(--dark)" /></Link>
         <div className="v-nav-links">
-          {['How it works', 'Stories', 'Help'].map((label) => (
-            <Link key={label} href="#" style={{
+          {[
+            { label: 'How it works', href: '/#how-it-works' },
+            { label: 'Stories', href: '/stories' },
+            { label: 'Help', href: '/help' },
+          ].map(({ label, href }) => (
+            <Link key={label} href={href} style={{
               fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
               textDecoration: 'none', letterSpacing: 0.2,
             }}>{label}</Link>

@@ -23,7 +23,7 @@ export function HowItWorks() {
   ];
 
   return (
-    <section className="v-section" style={{ background: 'var(--ivory)', position: 'relative' }}>
+    <section id="how-it-works" className="v-section" style={{ background: 'var(--ivory)', position: 'relative' }}>
       <div className="v-max">
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 60, flexWrap: 'wrap', gap: 24 }}>
           <div>

@@ -11,10 +11,10 @@ export function WhatYouKnow() {
   ];
 
   return (
-    <section className="v-section" style={{ background: 'var(--ivory-warm)', position: 'relative' }}>
+    <section id="what-youll-know" className="v-section" style={{ background: 'var(--ivory-warm)', position: 'relative' }}>
       <div className="v-max">
         <div className="v-grid-feature">
-          <div style={{ position: 'sticky', top: 100 }}>
+          <div className="v-feature-sticky">
             <span className="v-eyebrow" style={{ marginBottom: 14, display: 'block' }}>Inside every report</span>
             <h2 className="v-display-lg v-serif" style={{
               fontWeight: 400, color: 'var(--primary-deep)', margin: 0,

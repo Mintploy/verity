@@ -2,12 +2,31 @@ import { Wordmark } from '@/components/ui/Wordmark';
 import Link from 'next/link';
 
 export function Footer() {
-  const links = [
-    ['Product', ['How it works', "What you'll know", 'Pricing', 'For brands']],
-    ['Trust', ['ID verification', 'Privacy promise', 'How we score', 'Sources']],
-    ['Help', ['Get in touch', 'Story library', 'Press']],
-    ['Legal', ['Privacy policy', 'Terms', 'FCRA notice', 'Do not sell']],
-  ] as const;
+  const links: [string, [string, string][]][] = [
+    ['Product', [
+      ['How it works', '/#how-it-works'],
+      ["What you'll know", '/#what-youll-know'],
+      ['Pricing', '/checkout'],
+      ['For brands', '/help#brands'],
+    ]],
+    ['Trust', [
+      ['ID verification', '/#how-it-works'],
+      ['Privacy promise', '/privacy'],
+      ['How we score', '/help#scoring'],
+      ['Sources', '/help#sources'],
+    ]],
+    ['Help', [
+      ['Get in touch', '/help'],
+      ['Story library', '/stories'],
+      ['Press', '/help#press'],
+    ]],
+    ['Legal', [
+      ['Privacy policy', '/privacy'],
+      ['Terms', '/terms'],
+      ['FCRA notice', '/fcra'],
+      ['Do not sell', '/privacy#do-not-sell'],
+    ]],
+  ];
 
   return (
     <footer style={{ padding: '60px 20px 40px', background: 'var(--ivory-warm)' }}>
@@ -26,11 +45,11 @@ export function Footer() {
             <div key={title}>
               <div className="v-eyebrow" style={{ marginBottom: 16 }}>{title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {items.map((it) => (
-                  <Link key={it} href="#" style={{
+                {items.map(([label, href]) => (
+                  <Link key={label} href={href} style={{
                     fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
                     textDecoration: 'none',
-                  }}>{it}</Link>
+                  }}>{label}</Link>
                 ))}
               </div>
             </div>

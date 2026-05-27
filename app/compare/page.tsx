@@ -1,8 +1,9 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Nav } from '@/components/nav/Nav';
 import { Floret } from '@/components/ui/Floret';
 import Link from 'next/link';
+import { Report } from '@/lib/types';
 
 // ── Projection models ──────────────────────────────────────────────────────
 
@@ -123,17 +124,93 @@ function logY(value: number): number {
   return (Math.log10(v) - minLog) / (maxLog - minLog);
 }
 
+// ── Session report → ComparePerson ────────────────────────────────────────
+
+function parseIncome(income: string): number {
+  const nums = income.replace(/[^0-9]/g, ' ').trim().split(/\s+/).map(Number).filter(n => n > 1000);
+  if (!nums.length) return 80000;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+const SCORE_COLORS: Record<string, { color: string; colorDeep: string; colorPale: string }> = {
+  green:  { color: '#87AE7E', colorDeep: '#2F4A2C', colorPale: '#DEECD6' },
+  yellow: { color: '#E9B25C', colorDeep: '#6E4F1D', colorPale: '#F9DCAA' },
+  red:    { color: '#E7506C', colorDeep: '#B41E61', colorPale: '#FFE5EE' },
+};
+const RISK_MAP: Record<string, number> = { green: 0.08, yellow: 0.40, red: 0.72 };
+const GROWTH_MAP: Record<string, number> = { green: 0.065, yellow: 0.04, red: 0.02 };
+
+function reportToComparePerson(report: Report): ComparePerson {
+  const colors = SCORE_COLORS[report.score] ?? SCORE_COLORS.yellow;
+  const current = parseIncome(report.professional.income);
+  const risk = RISK_MAP[report.score] ?? 0.4;
+  const growth = GROWTH_MAP[report.score] ?? 0.04;
+  const parts = report.subject.name.trim().split(/\s+/);
+  const initials = parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : report.subject.name.slice(0, 2).toUpperCase();
+
+  return {
+    id: report.searchId,
+    name: report.subject.name,
+    age: report.subject.age,
+    role: report.professional.title,
+    company: report.professional.company,
+    archetype: report.professional.title,
+    initials,
+    score: report.score,
+    current,
+    risk,
+    ...colors,
+    summary: report.summary,
+    notes: {
+      5: report.nextSteps[0] ?? '',
+      10: report.nextSteps[1] ?? '',
+      20: report.nextSteps[2] ?? '',
+    },
+    project: (y: number) => {
+      const expected = current * Math.pow(1 + growth, y);
+      return { expected, high: expected * (1 + risk * 0.5), low: expected * (1 - risk * 0.4) };
+    },
+  };
+}
+
+function loadSessionReports(): ComparePerson[] {
+  if (typeof window === 'undefined') return [];
+  const people: ComparePerson[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key?.startsWith('report-')) {
+      try {
+        const report: Report = JSON.parse(sessionStorage.getItem(key)!);
+        people.push(reportToComparePerson(report));
+      } catch {}
+    }
+  }
+  return people;
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function ComparePage() {
   const [year, setYear] = useState(5);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [people, setPeople] = useState<ComparePerson[]>(COMPARE_MEN);
+  const [usingRealData, setUsingRealData] = useState(false);
+
+  useEffect(() => {
+    const fromSession = loadSessionReports();
+    if (fromSession.length >= 2) {
+      setPeople(fromSession);
+      setUsingRealData(true);
+    }
+  }, []);
 
   const ranked = useMemo(() => {
-    return [...COMPARE_MEN]
+    return [...people]
       .map(p => ({ ...p, proj: p.project(year) }))
       .sort((a, b) => b.proj.expected - a.proj.expected);
-  }, [year]);
+  }, [year, people]);
 
   const nearestNote = (notes: Record<number, string>, y: number): string => {
     const keys = Object.keys(notes).map(Number).sort((a, b) => Math.abs(a - y) - Math.abs(b - y));
@@ -155,6 +232,16 @@ export default function ComparePage() {
             }}>
               ← Back to search
             </Link>
+            {!usingRealData && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 16px', background: 'var(--gold-pale)',
+                borderRadius: 'var(--r-pill)', marginBottom: 14, marginLeft: 12,
+                fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)',
+              }}>
+                Sample data — run searches to compare real men
+              </div>
+            )}
             <div className="v-eyebrow" style={{ marginBottom: 12 }}>Your shortlist · {ranked.length} men · the honest math</div>
             <h1 className="v-display-lg v-serif" style={{
               fontWeight: 400,
@@ -305,7 +392,7 @@ export default function ComparePage() {
 
           {/* Trajectory chart */}
           <div style={{ position: 'sticky', top: 92 }}>
-            <TrajectoryChart men={COMPARE_MEN} year={year} />
+            <TrajectoryChart men={people} year={year} />
           </div>
         </div>
       </div>

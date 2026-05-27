@@ -110,6 +110,9 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
 .v-display-md { font-size: 48px; line-height: 1.05; letter-spacing: -0.5px; }
 .v-display-sm { font-size: 36px; line-height: 1.1; letter-spacing: -0.3px; }
 
+/* ── Sticky helpers ──────────────────────────────────────── */
+.v-feature-sticky { position: sticky; top: 100px; }
+
 /* ── Mobile breakpoint (≤768px) ──────────────────────────── */
 @media (max-width: 768px) {
   .v-section { padding: 56px 20px; }
@@ -132,6 +135,7 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
 
   .v-hide-mobile { display: none !important; }
   .v-stack-mobile { flex-direction: column !important; }
+  .v-feature-sticky { position: static; }
 }
 
 /* ── Tablet breakpoint (769–1024px) ─────────────────────── */
