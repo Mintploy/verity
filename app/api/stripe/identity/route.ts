@@ -4,13 +4,14 @@ import { createIdentityVerificationSession } from '@/lib/stripe';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
+    const { email } = body;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
 
     const session = await createIdentityVerificationSession({
       returnUrl: `${baseUrl}/verify/complete?session_id={VERIFICATION_SESSION_ID}`,
       metadata: {
         purpose: 'female_verification',
-        ...body.metadata,
+        ...(email ? { email } : {}),
       },
     });
 

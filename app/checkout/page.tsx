@@ -3,6 +3,12 @@ import { useState, useEffect } from 'react';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Sparkle } from '@/components/ui/Sparkle';
 
+function getEmailFromCookie(): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(/verity-pending-email=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -10,11 +16,12 @@ export default function CheckoutPage() {
   const startCheckout = async () => {
     setLoading(true);
     setError(null);
+    const email = getEmailFromCookie();
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ returnUrl: window.location.href }),
+        body: JSON.stringify({ email, returnUrl: window.location.href }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to create checkout');
