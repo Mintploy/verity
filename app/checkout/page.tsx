@@ -12,6 +12,18 @@ function getEmailFromCookie(): string | undefined {
 export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const email = getEmailFromCookie();
+    if (!email) {
+      window.location.replace('/verify');
+      return;
+    }
+    setReady(true);
+  }, []);
+
+  if (!ready) return null;
 
   const startCheckout = async () => {
     setLoading(true);

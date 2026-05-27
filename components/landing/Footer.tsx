@@ -6,7 +6,7 @@ export function Footer() {
     ['Product', [
       ['How it works', '/#how-it-works'],
       ["What you'll know", '/#what-youll-know'],
-      ['Pricing', '/checkout'],
+      ['Pricing', '/verify'],
       ['For brands', '/help#brands'],
     ]],
     ['Trust', [
