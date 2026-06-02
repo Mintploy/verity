@@ -9,6 +9,7 @@ export interface FecResult {
 
 export async function lookupDonations(name?: string): Promise<FecResult> {
   if (!name) return { summary: 'None on record' };
+  if (process.env.ALLOW_LIVE_LOOKUPS !== 'true') return { summary: 'None on record' };
 
   try {
     const apiKey = process.env.FEC_API_KEY ?? 'DEMO_KEY';

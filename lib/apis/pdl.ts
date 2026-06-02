@@ -12,9 +12,10 @@ export interface PdlResult {
 }
 
 export async function lookupProfessional(name?: string): Promise<PdlResult> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const apiKey = process.env.PDL_API_KEY;
 
-  if (!apiKey || apiKey === 'YOUR_PDL_KEY') {
+  if (!liveAllowed || !apiKey || apiKey === 'YOUR_PDL_KEY') {
     return getMockProfessionalData(name);
   }
 

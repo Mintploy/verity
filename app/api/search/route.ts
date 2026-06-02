@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     const report = await generateReport({ phone, name, userId: session.email });
 
-    return Response.json({ report, searchId: report.searchId });
+    return Response.json({ report, searchId: report.searchId, demoMode: process.env.ALLOW_LIVE_LOOKUPS !== 'true' });
   } catch (err: any) {
     console.error('Search error:', err);
     return Response.json({ error: err.message ?? 'Search failed' }, { status: 500 });

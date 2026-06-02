@@ -28,6 +28,7 @@ function ReportContent() {
   const router = useRouter();
   const [report, setReport] = useState<Report | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     const id = params.id as string;
@@ -37,6 +38,7 @@ function ReportContent() {
     } else {
       setNotFound(true);
     }
+    setDemoMode(sessionStorage.getItem('verity-demo') === '1');
   }, [params.id]);
 
   if (notFound) {
@@ -55,6 +57,11 @@ function ReportContent() {
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
+      {demoMode && (
+        <div style={{ textAlign: 'center', padding: '8px 20px', background: 'var(--gold-pale)', fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)', letterSpacing: 0.3 }}>
+          Demo mode — sample data, not real records.
+        </div>
+      )}
       <div className="v-grid-report" style={{
         padding: 'clamp(20px, 4vw, 56px)', maxWidth: 1480, margin: '0 auto',
       }}>

@@ -24,11 +24,11 @@ export default function PrivacyPage() {
             },
             {
               title: '2. What we collect',
-              body: 'We collect your email address when you register, your Stripe customer ID for payment processing, and authentication tokens stored in secure httpOnly cookies. We do not store the phone numbers you search, the names you enter, or the contents of any report. Reports exist in your browser session only and are not transmitted to our servers for storage.',
+              body: 'We collect your email address when you register, your Stripe customer ID for payment processing, and authentication tokens stored in secure httpOnly cookies. When you run a search, the phone number and name you enter are transmitted to our servers and to the third-party data providers listed in Section 7 in order to generate your report. We do not use your searches for advertising or profiling.',
             },
             {
               title: '3. How we use your information',
-              body: 'Your email is used to send authentication links and service communications. Your Stripe customer ID is used to verify your active membership on each login. We do not use your information for advertising, profiling, or sale to third parties.',
+              body: 'Your email is used to send authentication links and service communications. Your Stripe customer ID is used to verify your active membership on each login. Search queries are used solely to generate the report you requested, by querying the third-party data providers in Section 7. We do not sell your information or use it for advertising.',
             },
             {
               title: '4. Identity verification',
@@ -44,11 +44,11 @@ export default function PrivacyPage() {
             },
             {
               title: '7. Data sharing',
-              body: 'We do not sell, rent, or share your personal information with third parties except: (a) Stripe, for payment and identity processing; (b) Resend, for transactional email delivery; (c) as required by law or valid legal process.',
+              body: 'To generate reports, the phone number and name you search are shared with third-party data providers, which may include phone-intelligence, public-record, and background-data services (for example, providers of carrier data, court and bankruptcy records, property records, and sex-offender registry checks). We also share data with: (a) Stripe, for payment and identity processing; (b) Resend, for transactional email delivery; and (c) any party required by law or valid legal process. We do not sell or rent your personal information.',
             },
             {
               title: '8. Data retention',
-              body: 'We retain your email and Stripe customer ID for as long as your account is active. You may request deletion of your account at any time by emailing verity@mintploy.com. We will process deletion requests within 30 days.',
+              body: 'We retain your email and Stripe customer ID for as long as your account is active. Search queries (phone number and name) are transmitted to third-party providers to generate your report and are not stored on our servers beyond the duration of that request. You may request deletion of your account and associated data at any time by emailing verity@mintploy.com; we process deletion requests within 30 days.',
             },
             {
               id: 'do-not-sell',

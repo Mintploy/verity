@@ -8,6 +8,7 @@ export interface NsopwResult {
 
 export async function checkSexOffenderRegistry(name?: string): Promise<NsopwResult> {
   if (!name) return { onRegistry: false };
+  if (process.env.ALLOW_LIVE_LOOKUPS !== 'true') return { onRegistry: false };
 
   try {
     const nameParts = name.trim().split(' ');

@@ -19,9 +19,10 @@ export interface BackgroundCheckResult {
 }
 
 export async function runBackgroundCheck(phone: string, name?: string): Promise<BackgroundCheckResult> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const apiKey = process.env.BEENVERIFIED_API_KEY;
 
-  if (!apiKey || apiKey === 'YOUR_BEENVERIFIED_KEY') {
+  if (!liveAllowed || !apiKey || apiKey === 'YOUR_BEENVERIFIED_KEY') {
     return getMockBgData(phone, name);
   }
 

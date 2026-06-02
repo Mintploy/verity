@@ -1,5 +1,5 @@
 'use client';
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
 import { Sparkle } from '@/components/ui/Sparkle';
@@ -10,7 +10,12 @@ function SearchContent() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setDemoMode(sessionStorage.getItem('verity-demo') === '1');
+  }, []);
 
   const handleSearch = async () => {
     if (!phone.trim()) return;
@@ -29,6 +34,7 @@ function SearchContent() {
 
       // Store report in sessionStorage and navigate to report page
       sessionStorage.setItem(`report-${data.report.searchId}`, JSON.stringify(data.report));
+      if (data.demoMode) sessionStorage.setItem('verity-demo', '1');
       router.push(`/report/${data.report.searchId}`);
     } catch (err: any) {
       setError(err.message);
@@ -64,7 +70,12 @@ function SearchContent() {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(40px, 8vw, 80px) clamp(20px, 5vw, 56px)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(40px, 8vw, 80px) clamp(20px, 5vw, 56px)' }}>
+      {demoMode && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', background: 'var(--gold-pale)', borderRadius: 'var(--r-pill)', marginBottom: 20, fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)', letterSpacing: 0.3 }}>
+          Demo mode — sample data, not real records.
+        </div>
+      )}
       <div style={{ width: '100%', maxWidth: 600 }}>
         <span className="v-eyebrow" style={{ display: 'block', marginBottom: 16 }}>New search</span>
         <h1 style={{

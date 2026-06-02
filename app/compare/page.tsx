@@ -4,6 +4,7 @@ import { Nav } from '@/components/nav/Nav';
 import { Footer } from '@/components/landing/Footer';
 import { Floret } from '@/components/ui/Floret';
 import { Sparkle } from '@/components/ui/Sparkle';
+import { YearSlider } from '@/components/compare/YearSlider';
 import Link from 'next/link';
 import { Report } from '@/lib/types';
 
@@ -189,8 +190,6 @@ export default function ComparePage() {
           : 'driven by consistent compounding. The predictable path wins more often than it should.'
       }"`;
 
-  const YEAR_MARKS = [1, 3, 5, 10, 15, 20, 30, 40, 50];
-
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
@@ -220,50 +219,7 @@ export default function ComparePage() {
         </div>
 
         {/* ── Year slider ── */}
-        <div style={{ background: 'var(--pearl)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)', marginBottom: 32, padding: '24px 28px' }}>
-          <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 16 }}>Horizon</div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 32, flexWrap: 'wrap' }}>
-            {/* Big number */}
-            <div style={{ flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, lineHeight: 1 }}>
-                <span style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(64px,10vw,88px)', lineHeight: 0.9, fontWeight: 400, color: 'var(--dark)', letterSpacing: -2, fontVariantNumeric: 'tabular-nums' }}>{year}</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20, color: 'var(--gold)', fontWeight: 300, whiteSpace: 'nowrap' }}>
-                    {year === 1 ? 'year out' : 'years out'}
-                  </span>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>
-                    he'll be ~{avgAge + year} on avg · {2026 + year}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Slider track */}
-            <div style={{ flex: 1, minWidth: 200, paddingTop: 8 }}>
-              <input
-                type="range" min={1} max={50} value={year}
-                onChange={e => setYear(Number(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--primary)', height: 6, cursor: 'pointer', display: 'block' }}
-              />
-              {/* Year markers */}
-              <div style={{ position: 'relative', height: 28, marginTop: 4 }}>
-                {YEAR_MARKS.map(y => (
-                  <button key={y} onClick={() => setYear(y)} style={{
-                    position: 'absolute',
-                    left: `${((y - 1) / 49) * 100}%`,
-                    transform: 'translateX(-50%)',
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    fontFamily: 'var(--sans)', fontSize: 11, padding: '4px 2px',
-                    color: year === y ? 'var(--primary)' : 'var(--mauve-deep)',
-                    fontWeight: year === y ? 600 : 300,
-                    letterSpacing: 0.2,
-                    whiteSpace: 'nowrap',
-                  }}>{y}y</button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <YearSlider year={year} setYear={setYear} avgAge={avgAge} />
 
         {/* ── Rank cards + chart ── */}
         <div className="v-grid-compare">

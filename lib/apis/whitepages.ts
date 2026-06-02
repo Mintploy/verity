@@ -11,9 +11,10 @@ export interface WhitepagesPhoneResult {
 }
 
 export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const apiKey = process.env.WHITEPAGES_API_KEY;
 
-  if (!apiKey || apiKey === 'YOUR_WHITEPAGES_PRO_KEY') {
+  if (!liveAllowed || !apiKey || apiKey === 'YOUR_WHITEPAGES_PRO_KEY') {
     return getMockPhoneData(phone);
   }
 

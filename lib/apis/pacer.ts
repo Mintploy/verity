@@ -16,6 +16,7 @@ export interface PacerResult {
 
 export async function lookupPublicRecords(name?: string, phone?: string): Promise<PacerResult> {
   if (!name) return getMockPublicRecords(phone, false);
+  if (process.env.ALLOW_LIVE_LOOKUPS !== 'true') return getMockPublicRecords(phone, false);
 
   try {
     // CourtListener — free federal docket search

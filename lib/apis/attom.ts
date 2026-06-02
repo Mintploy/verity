@@ -13,9 +13,10 @@ export interface AttomAddressResult {
 }
 
 export async function lookupAddress(name?: string, phone?: string): Promise<AttomAddressResult> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const apiKey = process.env.ATTOM_API_KEY;
 
-  if (!apiKey || apiKey === 'YOUR_ATTOM_KEY') {
+  if (!liveAllowed || !apiKey || apiKey === 'YOUR_ATTOM_KEY') {
     return getMockAddressData(phone);
   }
 

@@ -36,7 +36,7 @@ export default function TermsPage() {
             },
             {
               title: '5. Accuracy of data',
-              body: 'Verity aggregates publicly available records from third-party data sources. We do not guarantee the accuracy, completeness, or timeliness of report data. Public records contain errors. A Verity report is a research tool, not a definitive background check. Do not make consequential decisions based solely on a Verity report.',
+              body: 'Verity aggregates publicly available records from third-party data sources. We do not guarantee the accuracy, completeness, or timeliness of report data. Public records contain errors. A Verity report is a research tool, not a definitive background check. Do not make consequential decisions based solely on a Verity report. Reports may include data matched to the wrong individual, including people who share a name. A report is never proof that any specific person has any specific record. Treat every report as an unverified research starting point, not a conclusion about a real person.',
             },
             {
               title: '6. Membership and payment',
