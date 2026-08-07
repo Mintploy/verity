@@ -76,7 +76,7 @@ export default function CheckoutPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)' }}>
-                Verity Founding Member Access
+                Founding Member Access
               </span>
               <span style={{ fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)', fontWeight: 400 }}>
                 $199
