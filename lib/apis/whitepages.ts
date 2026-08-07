@@ -41,8 +41,8 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
 
     if (!res.ok) return getMockPhoneData(phone);
 
-    const data = await res.json();
-    console.log('Whitepages phone raw:', JSON.stringify(data, null, 2));
+    cconst data = await res.json();
+    console.log('WP_PHONE_STATUS:', res.status, 'keys:', Object.keys(data).join(','));
     const result = data.results?.[0];
 
     return {
@@ -89,8 +89,7 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
     if (!res.ok) return {};
 
     const data = await res.json();
-    console.log('Whitepages people raw:', JSON.stringify(data, null, 2));
-
+    console.log('WP_PERSON_STATUS:', res.status, 'keys:', Object.keys(data).join(','), 'results:', data.results?.length ?? 0);
     const person = data.results?.[0];
     if (!person) return {};
 
