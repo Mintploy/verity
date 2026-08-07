@@ -40,7 +40,7 @@ export default function TermsPage() {
             },
             {
               title: '6. Membership and payment',
-              body: 'Membership is billed annually at $99/year. Your membership renews automatically at the end of each billing period unless you cancel. You may cancel at any time; cancellation takes effect at the end of the current billing period. All payments are final and non-refundable except as required by law.',
+              body: 'Membership is billed annually at $199/year for founding members (first 100 members) and $297/year thereafter. Your membership renews automatically at the end of each billing period unless you cancel. You may cancel at any time; cancellation takes effect at the end of the current billing period. All payments are final and non-refundable except as required by law.',
             },
             {
               title: '7. Privacy',
