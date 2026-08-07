@@ -1,5 +1,4 @@
-// Whitepages Pro API - Phone intelligence
-// Docs: https://pro.whitepages.com/developer/documentation/identity-check-api/
+// Whitepages Pro API - Phone intelligence + People Search
 
 export interface WhitepagesPhoneResult {
   carrier: string;
@@ -8,6 +7,22 @@ export interface WhitepagesPhoneResult {
   numberAge: string;
   origin: string;
   active: boolean;
+}
+
+export interface WhitepagesPeopleResult {
+  fullName?: string;
+  age?: number;
+  dob?: string;
+  aliases?: string[];
+  addresses?: Array<{
+    addr: string;
+    years: string;
+    current: boolean;
+    detail: string;
+    owned?: boolean;
+  }>;
+  associates?: string[];
+  relatives?: string[];
 }
 
 export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult> {
@@ -20,7 +35,6 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
 
   try {
     const cleaned = phone.replace(/\D/g, '');
-    // API key in header, not URL query (avoids logging keys in server access logs)
     const res = await fetch(`https://proapi.whitepages.com/3.3/phone?phone_number=${cleaned}`, {
       headers: { 'api_key': apiKey, 'Accept': 'application/json' },
     });
@@ -28,6 +42,7 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
     if (!res.ok) return getMockPhoneData(phone);
 
     const data = await res.json();
+    console.log('Whitepages phone raw:', JSON.stringify(data, null, 2));
     const result = data.results?.[0];
 
     return {
@@ -40,6 +55,87 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
     };
   } catch {
     return getMockPhoneData(phone);
+  }
+}
+
+export async function lookupPerson(phone: string, name?: string): Promise<WhitepagesPeopleResult> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
+  const apiKey = process.env.WHITEPAGES_API_KEY;
+
+  if (!liveAllowed || !apiKey || apiKey === 'YOUR_WHITEPAGES_PRO_KEY') {
+    return {};
+  }
+
+  try {
+    const params = new URLSearchParams();
+    params.set('phone', phone.replace(/\D/g, ''));
+    params.set('include_historical_locations', 'true');
+    params.set('include_fuzzy_matching', 'true');
+
+    if (name) {
+      const parts = name.trim().split(' ');
+      if (parts.length >= 2) {
+        params.set('first_name', parts[0]);
+        params.set('last_name', parts.slice(1).join(' '));
+      } else {
+        params.set('name', name.trim());
+      }
+    }
+
+    const res = await fetch(`https://proapi.whitepages.com/3.3/person?${params.toString()}`, {
+      headers: { 'api_key': apiKey, 'Accept': 'application/json' },
+    });
+
+    if (!res.ok) return {};
+
+    const data = await res.json();
+    console.log('Whitepages people raw:', JSON.stringify(data, null, 2));
+
+    const person = data.results?.[0];
+    if (!person) return {};
+
+    const locations = person.locations ?? [];
+    const addresses = locations.slice(0, 5).map((loc: any, i: number) => {
+      const street = [loc.street_line_1, loc.street_line_2].filter(Boolean).join(' ');
+      const cityState = [loc.city, loc.state_code].filter(Boolean).join(', ');
+      const zip = loc.postal_code ?? '';
+      const addr = [street, cityState, zip].filter(Boolean).join(', ');
+      const type = loc.location_type ?? '';
+      const isOwned = type.toLowerCase().includes('own');
+      const dateRange = loc.valid_for?.length
+        ? loc.valid_for.map((d: any) => d.start ? new Date(d.start).getFullYear() : '').filter(Boolean).join('–')
+        : '';
+      return {
+        addr: addr || '—',
+        years: dateRange || (i === 0 ? 'Current' : 'Previous'),
+        current: i === 0,
+        detail: type ? `${type}${isOwned ? ', owned' : ''}` : 'Residential',
+        owned: isOwned,
+      };
+    });
+
+    const fullName = [person.name?.first, person.name?.middle_initial, person.name?.last]
+      .filter(Boolean).join(' ') || undefined;
+
+    const age = person.age_range?.min
+      ? Math.round((person.age_range.min + (person.age_range.max ?? person.age_range.min)) / 2)
+      : person.age ?? undefined;
+
+    const dob = person.birth_date
+      ? new Date(person.birth_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : undefined;
+
+    const aliases = person.alternate_names?.map((a: any) =>
+      [a.first, a.last].filter(Boolean).join(' ')
+    ).filter(Boolean) ?? [];
+
+    const associates = person.associated_people?.map((p: any) =>
+      [p.name?.first, p.name?.last].filter(Boolean).join(' ')
+    ).filter(Boolean) ?? [];
+
+    return { fullName, age, dob, aliases, addresses, associates, relatives: [] };
+  } catch {
+    return {};
   }
 }
 
