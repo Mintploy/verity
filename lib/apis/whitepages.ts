@@ -1,4 +1,4 @@
-// Whitepages Pro API - Phone intelligence + People Search
+// Whitepages API v2
 
 export interface WhitepagesPhoneResult {
   carrier: string;
@@ -23,6 +23,9 @@ export interface WhitepagesPeopleResult {
   }>;
   associates?: string[];
   relatives?: string[];
+  linkedinUrl?: string;
+  company?: string;
+  jobTitle?: string;
 }
 
 export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult> {
@@ -35,25 +38,27 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
 
   try {
     const cleaned = phone.replace(/\D/g, '');
-    const res = await fetch(`https://proapi.whitepages.com/3.3/phone?phone_number=${cleaned}`, {
-      headers: { 'api_key': apiKey, 'Accept': 'application/json' },
+    const res = await fetch(`https://api.whitepages.com/v2/person?phone=${cleaned}&include_historical_locations=true`, {
+      headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' },
     });
 
+    console.log('WP_PHONE_STATUS:', res.status);
     if (!res.ok) return getMockPhoneData(phone);
 
     const data = await res.json();
-    console.log('WP_PHONE_STATUS:', res.status, 'keys:', Object.keys(data).join(','));
-    const result = data.results?.[0];
+    const person = Array.isArray(data) ? data[0] : null;
+    const phoneRecord = person?.phones?.[0];
 
     return {
-      carrier: result?.carrier?.name ?? 'Unknown',
-      lineType: result?.line_type === 'NonFixedVOIP' ? 'voip' : result?.line_type === 'Mobile' ? 'mobile' : 'landline',
-      voipFlag: result?.line_type === 'NonFixedVOIP' ? 'Number registered to a VoIP service. May indicate a secondary or temporary line.' : undefined,
-      numberAge: result?.subscriber_age_months ? `${Math.round(result.subscriber_age_months / 12)} years` : '—',
-      origin: result?.country_calling_code === '1' ? 'United States' : result?.country_calling_code ?? '—',
-      active: result?.is_active ?? true,
+      carrier: phoneRecord?.carrier ?? 'Unknown',
+      lineType: phoneRecord?.type === 'voip' ? 'voip' : phoneRecord?.type === 'mobile' ? 'mobile' : 'landline',
+      voipFlag: phoneRecord?.type === 'voip' ? 'Number registered to a VoIP service. May indicate a secondary or temporary line.' : undefined,
+      numberAge: '—',
+      origin: 'United States',
+      active: true,
     };
-  } catch {
+  } catch (e) {
+    console.log('WP_PHONE_ERROR:', e);
     return getMockPhoneData(phone);
   }
 }
@@ -82,58 +87,64 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
       }
     }
 
-    const res = await fetch(`https://proapi.whitepages.com/3.3/person?${params.toString()}`, {
-      headers: { 'api_key': apiKey, 'Accept': 'application/json' },
+    const res = await fetch(`https://api.whitepages.com/v2/person?${params.toString()}`, {
+      headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' },
     });
 
+    console.log('WP_PERSON_STATUS:', res.status);
     if (!res.ok) return {};
 
     const data = await res.json();
-    console.log('WP_PERSON_STATUS:', res.status, 'keys:', Object.keys(data).join(','), 'results:', data.results?.length ?? 0);
-    const person = data.results?.[0];
+    console.log('WP_PERSON_COUNT:', Array.isArray(data) ? data.length : 0);
+
+    const person = Array.isArray(data) ? data[0] : null;
     if (!person) return {};
 
-    const locations = person.locations ?? [];
-    const addresses = locations.slice(0, 5).map((loc: any, i: number) => {
-      const street = [loc.street_line_1, loc.street_line_2].filter(Boolean).join(' ');
-      const cityState = [loc.city, loc.state_code].filter(Boolean).join(', ');
-      const zip = loc.postal_code ?? '';
-      const addr = [street, cityState, zip].filter(Boolean).join(', ');
-      const type = loc.location_type ?? '';
-      const isOwned = type.toLowerCase().includes('own');
-      const dateRange = loc.valid_for?.length
-        ? loc.valid_for.map((d: any) => d.start ? new Date(d.start).getFullYear() : '').filter(Boolean).join('–')
-        : '';
-      return {
-        addr: addr || '—',
-        years: dateRange || (i === 0 ? 'Current' : 'Previous'),
-        current: i === 0,
-        detail: type ? `${type}${isOwned ? ', owned' : ''}` : 'Residential',
-        owned: isOwned,
-      };
-    });
+    // Current addresses
+    const currentAddrs = (person.current_addresses ?? []).map((a: any) => ({
+      addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
+      years: 'Current',
+      current: true,
+      detail: person.owned_properties?.some((p: any) => p.address?.includes(a.city)) ? 'Owned property' : 'Residential',
+      owned: person.owned_properties?.some((p: any) => p.address?.includes(a.city)) ?? false,
+    }));
 
-    const fullName = [person.name?.first, person.name?.middle_initial, person.name?.last]
-      .filter(Boolean).join(' ') || undefined;
+    // Historic addresses
+    const historicAddrs = (person.historic_addresses ?? []).slice(0, 4).map((a: any) => ({
+      addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
+      years: 'Previous',
+      current: false,
+      detail: 'Previous address',
+      owned: false,
+    }));
 
-    const age = person.age_range?.min
-      ? Math.round((person.age_range.min + (person.age_range.max ?? person.age_range.min)) / 2)
-      : person.age ?? undefined;
+    const addresses = [...currentAddrs, ...historicAddrs];
 
-    const dob = person.birth_date
-      ? new Date(person.birth_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    // Relatives
+    const relatives = (person.relatives ?? []).map((r: any) => r.name).filter(Boolean);
+
+    // Aliases
+    const aliases = (person.aliases ?? []).filter(Boolean);
+
+    // DOB
+    const dob = person.date_of_birth
+      ? new Date(person.date_of_birth).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : undefined;
 
-    const aliases = person.alternate_names?.map((a: any) =>
-      [a.first, a.last].filter(Boolean).join(' ')
-    ).filter(Boolean) ?? [];
-
-    const associates = person.associated_people?.map((p: any) =>
-      [p.name?.first, p.name?.last].filter(Boolean).join(' ')
-    ).filter(Boolean) ?? [];
-
-    return { fullName, age, dob, aliases, addresses, associates, relatives: [] };
-  } catch {
+    return {
+      fullName: person.name ?? undefined,
+      age: person.age ?? undefined,
+      dob,
+      aliases,
+      addresses,
+      relatives,
+      associates: [],
+      linkedinUrl: person.linkedin_url ?? undefined,
+      company: person.company_name ?? undefined,
+      jobTitle: person.job_title ?? undefined,
+    };
+  } catch (e) {
+    console.log('WP_PERSON_ERROR:', e);
     return {};
   }
 }
