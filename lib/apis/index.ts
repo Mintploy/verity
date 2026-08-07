@@ -95,13 +95,15 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     relationships: {
       status: bg?.maritalStatus ?? '—',
       spouse: bg?.spouse,
-      priors: bg?.priorMarriages ?? '0',
-      relatives: bg?.relatives ?? [],
-      associates: resolvedAssociates,
+      priors: bg?.priorMarriages ?? '—',
+      relatives: (wp?.relatives && wp.relatives.length > 0) ? wp.relatives : (bg?.relatives ?? []),
+      associates: (wp?.additionalPhones && wp.additionalPhones.length > 0)
+        ? [`Additional numbers on file: ${wp.additionalPhones.join(', ')}`]
+        : resolvedAssociates,
     },
     professional: {
-      title: prof?.title ?? '—',
-      company: prof?.company ?? '—',
+      title: wp?.jobTitle ?? prof?.title ?? '—',
+      company: wp?.company ?? prof?.company ?? '—',
       tenure: prof?.tenure ?? '—',
       income: prof?.income ?? '—',
       networth: prof?.networth ?? '—',
@@ -109,8 +111,11 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     },
     publicRecords: buildPublicRecords(pub, fec),
     social: {
-      handles: bg?.socialHandles ?? [],
-      presence: bg?.socialPresence ?? '—',
+      handles: [
+        ...(wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : []),
+        ...(bg?.socialHandles ?? []),
+      ],
+      presence: wp?.linkedinUrl ? 'LinkedIn profile found via Whitepages.' : bg?.socialPresence ?? '—',
       inconsistency: bg?.socialInconsistency ?? 'None flagged.',
     },
     nextSteps: getNextSteps(score, flags),
