@@ -29,6 +29,7 @@ export async function createCheckoutSession({
     ],
     success_url: successUrl,
     cancel_url: cancelUrl,
+    allow_promotion_codes: true,
     ...(customerId ? { customer: customerId } : {}),
     ...(email ? { customer_email: email } : {}),
     subscription_data: {
