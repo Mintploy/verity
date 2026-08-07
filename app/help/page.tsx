@@ -49,7 +49,7 @@ const faqs = [
     items: [
       {
         q: 'What does membership include?',
-        a: "One annual membership ($99/year) gives you unlimited background reports for 12 months, phone intelligence on any number, the Compare feature to evaluate multiple men side by side, PDF export, and 30-day re-run reminders when a report approaches a month old.",
+        a: "One annual membership ($199/year for founding members) gives you unlimited background reports for 12 months, phone intelligence on any number, the Compare feature to evaluate multiple men side by side, PDF export, and 30-day re-run reminders when a report approaches a month old.",
       },
       {
         q: 'Can I cancel?',
