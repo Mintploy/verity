@@ -4,6 +4,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
 import { Sparkle } from '@/components/ui/Sparkle';
 
+interface SavedReport {
+  key: string;
+  name: string;
+  phone: string;
+  score: string;
+  generatedAt: string;
+  searchId: string;
+}
+
+function getScoreColor(score: string) {
+  if (score === 'green') return { bg: 'var(--sage-pale)', text: 'var(--sage-deep)' };
+  if (score === 'red') return { bg: 'var(--deeprose-pale)', text: 'var(--deeprose-deep)' };
+  return { bg: 'var(--gold-pale)', text: 'var(--gold-deep)' };
+}
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const [phone, setPhone] = useState(searchParams.get('phone') ?? '');
@@ -11,11 +26,52 @@ function SearchContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
+  const [pastSearches, setPastSearches] = useState<SavedReport[]>([]);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const router = useRouter();
+
+  const loadPastSearches = () => {
+    const reports: SavedReport[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith('report-')) {
+        try {
+          const data = JSON.parse(sessionStorage.getItem(key)!);
+          reports.push({
+            key,
+            name: data.subject?.name ?? 'Unknown',
+            phone: data.subject?.phone ?? '—',
+            score: data.score ?? 'yellow',
+            generatedAt: data.generatedAt ?? '',
+            searchId: data.searchId ?? '',
+          });
+        } catch {}
+      }
+    }
+    reports.sort((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
+    setPastSearches(reports);
+  };
 
   useEffect(() => {
     setDemoMode(sessionStorage.getItem('verity-demo') === '1');
+    loadPastSearches();
   }, []);
+
+  const deleteSearch = (key: string) => {
+    sessionStorage.removeItem(key);
+    loadPastSearches();
+  };
+
+  const clearAllSearches = () => {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith('report-')) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    setConfirmClearAll(false);
+    loadPastSearches();
+  };
 
   const handleSearch = async () => {
     if (!phone.trim()) return;
@@ -32,7 +88,6 @@ function SearchContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Search failed');
 
-      // Store report in sessionStorage and navigate to report page
       sessionStorage.setItem(`report-${data.report.searchId}`, JSON.stringify(data.report));
       if (data.demoMode) sessionStorage.setItem('verity-demo', '1');
       router.push(`/report/${data.report.searchId}`);
@@ -87,10 +142,7 @@ function SearchContent() {
         </h1>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{
-            padding: '20px 28px', background: 'var(--pearl)',
-            borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-md)',
-          }}>
+          <div style={{ padding: '20px 28px', background: 'var(--pearl)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-md)' }}>
             <label style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--mauve-deep)', display: 'block', marginBottom: 8 }}>
               His phone number <span style={{ color: 'var(--rose)' }}>*</span>
             </label>
@@ -99,18 +151,11 @@ function SearchContent() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(•••) ••• ••••"
-              style={{
-                width: '100%', border: 'none', background: 'transparent', outline: 'none',
-                fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)',
-                fontVariantNumeric: 'tabular-nums',
-              }}
+              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)', fontVariantNumeric: 'tabular-nums' }}
             />
           </div>
 
-          <div style={{
-            padding: '20px 28px', background: 'var(--pearl)',
-            borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)',
-          }}>
+          <div style={{ padding: '20px 28px', background: 'var(--pearl)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)' }}>
             <label style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--mauve-deep)', display: 'block', marginBottom: 8 }}>
               His name <em style={{ color: 'var(--mauve)', fontStyle: 'normal', fontSize: 12 }}>(optional — sharpens results)</em>
             </label>
@@ -119,18 +164,12 @@ function SearchContent() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="First and last name"
-              style={{
-                width: '100%', border: 'none', background: 'transparent', outline: 'none',
-                fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)',
-              }}
+              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)' }}
             />
           </div>
 
           {error && (
-            <div style={{
-              padding: '14px 18px', background: 'var(--deeprose-pale)', borderRadius: 'var(--r-md)',
-              fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--deeprose-deep)',
-            }}>
+            <div style={{ padding: '14px 18px', background: 'var(--deeprose-pale)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--deeprose-deep)' }}>
               {error}
             </div>
           )}
@@ -155,6 +194,53 @@ function SearchContent() {
             Your search is private · He'll never know · Results in ~14 seconds
           </div>
         </div>
+
+        {pastSearches.length > 0 && (
+          <div style={{ marginTop: 48 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <span className="v-eyebrow">Recent searches</span>
+              {!confirmClearAll ? (
+                <button onClick={() => setConfirmClearAll(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)', letterSpacing: 0.3, textDecoration: 'underline' }}>
+                  Clear all
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>Are you sure?</span>
+                  <button onClick={clearAllSearches} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--deeprose-deep)', fontWeight: 600 }}>Yes, clear all</button>
+                  <button onClick={() => setConfirmClearAll(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)' }}>Cancel</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {pastSearches.map((s) => {
+                const scoreColor = getScoreColor(s.score);
+                const date = s.generatedAt ? new Date(s.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                return (
+                  <div key={s.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'var(--pearl)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-sm)', gap: 12 }}>
+                    <div onClick={() => router.push(`/report/${s.searchId}`)} style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, cursor: 'pointer' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: scoreColor.text }} />
+                      <div>
+                        <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)' }}>{s.name}</div>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)', marginTop: 2 }}>{s.phone} · {date}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 'var(--r-pill)', background: scoreColor.bg, color: scoreColor.text, fontFamily: 'var(--sans)', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
+                        {s.score}
+                      </span>
+                      <button onClick={() => deleteSearch(s.key)} title="Delete this search" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mauve)', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5 3.5l.5 8M9 3.5l-.5 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
