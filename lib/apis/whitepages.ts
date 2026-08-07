@@ -137,13 +137,13 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
     }));
 
     // Historic addresses
-    const historicAddrs = (person.historic_addresses ?? []).slice(0, 4).map((a: any) => ({
-      addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
-      years: 'Previous',
-      current: false,
-      detail: 'Previous address',
-      owned: false,
-    }));
+    const historicAddrs = (person.historic_addresses ?? []).slice(0, 4).map((a: any, i: number) => ({
+  addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
+  years: `Previous address ${i + 1} of ${Math.min(4, (person.historic_addresses ?? []).length)} · Date range pending property records`,
+  current: false,
+  detail: `Historic address · ${a.city}, ${a.state}`,
+  owned: false,
+}));
 
     // DOB
     const dob = person.date_of_birth
