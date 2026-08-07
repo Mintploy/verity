@@ -76,18 +76,19 @@ export default function CheckoutPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)' }}>
-                Verity Annual Membership
+                Verity Founding Member Access
               </span>
               <span style={{ fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)', fontWeight: 400 }}>
-                $99
+                $199
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
+                'Reserved for the first 100 women',
+                'Lock in $199/year for life',
                 'Unlimited background reports for 12 months',
                 'Phone intelligence on any number',
                 'Compare multiple men side by side',
-                'PDF export and 30-day re-run reminders',
                 'He will never know you searched',
               ].map((item, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
