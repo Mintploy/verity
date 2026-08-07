@@ -41,7 +41,7 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
 
     if (!res.ok) return getMockPhoneData(phone);
 
-    cconst data = await res.json();
+    const data = await res.json();
     console.log('WP_PHONE_STATUS:', res.status, 'keys:', Object.keys(data).join(','));
     const result = data.results?.[0];
 
