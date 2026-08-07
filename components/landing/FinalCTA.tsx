@@ -33,7 +33,7 @@ export function FinalCTA() {
             fontFamily: 'var(--sans)', fontSize: 17, opacity: 0.85, lineHeight: 1.6,
             margin: '24px auto 0', maxWidth: 540, fontWeight: 300,
           }}>
-            One verified account, unlimited reports for one year. $99 — the price of one nice dinner.
+            One verified account, unlimited reports for one year. $199 founding member rate for the first 100 women, locked in for life.
             Membership renews only if you choose.
           </p>
           <Link href="/verify" style={{
