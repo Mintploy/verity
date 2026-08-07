@@ -130,7 +130,7 @@ export default function CheckoutPage() {
               transition: 'background .2s',
             }}
           >
-            {loading ? 'Opening Stripe...' : 'Begin membership → $99/year'}
+            {loading ? 'Opening Stripe...' : 'Begin membership → $199/year'}
           </button>
 
           <div style={{
