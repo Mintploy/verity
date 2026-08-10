@@ -203,13 +203,7 @@ function ReportMain({ report }: { report: Report }) {
                   )}
                 </div>
                 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark-soft)', marginBottom: 16, fontStyle: 'italic', textDecoration: 'none', borderBottom: '1px solid var(--mauve)', display: 'inline-block' }}
-                >
-                  {prop.address} ↗
-                </a>
+                  <div style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark-soft)', marginBottom: 16, fontStyle: 'italic' }}>{prop.address}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 12 }}>
                   {prop.currentValue && (
                     <div style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
