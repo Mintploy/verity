@@ -52,6 +52,7 @@ async function fetchPropertyIntelligence(fullAddress: string, apiKey: string): P
   try {
     const { address1, address2 } = splitAddress(fullAddress);
     const params = `address1=${encodeURIComponent(address1)}&address2=${encodeURIComponent(address2)}`;
+    console.log('ATTOM_ADDR:', address1, '|', address2);
     const headers = { 'apikey': apiKey, 'Accept': 'application/json' };
 
     const [detailRes, avmRes, rentalRes] = await Promise.allSettled([
