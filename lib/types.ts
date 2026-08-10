@@ -32,6 +32,22 @@ export interface Address {
   owned?: boolean;
 }
 
+export interface PropertyIntelligence {
+  address: string;
+  ownerName?: string;
+  ownerType?: string;
+  purchasePrice?: string;
+  purchaseDate?: string;
+  yearsOwned?: string;
+  currentValue?: string;
+  estimatedRent?: string;
+  propertyType?: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  yearBuilt?: number;
+}
+
 export interface Relationships {
   status: string;
   spouse?: string;
@@ -81,6 +97,7 @@ export interface Report {
   phone: PhoneIntelligence;
   identity: IdentityData;
   addresses: Address[];
+  propertyIntelligence?: PropertyIntelligence[];
   relationships: Relationships;
   professional: Professional;
   publicRecords: PublicRecord[];
