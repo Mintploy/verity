@@ -31,8 +31,20 @@ export interface AttomAddressResult {
 
 function splitAddress(fullAddress: string): { address1: string; address2: string } {
   const parts = fullAddress.split(',');
-  const address1 = (parts[0] ?? '').trim();
-  const address2 = parts.slice(1).join(',').trim();
+  if (parts.length >= 3) {
+    const address1 = (parts[0] ?? '').trim();
+    const address2 = parts.slice(1).join(',').trim();
+    return { address1, address2 };
+  }
+  if (parts.length === 2) {
+    const address1 = (parts[0] ?? '').trim();
+    const address2 = (parts[1] ?? '').trim();
+    return { address1, address2 };
+  }
+  // Single string — try to split on last two words as city state
+  const words = fullAddress.trim().split(' ');
+  const address1 = words.slice(0, -2).join(' ');
+  const address2 = words.slice(-2).join(' ');
   return { address1, address2 };
 }
 
