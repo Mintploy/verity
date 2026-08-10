@@ -24,9 +24,12 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const nameFromBg = bgCheck.status === 'fulfilled' ? bgCheck.value?.fullName : req.name;
   const bestName = nameFromWp ?? nameFromBg;
 
+  // Pass Whitepages addresses to ATTOM for property enrichment
+  const wpAddresses = wp?.addresses?.map((a: any) => a.addr).filter(Boolean) ?? [];
+
   const [profData, addressData, fecData] = await Promise.allSettled([
     lookupProfessional(bestName),
-    lookupAddress(bestName, req.phone),
+    lookupAddress(bestName, req.phone, wpAddresses.length ? wpAddresses : undefined),
     lookupDonations(bestName),
   ]);
 
@@ -92,6 +95,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       aliases: resolvedAliases,
     },
     addresses: addressHistory,
+    propertyIntelligence: addr?.propertyIntelligence ?? [],
     relationships: {
       status: bg?.maritalStatus ?? '—',
       spouse: bg?.spouse,
