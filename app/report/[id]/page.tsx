@@ -182,7 +182,7 @@ function ReportMain({ report }: { report: Report }) {
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.addr)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.2, textDecoration: 'none', borderBottom: '1px solid var(--mauve)', display: 'inline-block' }}>{a.addr} ↗</a>
+                style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.2, textDecoration: 'none', borderBottom: '1px solid var(--mauve)', display: 'inline-block' }}>{a.addr}{' ↗'}</a>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: a.flag ? 'var(--deeprose-deep)' : 'var(--dark-soft)', marginTop: 4, fontWeight: a.flag ? 500 : 300 }}>{a.detail}</div>
               </div>
             </div>
