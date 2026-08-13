@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Wordmark } from '@/components/ui/Wordmark';
@@ -13,6 +13,14 @@ interface NavProps {
 export function Nav({ showCompare, onCompare }: NavProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => setIsLoggedIn(d.authenticated === true))
+      .catch(() => {});
+  }, []);
 
   const handleCompare = () => {
     setMenuOpen(false);
@@ -61,23 +69,47 @@ export function Nav({ showCompare, onCompare }: NavProps) {
         </div>
 
         <div className="v-nav-actions">
-          <Link href="/login" className="v-hide-mobile" style={{
-            fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
-            textDecoration: 'none',
-          }}>
-            Sign in
-          </Link>
-          <Link href="/verify" className="v-hide-mobile" style={{
-            padding: '10px 20px', borderRadius: 'var(--r-pill)',
-            background: 'var(--primary)', color: 'var(--ivory)',
-            textDecoration: 'none',
-            fontFamily: 'var(--serif)', fontSize: 14, letterSpacing: 0.3,
-            fontWeight: 500, whiteSpace: 'nowrap',
-            boxShadow: 'var(--shadow-pop)',
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-          }}>
-            Get started
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <Link href="/search" className="v-hide-mobile" style={{
+                fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
+                textDecoration: 'none',
+              }}>
+                My searches
+              </Link>
+              <Link href="/search" className="v-hide-mobile" style={{
+                padding: '10px 20px', borderRadius: 'var(--r-pill)',
+                background: 'var(--primary)', color: 'var(--ivory)',
+                textDecoration: 'none',
+                fontFamily: 'var(--serif)', fontSize: 14, letterSpacing: 0.3,
+                fontWeight: 500, whiteSpace: 'nowrap',
+                boxShadow: 'var(--shadow-pop)',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+              }}>
+                New search
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="v-hide-mobile" style={{
+                fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
+                textDecoration: 'none',
+              }}>
+                Sign in
+              </Link>
+              <Link href="/verify" className="v-hide-mobile" style={{
+                padding: '10px 20px', borderRadius: 'var(--r-pill)',
+                background: 'var(--primary)', color: 'var(--ivory)',
+                textDecoration: 'none',
+                fontFamily: 'var(--serif)', fontSize: 14, letterSpacing: 0.3,
+                fontWeight: 500, whiteSpace: 'nowrap',
+                boxShadow: 'var(--shadow-pop)',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+              }}>
+                Get started
+              </Link>
+            </>
+          )}
 
           {/* Hamburger — mobile only */}
           <button
@@ -154,22 +186,45 @@ export function Nav({ showCompare, onCompare }: NavProps) {
 
         {/* CTA buttons */}
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Link href="/verify" onClick={close} style={{
-            display: 'block', padding: '16px 24px', textAlign: 'center',
-            borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)',
-            textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500,
-            boxShadow: 'var(--shadow-pop)',
-          }}>
-            Get started
-          </Link>
-          <Link href="/login" onClick={close} style={{
-            display: 'block', padding: '14px 24px', textAlign: 'center',
-            borderRadius: 'var(--r-pill)', border: '1.5px solid var(--ivory-deep)',
-            color: 'var(--dark-soft)', textDecoration: 'none',
-            fontFamily: 'var(--sans)', fontSize: 15,
-          }}>
-            Sign in
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <Link href="/search" onClick={close} style={{
+                display: 'block', padding: '16px 24px', textAlign: 'center',
+                borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)',
+                textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500,
+                boxShadow: 'var(--shadow-pop)',
+              }}>
+                New search
+              </Link>
+              <Link href="/api/auth/logout" onClick={close} style={{
+                display: 'block', padding: '14px 24px', textAlign: 'center',
+                borderRadius: 'var(--r-pill)', border: '1.5px solid var(--ivory-deep)',
+                color: 'var(--dark-soft)', textDecoration: 'none',
+                fontFamily: 'var(--sans)', fontSize: 15,
+              }}>
+                Sign out
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/verify" onClick={close} style={{
+                display: 'block', padding: '16px 24px', textAlign: 'center',
+                borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)',
+                textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500,
+                boxShadow: 'var(--shadow-pop)',
+              }}>
+                Get started
+              </Link>
+              <Link href="/login" onClick={close} style={{
+                display: 'block', padding: '14px 24px', textAlign: 'center',
+                borderRadius: 'var(--r-pill)', border: '1.5px solid var(--ivory-deep)',
+                color: 'var(--dark-soft)', textDecoration: 'none',
+                fontFamily: 'var(--sans)', fontSize: 15,
+              }}>
+                Sign in
+              </Link>
+            </>
+          )}
         </div>
 
         <div style={{
