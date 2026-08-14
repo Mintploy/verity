@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+function getResend() { return new Resend(process.env.RESEND_API_KEY!); }
 const FROM = 'Verity <verity@mintploy.com>';
 const BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://verityprive.com';
 
@@ -17,7 +17,7 @@ const wrap = (body: string) => `
 
 export async function sendMagicLink(email: string, token: string) {
   const link = `${BASE}/auth/verify?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Your Verity sign-in link',
@@ -40,7 +40,7 @@ export async function sendMagicLink(email: string, token: string) {
 
 export async function sendWelcomeEmail(email: string, token: string) {
   const link = `${BASE}/auth/verify?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: "You're in. Welcome to Verity.",

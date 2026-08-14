@@ -338,6 +338,33 @@ function ReportMain({ report }: { report: Report }) {
 }
 
 function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const saveToHisFile = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch('/api/hisfile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nickname: report.subject.name,
+          full_name: report.subject.name,
+          phone: report.subject.phone,
+          safety_score: report.score,
+          report_id: report.searchId,
+        }),
+      });
+      if (res.status === 401) { router.push('/login'); return; }
+      if (!res.ok) { setSaveError('Could not save. Are you signed in?'); return; }
+      router.push('/hisfile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <aside style={{ position: 'sticky', top: 92, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div id="sec-8" style={{ padding: '24px 22px', borderRadius: 'var(--r-lg)', background: 'linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%)', color: 'var(--ivory)', position: 'relative', overflow: 'hidden' }}>
@@ -362,6 +389,8 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
       </div>
 
       <div style={{ padding: 18, borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <ActionButton icon="save" label={saving ? 'Saving...' : 'Save to His File'} onClick={saveToHisFile} />
+        {saveError && <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--deeprose-deep)', padding: '6px 12px' }}>{saveError}</div>}
         <ActionButton icon="compare" label="Compare with others" onClick={onCompare} />
         <ActionButton icon="dl" label="Download PDF" onClick={() => window.print()} />
         <ActionButton icon="share" label="Share with your circle" />
@@ -435,6 +464,7 @@ function ActionButton({ icon, label, onClick }: { icon: string; label: string; o
   return (
     <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: 0, background: 'transparent', cursor: 'pointer', borderRadius: 8, textAlign: 'left' as const, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', width: '100%' }}>
       <span style={{ width: 14, opacity: 0.6 }}>
+        {icon === 'save' && '♡'}
         {icon === 'compare' && '⊕'}
         {icon === 'dl' && '↓'}
         {icon === 'share' && '↗'}
