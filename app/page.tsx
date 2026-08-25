@@ -2,6 +2,7 @@ import { Nav } from '@/components/nav/Nav';
 import { Hero } from '@/components/landing/Hero';
 import { PressStrip } from '@/components/landing/PressStrip';
 import { HowItWorks } from '@/components/landing/HowItWorks';
+import { MarqueeColumns } from '@/components/landing/MarqueeColumns';
 import { WhatYouKnow } from '@/components/landing/WhatYouKnow';
 import { Testimonial } from '@/components/landing/Testimonial';
 import { FinalCTA } from '@/components/landing/FinalCTA';
@@ -14,6 +15,7 @@ export default function HomePage() {
       <Hero />
       <PressStrip />
       <HowItWorks />
+      <MarqueeColumns />
       <WhatYouKnow />
       <Testimonial />
       <FinalCTA />
