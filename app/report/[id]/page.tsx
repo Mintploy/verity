@@ -6,6 +6,7 @@ import { Nav } from '@/components/nav/Nav';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Floret } from '@/components/ui/Floret';
 import { Report, ScoreState } from '@/lib/types';
+import { getStarSign, getCompatibility, SIGN_EMOJI, StarSign } from '@/lib/starsigns';
 
 export default function ReportPage() {
   return (
@@ -29,6 +30,7 @@ function ReportContent() {
   const [report, setReport] = useState<Report | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [userSign, setUserSign] = useState<StarSign | null | undefined>(undefined);
 
   useEffect(() => {
     const id = params.id as string;
@@ -39,6 +41,13 @@ function ReportContent() {
       setNotFound(true);
     }
     setDemoMode(sessionStorage.getItem('verity-demo') === '1');
+    fetch('/api/profile')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const sign = d?.profile?.star_sign ?? (d?.profile?.date_of_birth ? getStarSign(d.profile.date_of_birth) : null);
+        setUserSign(sign as StarSign | null ?? null);
+      })
+      .catch(() => setUserSign(null));
   }, [params.id]);
 
   if (notFound) {
@@ -64,7 +73,7 @@ function ReportContent() {
       )}
       <div className="v-grid-report" style={{ padding: 'clamp(20px, 4vw, 56px)', maxWidth: 1480, margin: '0 auto' }}>
         <ReportSidebar report={report} onCompare={() => router.push('/compare')} />
-        <ReportMain report={report} />
+        <ReportMain report={report} userSign={userSign} />
         <ReportActionSidebar report={report} onCompare={() => router.push('/compare')} />
       </div>
     </div>
@@ -98,9 +107,13 @@ function ReportSidebar({ report, onCompare }: { report: Report; onCompare: () =>
   );
 }
 
-function ReportMain({ report }: { report: Report }) {
+function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign | null }) {
   const scoreConfig = getScoreConfig(report.score);
   const initials = report.subject.name.split(' ').map((n: string) => n[0]).join('');
+
+  const subjectSign = getStarSign(report.identity.dob) ?? getStarSign(report.subject.dob ?? '');
+  const compat = (subjectSign && userSign) ? getCompatibility(subjectSign, userSign) : null;
+  const compatPct = compat ? Math.round(compat.score * 10) : null;
 
   return (
     <main style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -140,6 +153,73 @@ function ReportMain({ report }: { report: Report }) {
           <div className="v-eyebrow" style={{ marginBottom: 16 }}>Verity's verdict</div>
           <div style={{ fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, lineHeight: 1.1, color: 'var(--dark)', fontStyle: 'italic', letterSpacing: -0.3 }}>"{report.headline}"</div>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.65, color: 'var(--dark)', margin: '20px 0 0', fontWeight: 300 }}>{report.summary}</p>
+
+          {/* Star sign compatibility */}
+          {(compat || userSign === null) && (
+            <div style={{ marginTop: 22, paddingTop: 20, borderTop: '1px solid var(--gold-pale)' }}>
+              <div className="v-eyebrow" style={{ marginBottom: 14 }}>Star sign compatibility</div>
+              {compat && subjectSign && userSign ? (
+                <>
+                  {/* Signs row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 20 }}>{SIGN_EMOJI[userSign]}</span>
+                      <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{userSign} <em style={{ opacity: 0.55 }}>you</em></span>
+                    </div>
+                    <span style={{ color: 'var(--mauve)', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16 }}>×</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 20 }}>{SIGN_EMOJI[subjectSign]}</span>
+                      <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{subjectSign} <em style={{ opacity: 0.55 }}>him</em></span>
+                    </div>
+                  </div>
+
+                  {/* Percentage + bar */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
+                    <div style={{
+                      fontFamily: 'var(--serif)', fontSize: 44, fontWeight: 400, lineHeight: 1,
+                      color: compatPct! >= 70 ? 'var(--sage-deep)' : compatPct! >= 50 ? 'var(--honey-deep)' : 'var(--deeprose-deep)',
+                    }}>
+                      {compatPct}%
+                    </div>
+                    <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--dark-soft)' }}>
+                      {compat.rating}
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{ height: 5, borderRadius: 3, background: 'var(--ivory-warm)', overflow: 'hidden', marginBottom: 14 }}>
+                    <div style={{
+                      height: '100%', borderRadius: 3,
+                      width: `${compatPct}%`,
+                      background: compatPct! >= 70 ? 'var(--sage)' : compatPct! >= 50 ? 'var(--honey)' : 'var(--deeprose)',
+                      transition: 'width 0.8s ease',
+                    }} />
+                  </div>
+
+                  {/* Summary */}
+                  <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--dark)', lineHeight: 1.65, margin: 0 }}>
+                    "{compat.summary}"
+                  </p>
+                </>
+              ) : (
+                /* User has no DOB set */
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', fontWeight: 300 }}>
+                    Add your birthday to see compatibility.
+                  </div>
+                  <a href="/settings" style={{
+                    padding: '7px 14px', borderRadius: 'var(--r-pill)',
+                    background: 'var(--blush-pale)', color: 'var(--wine)',
+                    fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500,
+                    textDecoration: 'none', whiteSpace: 'nowrap',
+                  }}>
+                    Settings →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ flex: 1 }} />
           <div style={{ marginTop: 24, display: 'flex', gap: 24, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)', letterSpacing: 0.3 }}>
             <span><span style={{ opacity: 0.6 }}>CONFIDENCE</span> {report.confidence}%</span>
