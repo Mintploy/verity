@@ -49,8 +49,10 @@ export default function HisFileDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saved, setSaved] = useState(false);
   const [ickInput, setIckInput] = useState('');
+  const [hasDob, setHasDob] = useState<boolean | null>(null);
 
   useEffect(() => {
+    fetch('/api/profile').then(r => r.json()).then(d => setHasDob(!!d?.profile?.date_of_birth)).catch(() => {});
     if (isNew) return;
     fetch(`/api/hisfile/${id}`)
       .then(r => {
@@ -147,8 +149,29 @@ export default function HisFileDetail() {
           )}
         </div>
 
-        {/* Compatibility */}
-        {file.compatibility_score !== undefined && file.compatibility_summary && (
+        {/* Compatibility — or prompt if user hasn't set their DOB yet */}
+        {hasDob === false ? (
+          <Link href="/settings" style={{ textDecoration: 'none', display: 'block', marginBottom: 20 }}>
+            <div style={{
+              padding: '16px 20px', borderRadius: 'var(--r-lg)',
+              background: 'var(--blush-pale)', border: '1px solid var(--primary-pale)',
+              display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+            }}>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>✦</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', fontWeight: 400 }}>
+                  Add your birthday to see compatibility.
+                </div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 3, opacity: 0.75 }}>
+                  We'll calculate how your star sign lines up with {file.nickname || 'this person'}.
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--primary-deep)', fontWeight: 500, flexShrink: 0 }}>
+                Settings →
+              </div>
+            </div>
+          </Link>
+        ) : file.compatibility_score !== undefined && file.compatibility_summary ? (
           <div style={{ padding: '20px 24px', borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)', marginBottom: 20 }}>
             <div className="v-eyebrow" style={{ marginBottom: 8 }}>Star sign compatibility</div>
             {compatBar(file.compatibility_score)}
@@ -158,7 +181,7 @@ export default function HisFileDetail() {
               </p>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* Basics */}
         <Section eyebrow="01" title="Basics">

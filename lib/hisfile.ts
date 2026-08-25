@@ -124,6 +124,20 @@ export async function deleteHisFile(userId: string, id: string): Promise<boolean
   return !error;
 }
 
+export async function backfillCompatibility(userId: string, userSign: StarSign): Promise<void> {
+  const sb = getServiceSupabase();
+  const { data: files } = await sb.from('his_files').select('id, star_sign').eq('user_id', userId);
+  if (!files?.length) return;
+  for (const file of files) {
+    if (!file.star_sign) continue;
+    const compat = getCompatibility(file.star_sign as StarSign, userSign);
+    await sb.from('his_files')
+      .update({ compatibility_score: compat.score, compatibility_summary: compat.summary })
+      .eq('id', file.id)
+      .eq('user_id', userId);
+  }
+}
+
 export async function generateWrapped(userId: string, year: number): Promise<VerityWrapped | null> {
   const sb = getServiceSupabase();
 

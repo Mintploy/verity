@@ -33,7 +33,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
     { label: 'How it works', href: '/#how-it-works' },
     { label: 'Stories', href: '/stories' },
     { label: 'Help', href: '/help' },
-    ...(isLoggedIn ? [{ label: 'His File', href: '/hisfile' }] : []),
+    ...(isLoggedIn ? [{ label: 'His File', href: '/hisfile' }, { label: 'Settings', href: '/settings' }] : []),
   ];
 
   return (

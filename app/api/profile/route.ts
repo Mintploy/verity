@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
-import { getUserProfile, upsertUserProfile } from '@/lib/hisfile';
+import { getUserProfile, upsertUserProfile, backfillCompatibility } from '@/lib/hisfile';
+import type { StarSign } from '@/lib/starsigns';
 
 async function auth(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const profile = await upsertUserProfile(session.email, session.email, body);
+    if (profile?.star_sign) {
+      await backfillCompatibility(session.email, profile.star_sign as StarSign);
+    }
     return Response.json({ profile });
   } catch (e: any) {
     return Response.json({ error: e.message ?? 'Failed' }, { status: 500 });

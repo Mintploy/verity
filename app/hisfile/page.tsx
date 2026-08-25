@@ -41,16 +41,19 @@ export default function HisFilePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [error, setError] = useState<string | null>(null);
+  const [hasDob, setHasDob] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetch('/api/hisfile')
-      .then(r => {
+    Promise.all([
+      fetch('/api/hisfile').then(r => {
         if (r.status === 401) { router.push('/login'); return null; }
         return r.json();
-      })
-      .then(d => { if (d) setFiles(d.files ?? []); })
-      .catch(() => setError('Could not load your files.'))
-      .finally(() => setLoading(false));
+      }),
+      fetch('/api/profile').then(r => r.json()),
+    ]).then(([fileData, profileData]) => {
+      if (fileData) setFiles(fileData.files ?? []);
+      setHasDob(!!profileData?.profile?.date_of_birth);
+    }).catch(() => setError('Could not load your files.')).finally(() => setLoading(false));
   }, [router]);
 
   const filtered = activeTab === 'all' ? files : files.filter(f => f.status === activeTab);
@@ -105,6 +108,30 @@ export default function HisFilePage() {
             </button>
           ))}
         </div>
+
+        {/* Birthday prompt — shown once profile is loaded and DOB is missing */}
+        {!loading && hasDob === false && (
+          <Link href="/settings" style={{ textDecoration: 'none', display: 'block', marginBottom: 16 }}>
+            <div style={{
+              padding: '16px 20px', borderRadius: 'var(--r-lg)',
+              background: 'var(--blush-pale)', border: '1px solid var(--primary-pale)',
+              display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+            }}>
+              <div style={{ fontSize: 22, flexShrink: 0 }}>✦</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', fontWeight: 400 }}>
+                  Add your birthday to see compatibility.
+                </div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 3, opacity: 0.75 }}>
+                  We'll show how your star sign lines up with each man in your files.
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--primary-deep)', fontWeight: 500, flexShrink: 0 }}>
+                Go to Settings →
+              </div>
+            </div>
+          </Link>
+        )}
 
         {loading && (
           <div style={{ textAlign: 'center', padding: 60, fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--dark-soft)' }}>
