@@ -59,7 +59,8 @@ export interface VerityWrapped {
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const sb = getServiceSupabase();
-  const { data } = await sb.from('user_profiles').select('*').eq('user_id', userId).single();
+  const { data, error } = await sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
   return data ?? null;
 }
 
@@ -67,7 +68,8 @@ export async function upsertUserProfile(userId: string, email: string, updates: 
   const sb = getServiceSupabase();
   const starSign = updates.date_of_birth ? getStarSign(updates.date_of_birth) : undefined;
   const row = { user_id: userId, email, ...updates, ...(starSign ? { star_sign: starSign } : {}) };
-  const { data } = await sb.from('user_profiles').upsert(row, { onConflict: 'user_id' }).select().single();
+  const { data, error } = await sb.from('user_profiles').upsert(row, { onConflict: 'user_id' }).select().single();
+  if (error) throw error;
   return data ?? null;
 }
 

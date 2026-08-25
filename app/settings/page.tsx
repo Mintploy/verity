@@ -57,9 +57,9 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date_of_birth: dob }),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error ?? 'Something went wrong.');
+      const d = await res.json();
+      if (!res.ok || !d.profile) {
+        setError(d.error ?? 'Could not save — please try again.');
         return;
       }
       setSaved(true);
