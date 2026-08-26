@@ -42,6 +42,8 @@ export default function HisFilePage() {
   const [activeTab, setActiveTab] = useState('all');
   const [error, setError] = useState<string | null>(null);
   const [hasDob, setHasDob] = useState<boolean | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -55,6 +57,17 @@ export default function HisFilePage() {
       setHasDob(!!profileData?.profile?.date_of_birth);
     }).catch(() => setError('Could not load your files.')).finally(() => setLoading(false));
   }, [router]);
+
+  const deleteFile = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirmDeleteId !== id) { setConfirmDeleteId(id); return; }
+    setDeletingId(id);
+    await fetch(`/api/hisfile/${id}`, { method: 'DELETE' });
+    setFiles(prev => prev.filter(f => f.id !== id));
+    setConfirmDeleteId(null);
+    setDeletingId(null);
+  };
 
   const filtered = activeTab === 'all' ? files : files.filter(f => f.status === activeTab);
 
@@ -165,74 +178,115 @@ export default function HisFilePage() {
               const sc = scoreColor(file.safety_score);
               const st = statusColor(file.status);
               const nick = file.nickname || 'Unnamed';
+              const isConfirming = confirmDeleteId === file.id;
+              const isDeleting = deletingId === file.id;
               return (
-                <Link
+                <div
                   key={file.id}
-                  href={`/hisfile/${file.id}`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <div style={{
+                  onClick={() => router.push(`/hisfile/${file.id}`)}
+                  style={{
                     padding: '18px 22px', borderRadius: 'var(--r-lg)',
                     background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)',
                     display: 'flex', alignItems: 'center', gap: 16,
                     transition: 'box-shadow 0.15s, transform 0.15s',
                     cursor: 'pointer',
                   }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'; (e.currentTarget as HTMLElement).style.transform = ''; }}
-                  >
-                    {/* Safety score dot */}
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: sc.dot, flexShrink: 0, boxShadow: `0 0 0 3px ${sc.bg}` }} />
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'; (e.currentTarget as HTMLElement).style.transform = ''; }}
+                >
+                  {/* Safety score dot */}
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: sc.dot, flexShrink: 0, boxShadow: `0 0 0 3px ${sc.bg}` }} />
 
-                    {/* Avatar */}
-                    <div style={{
-                      width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                      background: 'linear-gradient(135deg, var(--ivory-warm), var(--champagne))',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18,
-                      color: 'var(--dark-soft)', border: '2px solid var(--gold-pale)',
-                    }}>
-                      {initials(nick)}
-                    </div>
-
-                    {/* Main info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', fontWeight: 400 }}>{nick}</span>
-                        {file.full_name && (
-                          <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.7 }}>({file.full_name})</span>
-                        )}
-                        {file.star_sign && (
-                          <span style={{ fontSize: 14 }} title={file.star_sign}>{starSignEmoji(file.star_sign)}</span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
-                        {file.phone && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.65 }}>{file.phone}</span>}
-                        {file.researched_at && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)' }}>{formatDate(file.researched_at)}</span>}
-                        {file.compatibility_score !== undefined && file.compatibility_score !== null && (
-                          <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)' }}>
-                            ♡ {file.compatibility_score}/10
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Status pill */}
-                    {file.status && (
-                      <div style={{
-                        padding: '5px 12px', borderRadius: 'var(--r-pill)',
-                        background: st.bg, color: st.text,
-                        fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500,
-                        letterSpacing: 0.2, textTransform: 'capitalize',
-                        whiteSpace: 'nowrap', flexShrink: 0,
-                      }}>
-                        {file.status}
-                      </div>
-                    )}
-
-                    <span style={{ color: 'var(--mauve)', fontSize: 18, flexShrink: 0 }}>›</span>
+                  {/* Avatar */}
+                  <div style={{
+                    width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                    background: 'linear-gradient(135deg, var(--ivory-warm), var(--champagne))',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18,
+                    color: 'var(--dark-soft)', border: '2px solid var(--gold-pale)',
+                  }}>
+                    {initials(nick)}
                   </div>
-                </Link>
+
+                  {/* Main info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', fontWeight: 400 }}>{nick}</span>
+                      {file.full_name && (
+                        <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.7 }}>({file.full_name})</span>
+                      )}
+                      {file.star_sign && (
+                        <span style={{ fontSize: 14 }} title={file.star_sign}>{starSignEmoji(file.star_sign)}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
+                      {file.phone && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.65 }}>{file.phone}</span>}
+                      {file.researched_at && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)' }}>{formatDate(file.researched_at)}</span>}
+                      {file.compatibility_score !== undefined && file.compatibility_score !== null && (
+                        <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)' }}>
+                          ♡ {file.compatibility_score}/10
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status pill */}
+                  {file.status && (
+                    <div style={{
+                      padding: '5px 12px', borderRadius: 'var(--r-pill)',
+                      background: st.bg, color: st.text,
+                      fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500,
+                      letterSpacing: 0.2, textTransform: 'capitalize',
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                    }}>
+                      {file.status}
+                    </div>
+                  )}
+
+                  {/* Delete button */}
+                  {isConfirming ? (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={e => deleteFile(file.id!, e)}
+                        disabled={isDeleting}
+                        style={{
+                          padding: '5px 12px', borderRadius: 'var(--r-pill)',
+                          background: 'var(--deeprose)', border: 'none',
+                          color: 'var(--ivory)', fontFamily: 'var(--sans)', fontSize: 11,
+                          cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {isDeleting ? '...' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                        style={{
+                          padding: '5px 10px', borderRadius: 'var(--r-pill)',
+                          background: 'var(--pearl)', border: '1px solid var(--gold-pale)',
+                          color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 11,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={e => deleteFile(file.id!, e)}
+                      title="Delete file"
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--mauve)', fontSize: 15, padding: '4px 6px',
+                        borderRadius: 'var(--r-sm)', flexShrink: 0,
+                        opacity: 0.5, transition: 'opacity 0.15s, color 0.15s',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--deeprose)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.5'; (e.currentTarget as HTMLElement).style.color = 'var(--mauve)'; }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

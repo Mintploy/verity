@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
 import { getStarSign } from '@/lib/starsigns';
+import Link from 'next/link';
 
 const SIGN_DESCRIPTIONS: Record<string, string> = {
   Aries:       'Bold and magnetic — you move first and figure it out later.',
@@ -31,6 +32,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
+  const [deleting, setDeleting] = useState(false);
 
   const sign = dob ? getStarSign(dob) : null;
 
@@ -66,6 +69,15 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await fetch('/api/account/delete', { method: 'DELETE' });
+    } finally {
+      router.push('/');
     }
   };
 
@@ -196,6 +208,106 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Privacy links */}
+        <div style={{ marginTop: 8, padding: '16px 0', borderTop: '1px solid var(--gold-pale)', display: 'flex', gap: 20 }}>
+          <Link href="/privacy" style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.65, textDecoration: 'none' }}>Privacy Policy</Link>
+          <Link href="/terms" style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.65, textDecoration: 'none' }}>Terms of Use</Link>
+        </div>
+
+        {/* Danger zone */}
+        <div style={{ marginTop: 32, borderRadius: 'var(--r-xl)', border: '1px solid var(--deeprose-pale)', overflow: 'hidden' }}>
+          <div style={{ padding: '20px 28px', borderBottom: '1px solid var(--deeprose-pale)', background: 'var(--pearl)' }}>
+            <div className="v-eyebrow" style={{ fontSize: 10, color: 'var(--deeprose-deep)', marginBottom: 4 }}>Danger zone</div>
+            <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', fontWeight: 400 }}>Delete account</div>
+          </div>
+          <div style={{ padding: '20px 28px 24px', background: 'var(--pearl)' }}>
+            <p style={{ margin: '0 0 20px', fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', lineHeight: 1.65, fontWeight: 300 }}>
+              Permanently deletes your profile, all His Files, and your Verity Wrapped data. This cannot be undone.
+            </p>
+
+            {deleteStep === 0 && (
+              <button
+                onClick={() => setDeleteStep(1)}
+                style={{
+                  padding: '11px 24px', borderRadius: 'var(--r-pill)',
+                  background: 'transparent', border: '1.5px solid var(--deeprose)',
+                  color: 'var(--deeprose-deep)', fontFamily: 'var(--sans)', fontSize: 14,
+                  cursor: 'pointer', fontWeight: 500,
+                }}
+              >
+                Delete my account
+              </button>
+            )}
+
+            {deleteStep === 1 && (
+              <div style={{ padding: '18px 20px', borderRadius: 'var(--r-lg)', background: 'var(--deeprose-pale)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p style={{ margin: 0, fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--deeprose-deep)', fontWeight: 500 }}>
+                  Are you sure? All your data will be permanently erased.
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => setDeleteStep(2)}
+                    style={{
+                      padding: '10px 20px', borderRadius: 'var(--r-pill)',
+                      background: 'var(--deeprose)', border: 'none',
+                      color: 'var(--ivory)', fontFamily: 'var(--sans)', fontSize: 13,
+                      cursor: 'pointer', fontWeight: 500,
+                    }}
+                  >
+                    Yes, delete everything
+                  </button>
+                  <button
+                    onClick={() => setDeleteStep(0)}
+                    style={{
+                      padding: '10px 20px', borderRadius: 'var(--r-pill)',
+                      background: 'var(--pearl)', border: '1px solid var(--gold-pale)',
+                      color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {deleteStep === 2 && (
+              <div style={{ padding: '18px 20px', borderRadius: 'var(--r-lg)', background: 'var(--deeprose-pale)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p style={{ margin: 0, fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--deeprose-deep)', fontWeight: 500 }}>
+                  Last chance. This will delete all your data immediately and log you out.
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={deleteAccount}
+                    disabled={deleting}
+                    style={{
+                      padding: '10px 20px', borderRadius: 'var(--r-pill)',
+                      background: 'var(--deeprose)', border: 'none',
+                      color: 'var(--ivory)', fontFamily: 'var(--sans)', fontSize: 13,
+                      cursor: deleting ? 'not-allowed' : 'pointer', fontWeight: 500,
+                      opacity: deleting ? 0.7 : 1,
+                    }}
+                  >
+                    {deleting ? 'Deleting...' : 'Delete account forever'}
+                  </button>
+                  <button
+                    onClick={() => setDeleteStep(0)}
+                    disabled={deleting}
+                    style={{
+                      padding: '10px 20px', borderRadius: 'var(--r-pill)',
+                      background: 'var(--pearl)', border: '1px solid var(--gold-pale)',
+                      color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
