@@ -14,7 +14,7 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', margin: '0 0 56px' }}>
-            Effective May 27, 2026 · Mintploy, Inc. · Los Angeles, CA
+            Effective August 26, 2026 · Mintploy, Inc. · Los Angeles, CA
           </p>
 
           {[
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
             },
             {
               title: '2. What we collect',
-              body: 'We collect your email address when you register, your Stripe customer ID for payment processing, and authentication tokens stored in secure httpOnly cookies. When you run a search, the phone number and name you enter are transmitted to our servers and to the third-party data providers listed in Section 7 in order to generate your report. We do not use your searches for advertising or profiling.',
+              body: 'We collect your email address when you register, your Stripe customer ID for payment processing, and authentication tokens stored in secure httpOnly cookies. When you run a search, the phone number and name you enter are transmitted to our servers and to the third-party data providers listed in Section 7 in order to generate your report. If you choose to save a report to "His File," we store the associated name, phone number, safety score, and any personal notes or details you voluntarily enter about that individual. His File data is private to you, encrypted at rest, and deleted when you remove the entry or close your account. We do not use your searches for advertising or profiling.',
             },
             {
               title: '3. How we use your information',
@@ -48,12 +48,12 @@ export default function PrivacyPage() {
             },
             {
               title: '8. Data retention',
-              body: 'We retain your email and Stripe customer ID for as long as your account is active. Search queries (phone number and name) are transmitted to third-party providers to generate your report and are not stored on our servers beyond the duration of that request. You may request deletion of your account and associated data at any time by emailing verity@mintploy.com; we process deletion requests within 30 days.',
+              body: 'We retain your email and Stripe customer ID for as long as your account is active. When you run a search, your query is transmitted to third-party providers; the raw query is not retained beyond that request. If you save a result to His File, the name, phone number, safety score, and any notes you enter are stored until you delete that entry or your account. You can delete individual His File entries at any time from the His File page. You can delete your account and all associated data at any time from Settings → Delete account; deletion is immediate and irreversible. You may also request deletion by emailing verity@mintploy.com.',
             },
             {
               id: 'do-not-sell',
               title: '9. Do not sell my personal information',
-              body: 'We do not sell your personal information. If you are a California resident, you have the right under CCPA to request disclosure of what personal information we collect and to request deletion. Contact verity@mintploy.com to exercise these rights.',
+              body: 'We do not sell your personal information. If you are a California resident, you have the right under CCPA to request disclosure of what personal information we collect and to request deletion. You can delete all your data instantly at any time through Settings → Delete account. You may also contact verity@mintploy.com to exercise these rights.',
             },
             {
               title: '10. Security',
