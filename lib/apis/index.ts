@@ -109,8 +109,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       title: wp?.jobTitle ?? prof?.title ?? '—',
       company: wp?.company ?? prof?.company ?? '—',
       tenure: prof?.tenure ?? '—',
-      income: prof?.income ?? '—',
-      networth: prof?.networth ?? '—',
       llcs: prof?.llcs ?? 'None found.',
     },
     publicRecords: buildPublicRecords(pub, fec),

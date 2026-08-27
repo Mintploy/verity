@@ -4,7 +4,7 @@ export function WhatYouKnow() {
     { l: 'Identity signals', d: 'Full legal name, age, date of birth — cross-referenced across three sources.' },
     { l: 'Address history', d: 'Last five known addresses, ownership vs. rental, purchase and sale prices, trust holdings.' },
     { l: 'Marital & relationships', d: 'Current marital status, prior marriages, known relatives, close associates.' },
-    { l: 'Professional profile', d: 'Employer, title, tenure, estimated income, estimated net worth, LLCs and business registrations.' },
+    { l: 'Professional profile', d: 'Employer, title, tenure, business registrations, and LLC filings from public record.' },
     { l: 'Public record flags', d: 'Sex offender registry, bankruptcy, lawsuits and judgments, evictions, professional licenses, political donations.' },
     { l: 'Social footprint', d: 'Known social handles, presence assessment, inconsistencies across profiles, age discrepancies.' },
     { l: 'Our recommendation', d: "A plain-English score, a short verdict, and the three to five things we'd actually do next, in your shoes." },

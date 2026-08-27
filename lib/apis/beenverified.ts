@@ -103,7 +103,7 @@ const PERSONAS = [
     relatives: ['Linda Baxter', 'Chris Baxter'],
     associates: ['Josh Martinez', 'Sam Lee'],
     socialHandles: ['Instagram: @tbaxter', 'Twitter: @tylerb95', 'TikTok: @tyler.baxter'],
-    socialPresence: 'Active across three platforms. Lifestyle posts consistent with stated income level.',
+    socialPresence: 'Active across three platforms. Presence consistent across accounts.',
     socialInconsistency: 'None flagged.', hasFlags: false,
   },
   {

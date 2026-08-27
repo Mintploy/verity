@@ -357,10 +357,6 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
             <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--dark)', lineHeight: 1.2 }}>{report.professional.title}</div>
             <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 4 }}>{report.professional.company} · {report.professional.tenure}</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <Stat label="Est. income" value={report.professional.income} />
-            <Stat label="Est. net worth" value={report.professional.networth} />
-          </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Business entities</div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, fontWeight: 300 }}>{report.professional.llcs}</div>
         </Section>

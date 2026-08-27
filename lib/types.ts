@@ -60,8 +60,6 @@ export interface Professional {
   title: string;
   company: string;
   tenure: string;
-  income: string;
-  networth: string;
   llcs: string;
 }
 

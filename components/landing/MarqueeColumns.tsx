@@ -32,7 +32,7 @@ const col2: Card[] = [
 
 const col3: Card[] = [
   { type: 'tag', text: 'Identity verified · 3 sources', tone: 'clear' },
-  { type: 'data', label: 'Net worth estimate', val: '$340k–$480k · property & assets' },
+  { type: 'data', label: 'Property record', val: '2 properties · Austin TX · owned since 2019' },
   { type: 'score', score: 'yellow', label: 'Soft yellow', sub: 'Proceed with care.' },
   { type: 'quote', text: 'I use it before every first date. Non-negotiable.', attr: 'Aisha T. · 26 · NYC' },
   { type: 'data', label: 'Public records', val: '1 civil suit open · 2023 · Los Angeles' },

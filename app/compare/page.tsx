@@ -1,204 +1,179 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Nav } from '@/components/nav/Nav';
 import { Footer } from '@/components/landing/Footer';
 import { Floret } from '@/components/ui/Floret';
-import { Sparkle } from '@/components/ui/Sparkle';
-import { YearSlider } from '@/components/compare/YearSlider';
 import Link from 'next/link';
 import { Report } from '@/lib/types';
 
-// ── Types & models ─────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
-interface Projection { expected: number; high: number; low: number; }
-
-interface ComparePerson {
-  id: string; name: string; age: number; role: string; company: string;
-  archetype: string; initials: string; score: 'green' | 'yellow' | 'red';
-  current: number; risk: number; color: string; colorDeep: string; colorPale: string;
-  summary: string; notes: Record<number, string>;
-  project: (year: number) => Projection;
+interface CompareEntry {
+  id: string;
+  name: string;
+  initials: string;
+  age: number;
+  title: string;
+  company: string;
+  tenure: string;
+  llcs: string;
+  score: 'green' | 'yellow' | 'red';
+  addressCount: number;
+  currentAddress: string;
+  publicFlags: string[];
+  publicClears: string[];
+  phoneType: string;
+  verifiedBy: number;
+  summary: string;
+  nextSteps: string[];
 }
 
-const COMPARE_MEN: ComparePerson[] = [
+const SCORE_LABELS: Record<string, string> = {
+  green: 'Green light',
+  yellow: 'Soft yellow',
+  red: 'Deep rose',
+};
+
+const SCORE_CONFIG: Record<string, { bg: string; dot: string; text: string; deep: string }> = {
+  green:  { bg: 'var(--sage-pale)',     dot: 'var(--sage)',     text: 'var(--sage-deep)',     deep: 'var(--sage-deep)' },
+  yellow: { bg: 'var(--honey-pale)',    dot: 'var(--honey)',    text: 'var(--honey-deep)',    deep: 'var(--honey-deep)' },
+  red:    { bg: 'var(--deeprose-pale)', dot: 'var(--deeprose)', text: 'var(--deeprose-deep)', deep: 'var(--deeprose-deep)' },
+};
+
+// ── Sample data ────────────────────────────────────────────────────────────
+
+const SAMPLE_MEN: CompareEntry[] = [
   {
-    id: 'alex', name: 'Alex Pierre', age: 32, role: 'Founder · CEO',
-    company: 'Stitch Labs · Seed, raising A', archetype: 'Tech founder',
-    initials: 'AP', score: 'yellow', current: 95000, risk: 0.72,
-    color: '#E7506C', colorDeep: '#B41E61', colorPale: '#FFE5EE',
-    summary: "High variance. Two years of break-even runway, one Series A on the deck. If the A closes and the company exits, trajectory bends sharply upward. If it doesn't, he returns to industry pay — comfortably, but with no founder upside.",
-    notes: {
-      5: "Year 5 sits right on the A. Closed cleanly: ~$350K cash + meaningful equity. Walked away: $310K in an L6 role somewhere good.",
-      10: "A founder who shipped his second round is a materially different bet from one who didn't. Watch year 4 closely.",
-      20: "Founder math: 1 in 30 outcomes are life-changing, the other 29 are fine. Expected value is real, but the variance is the entire story.",
-    },
-    project: (y) => {
-      const sp = 0.28;
-      let s = y < 4 ? 95000 * Math.pow(1.04, y) : y < 8 ? 95000 * Math.pow(1.04, 4) * Math.pow(1.45, y - 4)
-        : y < 14 ? 95000 * Math.pow(1.04, 4) * Math.pow(1.45, 4) * Math.pow(1.18, y - 8)
-        : Math.min(25000000, 95000 * Math.pow(1.04, 4) * Math.pow(1.45, 4) * Math.pow(1.18, 6) * Math.pow(1.05, y - 14));
-      let f = y < 4 ? 95000 * Math.pow(1.05, y) : 310000 * Math.pow(1.038, y - 4);
-      const expected = s * sp + f * (1 - sp);
-      return { expected, high: Math.max(s, f, expected), low: Math.min(s, f, expected) };
-    },
+    id: 'alex', name: 'Alex Pierre', initials: 'AP', age: 32,
+    title: 'Founder & CEO', company: 'Fielder AI (Series A)', tenure: '4 years',
+    llcs: 'Fielder AI Inc., JAH Ventures LLC',
+    score: 'yellow',
+    addressCount: 3, currentAddress: 'San Francisco, CA (renting)',
+    publicFlags: ['VoIP secondary line detected', '1 civil dispute open · 2023'],
+    publicClears: ['Sex offender registry: clear', 'No bankruptcy', 'No evictions'],
+    phoneType: 'VoIP detected · possible secondary line',
+    verifiedBy: 3,
+    summary: 'Identity cross-references cleanly. Two items worth a conversation: the VoIP line and an open civil filing. Neither is a hard stop, but both are worth asking about.',
+    nextSteps: ['Ask about the VoIP number directly — "do you have two phones?" is natural.', 'The civil dispute is open, not closed. Ask casually what the situation is.', 'Meet in public for the first meeting.'],
   },
   {
-    id: 'reid', name: 'Reid Whitman', age: 36, role: 'Corporate attorney',
-    company: 'Cravath, Swaine & Moore · M&A', archetype: 'BigLaw partner-track',
-    initials: 'RW', score: 'green', current: 325000, risk: 0.12,
-    color: '#C8A6B4', colorDeep: '#5C2A50', colorPale: '#FFE0DE',
-    summary: "Predictable, ceiling-bound. Partner track puts him at $1.1M ± $200K by year 5. Plateau begins around senior partner at year 15. Limited upside above $2.5M unless he opens his own shop.",
-    notes: {
-      5: "Partner at Cravath or one peer firm: $1.1M ± 200K. Steady, not stratospheric.",
-      10: "Senior partner band. Top of his pay scale. The plateau begins asserting itself.",
-      20: "No real upside from here without an entrepreneurial turn.",
-    },
-    project: (y) => {
-      const pY = 4, sY = 15;
-      let expected = y < pY ? 325000 + (1100000 - 325000) * (y / pY)
-        : y < sY ? 1100000 + (1900000 - 1100000) * ((y - pY) / (sY - pY))
-        : 1900000 * Math.pow(1.006, y - sY);
-      return { expected, high: expected * 1.18, low: expected * 0.84 };
-    },
+    id: 'reid', name: 'Reid Whitman', initials: 'RW', age: 36,
+    title: 'Corporate Attorney', company: 'Cravath, Swaine & Moore', tenure: '6 years',
+    llcs: 'None found.',
+    score: 'green',
+    addressCount: 2, currentAddress: 'Manhattan, NY · 1 Columbus Circle (owned)',
+    publicFlags: [],
+    publicClears: ['Sex offender registry: clear', 'No bankruptcy', 'No evictions', 'No criminal record', 'Identity verified · 4 sources'],
+    phoneType: 'T-Mobile · mobile · 8 years',
+    verifiedBy: 4,
+    summary: 'Clean across all sources. Identity verified at four cross-references. Bar registration active. No flags of any kind.',
+    nextSteps: ['Record is clean. Meet in a public place — your standard, not a safety measure.', 'Quick reverse image search on his photos takes 30 seconds.', 'If anything feels off in person, trust that over the green score.'],
   },
   {
-    id: 'marcus', name: 'Marcus Anderson', age: 41, role: 'Real estate operator',
-    company: 'Anderson Holdings LLC', archetype: 'Cyclical operator',
-    initials: 'MA', score: 'yellow', current: 260000, risk: 0.40,
-    color: '#E9B25C', colorDeep: '#6E4F1D', colorPale: '#F9DCAA',
-    summary: "Cyclical. Income tracks the property market — strong in good cycles, soft in down ones. The active 2024 civil suit caps near-term growth. No clear path above $1.5M without scaling the LLC.",
-    notes: {
-      5: "A 2027–2029 market does most of the work here. Expected: $360K, but the range is wide.",
-      10: "If he scales the LLC and weathers two cycles, $700K+ is plausible.",
-      20: "Real estate operators in their 60s either own everything or own one thing too long.",
-    },
-    project: (y) => {
-      const base = 260000 + (1150000 - 260000) * Math.min(1, y / 16);
-      const expected = Math.max(180000, base + Math.sin(y / 3.2 + 1) * 70000);
-      return { expected, high: expected * 1.75, low: expected * 0.55 };
-    },
+    id: 'marcus', name: 'Marcus Anderson', initials: 'MA', age: 41,
+    title: 'Real Estate Operator', company: 'Anderson Holdings LLC', tenure: '11 years',
+    llcs: 'Anderson Holdings LLC, SunBelt Properties LLC, MR 2017 Trust',
+    score: 'yellow',
+    addressCount: 5, currentAddress: 'Scottsdale, AZ (owned)',
+    publicFlags: ['Active civil suit · Los Angeles County · 2024'],
+    publicClears: ['Sex offender registry: clear', 'No criminal record', 'No evictions', 'No bankruptcy'],
+    phoneType: 'AT&T · mobile · 11 years',
+    verifiedBy: 3,
+    summary: 'Clean record except for an active civil case in LA County. Three LLCs and a trust in public filings. Address history spans five states.',
+    nextSteps: ['The civil suit is worth a casual mention.', 'Five addresses in 11 years is worth understanding.', 'Meet in public, daytime first meeting.'],
   },
   {
-    id: 'daniel', name: 'Daniel Chen', age: 34, role: 'Senior Staff Engineer',
-    company: 'Stripe · Infrastructure', archetype: 'Senior IC engineer',
-    initials: 'DC', score: 'green', current: 375000, risk: 0.08,
-    color: '#87AE7E', colorDeep: '#2F4A2C', colorPale: '#DEECD6',
-    summary: "Stable, capped. IC engineer ladders top out around Distinguished Engineer at ~$1.1M. Strong floor, modest ceiling. Liquidity comes from RSUs. The boring number that compounds.",
-    notes: {
-      5: "Principal Engineer band: $620K–$780K. Quiet, dependable growth.",
-      10: "Distinguished Engineer at $1M+, or a CTO pivot. The plateau asserts around year 12.",
-      20: "Without a founder turn or executive pivot, this is the ceiling. The stability is the feature.",
-    },
-    project: (y) => {
-      const expected = Math.min(1100000, 375000 * Math.pow(1.075, Math.min(y, 14))) * Math.pow(1.005, Math.max(0, y - 14));
-      return { expected, high: expected * 1.14, low: expected * 0.90 };
-    },
+    id: 'daniel', name: 'Daniel Chen', initials: 'DC', age: 34,
+    title: 'Senior Staff Engineer', company: 'Stripe · Infrastructure', tenure: '5 years',
+    llcs: 'None found.',
+    score: 'green',
+    addressCount: 2, currentAddress: 'San Francisco, CA (renting)',
+    publicFlags: [],
+    publicClears: ['Sex offender registry: clear', 'No criminal record', 'No bankruptcy', 'No evictions', 'Identity verified · 4 sources'],
+    phoneType: 'T-Mobile · mobile · 6 years',
+    verifiedBy: 4,
+    summary: 'Clean across all sources. Identity verified at four cross-references. Phone is a stable mobile line. No flags.',
+    nextSteps: ['Clean record. Meet in public — your standard.', 'Reverse image search on his profile photos.', 'Trust your instincts in person.'],
   },
 ];
 
-function fmtMoney(n: number): string {
-  if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
-  if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
-  if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
-  return '$' + Math.round(n);
-}
-
-function logY(value: number): number {
-  const minLog = Math.log10(50000), maxLog = Math.log10(25000000);
-  return (Math.log10(Math.max(50000, Math.min(25000000, value))) - minLog) / (maxLog - minLog);
-}
-
-// ── Session data ───────────────────────────────────────────────────────────
-
-function parseIncome(s: string): number {
-  const nums = s.replace(/[^0-9]/g, ' ').trim().split(/\s+/).map(Number).filter(n => n > 1000);
-  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 80000;
-}
-
-const SCORE_COLORS: Record<string, { color: string; colorDeep: string; colorPale: string }> = {
-  green: { color: '#87AE7E', colorDeep: '#2F4A2C', colorPale: '#DEECD6' },
-  yellow: { color: '#E9B25C', colorDeep: '#6E4F1D', colorPale: '#F9DCAA' },
-  red: { color: '#E7506C', colorDeep: '#B41E61', colorPale: '#FFE5EE' },
-};
-
-function reportToComparePerson(report: Report): ComparePerson {
-  const colors = SCORE_COLORS[report.score] ?? SCORE_COLORS.yellow;
-  const current = parseIncome(report.professional.income);
-  const risk = ({ green: 0.08, yellow: 0.40, red: 0.72 } as Record<string, number>)[report.score] ?? 0.4;
-  const growth = ({ green: 0.065, yellow: 0.04, red: 0.02 } as Record<string, number>)[report.score] ?? 0.04;
+function reportToEntry(report: Report): CompareEntry {
   const parts = report.subject.name.trim().split(/\s+/);
-  const initials = parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : report.subject.name.slice(0, 2).toUpperCase();
+  const initials = parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : report.subject.name.slice(0, 2).toUpperCase();
+
+  const publicFlags = report.publicRecords.filter(r => r.flag || (!r.good && !r.neutral)).map(r => `${r.label}: ${r.value}`);
+  const publicClears = report.publicRecords.filter(r => r.good).map(r => r.label + ': clear');
+  const currentAddr = report.addresses.find(a => a.current)?.addr ?? report.addresses[0]?.addr ?? '—';
+
   return {
-    id: report.searchId, name: report.subject.name, age: report.subject.age,
-    role: report.professional.title, company: report.professional.company,
-    archetype: report.professional.title, initials, score: report.score, current, risk,
-    ...colors, summary: report.summary,
-    notes: { 5: report.nextSteps[0] ?? '', 10: report.nextSteps[1] ?? '', 20: report.nextSteps[2] ?? '' },
-    project: (y) => {
-      const expected = current * Math.pow(1 + growth, y);
-      return { expected, high: expected * (1 + risk * 0.5), low: expected * (1 - risk * 0.4) };
-    },
+    id: report.searchId,
+    name: report.subject.name,
+    initials,
+    age: report.subject.age,
+    title: report.professional.title,
+    company: report.professional.company,
+    tenure: report.professional.tenure,
+    llcs: report.professional.llcs,
+    score: report.score,
+    addressCount: report.addresses.length,
+    currentAddress: currentAddr,
+    publicFlags,
+    publicClears,
+    phoneType: `${report.phone.carrier} · ${report.phone.lineType}${report.phone.voipFlag ? ' · ' + report.phone.voipFlag : ''} · ${report.phone.numberAge}`,
+    verifiedBy: report.identity.verifiedBy,
+    summary: report.summary,
+    nextSteps: report.nextSteps,
   };
 }
 
-function loadSessionReports(): ComparePerson[] {
+function loadSessionReports(): CompareEntry[] {
   if (typeof window === 'undefined') return [];
-  const people: ComparePerson[] = [];
+  const entries: CompareEntry[] = [];
   for (let i = 0; i < sessionStorage.length; i++) {
     const key = sessionStorage.key(i);
     if (key?.startsWith('report-')) {
-      try { people.push(reportToComparePerson(JSON.parse(sessionStorage.getItem(key)!))); } catch {}
+      try { entries.push(reportToEntry(JSON.parse(sessionStorage.getItem(key)!))); } catch {}
     }
   }
-  return people;
+  return entries;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const SCORE_ORDER = { red: 0, yellow: 1, green: 2 };
+
+function sortedByScore(people: CompareEntry[]) {
+  return [...people].sort((a, b) => SCORE_ORDER[b.score] - SCORE_ORDER[a.score]);
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function ComparePage() {
-  const [year, setYear] = useState(5);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [people, setPeople] = useState<ComparePerson[]>(COMPARE_MEN);
+  const [people, setPeople] = useState<CompareEntry[]>(SAMPLE_MEN);
   const [usingRealData, setUsingRealData] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     const fromSession = loadSessionReports();
     if (fromSession.length >= 2) { setPeople(fromSession); setUsingRealData(true); }
   }, []);
 
-  const ranked = useMemo(() =>
-    [...people].map(p => ({ ...p, proj: p.project(year) })).sort((a, b) => b.proj.expected - a.proj.expected),
-    [year, people]
-  );
-
-  const avgAge = Math.round(people.reduce((a, p) => a + p.age, 0) / people.length);
-
-  const nearestNote = (notes: Record<number, string>, y: number) => {
-    const keys = Object.keys(notes).map(Number).sort((a, b) => Math.abs(a - y) - Math.abs(b - y));
-    return notes[keys[0]] ?? '';
-  };
-
+  const ranked = sortedByScore(people);
   const leader = ranked[0];
-  const topNote = nearestNote(leader?.notes ?? {}, year);
-  const highestCeiling = [...ranked].sort((a, b) => b.proj.high - a.proj.high)[0];
-
-  const verityRead = topNote
-    ? `"${topNote}"`
-    : `"At year ${year}, ${leader?.name.split(' ')[0]} leads — but the gap is ${
-        (leader?.risk ?? 0) > 0.3
-          ? 'largely a function of variance, not certainty. Watch the bands, not just the lines.'
-          : 'driven by consistent compounding. The predictable path wins more often than it should.'
-      }"`;
+  const flagCount = (p: CompareEntry) => p.publicFlags.length;
+  const totalFlags = people.reduce((s, p) => s + flagCount(p), 0);
 
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
 
-      <div style={{ maxWidth: 1480, margin: '0 auto', padding: 'clamp(20px, 4vw, 56px)' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(20px, 4vw, 56px)' }}>
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24, marginBottom: 36 }}>
-          <div style={{ maxWidth: 720 }}>
+          <div style={{ maxWidth: 640 }}>
             <Link href="/search" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', textDecoration: 'none', marginBottom: 14 }}>
               ← Back to search
             </Link>
@@ -208,118 +183,194 @@ export default function ComparePage() {
               </div>
             )}
             <h1 className="v-display-lg v-serif" style={{ fontWeight: 400, color: 'var(--dark)', margin: 0 }}>
-              Where each of them <em style={{ color: 'var(--rose)' }}>actually</em> lands.
+              Side by side. <em style={{ color: 'var(--rose)' }}>All the facts.</em>
             </h1>
-            <p style={{ fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '18px 0 0', maxWidth: 560, fontWeight: 300 }}>
-              Each man modeled on his archetype — tech founder versus partner-track attorney versus
-              cyclical operator versus capped IC. Risk-adjusted. Confidence bands shown. Slide the year.
+            <p style={{ fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '18px 0 0', maxWidth: 500, fontWeight: 300 }}>
+              Every man from your recent searches, compared on public record, identity verification, phone signals, and address history. Sorted by safety score.
             </p>
           </div>
           <Floret size={48} color="var(--blush-deep)" center="var(--ivory)" />
         </div>
 
-        {/* ── Year slider ── */}
-        <YearSlider year={year} setYear={setYear} avgAge={avgAge} />
-
-        {/* ── Rank cards + chart ── */}
-        <div className="v-grid-compare">
-          {/* Left: rank cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 14, letterSpacing: 0.25 }}>
-              Ranked · Expected income at year {year}
+        {/* Summary bar */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+          {(['green', 'yellow', 'red'] as const).map(score => {
+            const count = people.filter(p => p.score === score).length;
+            const c = SCORE_CONFIG[score];
+            return (
+              <div key={score} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', background: c.bg, border: `1px solid ${c.dot}33`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot }} />
+                <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: c.deep, fontWeight: 500 }}>{count} {SCORE_LABELS[score]}</span>
+              </div>
+            );
+          })}
+          {totalFlags > 0 && (
+            <div style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', background: 'var(--honey-pale)', border: '1px solid var(--honey)33', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--honey-deep)', fontWeight: 500 }}>{totalFlags} flag{totalFlags !== 1 ? 's' : ''} across all files</span>
             </div>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 24, alignItems: 'start' }}>
+
+          {/* Cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 6 }}>Sorted by safety score · {ranked.length} men</div>
 
             {ranked.map((person, i) => {
+              const c = SCORE_CONFIG[person.score];
               const isExpanded = expanded === person.id;
-              const note = nearestNote(person.notes, year);
-              const rangePercent = Math.round((person.proj.high - person.proj.low) / (2 * person.proj.expected) * 100);
               return (
-                <div key={person.id} style={{ marginBottom: 10 }}>
+                <div key={person.id} style={{ borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: isExpanded ? 'var(--shadow-md)' : 'var(--shadow-sm)', borderLeft: `3px solid ${c.dot}`, overflow: 'hidden' }}>
                   <div
                     onClick={() => setExpanded(isExpanded ? null : person.id)}
-                    style={{
-                      padding: '18px 20px', borderRadius: 'var(--r-lg)',
-                      background: 'var(--pearl)',
-                      boxShadow: isExpanded ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-                      cursor: 'pointer', transition: 'box-shadow .2s',
-                      borderLeft: `3px solid ${person.color}`,
-                    }}
+                    style={{ padding: '18px 20px', cursor: 'pointer' }}
                   >
-                    {/* Top row: rank | avatar | name | amount */}
+                    {/* Top row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 40, color: 'var(--gold)', fontWeight: 300, lineHeight: 1, opacity: 0.65, minWidth: 28, textAlign: 'center' }}>
+                      <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 36, color: 'var(--gold)', fontWeight: 300, lineHeight: 1, opacity: 0.55, minWidth: 24, textAlign: 'center' }}>
                         {i + 1}
                       </span>
-                      <div style={{ width: 38, height: 38, borderRadius: '50%', background: person.colorPale, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 13, color: person.colorDeep, flexShrink: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: c.deep, flexShrink: 0 }}>
                         {person.initials}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--serif)', fontSize: 17, color: 'var(--dark)', lineHeight: 1.2 }}>{person.name}</div>
-                        <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)', marginTop: 2 }}>{person.role} · <em style={{ fontStyle: 'italic', color: 'var(--mauve-deep)' }}>{person.archetype}</em></div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontFamily: 'var(--serif)', fontSize: 26, color: 'var(--dark)', fontWeight: 400, lineHeight: 1 }}>
-                          {fmtMoney(person.proj.expected)}
-                        </div>
-                        <div style={{ fontFamily: 'var(--sans)', fontSize: 10, color: 'var(--mauve-deep)', marginTop: 3, letterSpacing: 0.4, textTransform: 'uppercase' }}>
-                          ±{rangePercent}% range
+                        <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', lineHeight: 1.2 }}>{person.name}</div>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--dark-soft)', marginTop: 3 }}>
+                          {person.title} · {person.company}
                         </div>
                       </div>
-                    </div>
-
-                    {/* Sparkline */}
-                    <MiniSparkline person={person} year={year} />
-
-                    {/* Verity's Read toggle */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--ivory-deep)' }}>
-                      <span className="v-eyebrow" style={{ fontSize: 9, color: 'var(--gold-deep)' }}>Verity's read</span>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--mauve-deep)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-pill)', background: c.bg }}>
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot }} />
+                          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: c.deep, fontWeight: 500 }}>{SCORE_LABELS[person.score]}</span>
+                        </div>
+                        {person.publicFlags.length > 0 && (
+                          <span style={{ fontFamily: 'var(--sans)', fontSize: 10.5, color: 'var(--honey-deep)' }}>
+                            {person.publicFlags.length} flag{person.publicFlags.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--mauve-deep)', flexShrink: 0 }}>
                         <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
 
-                    {isExpanded && (
-                      <div style={{ marginTop: 12 }}>
-                        <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.65, margin: '0 0 12px', fontWeight: 300 }}>{person.summary}</p>
-                        {note && (
-                          <div style={{ padding: '12px 14px', background: person.colorPale, borderRadius: 'var(--r-md)', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 13.5, color: person.colorDeep, lineHeight: 1.5 }}>
-                            Year {year}: {note}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* Quick facts bar */}
+                    <div style={{ display: 'flex', gap: 20, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--ivory-deep)', flexWrap: 'wrap' }}>
+                      <QuickFact label="Phone" value={person.phoneType} />
+                      <QuickFact label="Location" value={person.currentAddress} />
+                      <QuickFact label="Verified by" value={`${person.verifiedBy} sources`} />
+                      {person.addressCount > 1 && <QuickFact label="Address history" value={`${person.addressCount} known addresses`} />}
+                    </div>
                   </div>
+
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--ivory-deep)', marginTop: 0 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+                        {/* Public record flags */}
+                        <div>
+                          <div className="v-eyebrow" style={{ fontSize: 9, marginBottom: 10 }}>Flags</div>
+                          {person.publicFlags.length === 0 ? (
+                            <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--sage-deep)' }}>None found</div>
+                          ) : person.publicFlags.map((f, j) => (
+                            <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--honey)', flexShrink: 0, marginTop: 4 }} />
+                              <span style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--honey-deep)', lineHeight: 1.4 }}>{f}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Clears */}
+                        <div>
+                          <div className="v-eyebrow" style={{ fontSize: 9, marginBottom: 10 }}>Clear</div>
+                          {person.publicClears.slice(0, 4).map((c, j) => (
+                            <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sage)', flexShrink: 0, marginTop: 4 }} />
+                              <span style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', lineHeight: 1.4 }}>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Business entities */}
+                      {person.llcs && person.llcs !== 'None found.' && (
+                        <div style={{ marginTop: 16 }}>
+                          <div className="v-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>Business entities</div>
+                          <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', lineHeight: 1.5 }}>{person.llcs}</div>
+                        </div>
+                      )}
+
+                      {/* Summary */}
+                      <div style={{ marginTop: 16, padding: '14px 16px', background: c.bg, borderRadius: 'var(--r-md)' }}>
+                        <div className="v-eyebrow" style={{ fontSize: 9, color: c.deep, marginBottom: 6 }}>Verity's read</div>
+                        <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: c.deep, lineHeight: 1.55, margin: 0 }}>{person.summary}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* Right: chart + verity's read */}
-          <div style={{ position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <TrajectoryChart men={people} year={year} />
+          {/* Right panel */}
+          <div style={{ position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Verity's Read panel */}
-            <div style={{ background: 'var(--primary-deep)', borderRadius: 'var(--r-xl)', padding: '28px 28px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <Sparkle size={11} color="var(--gold)" />
-                <span className="v-eyebrow" style={{ fontSize: 10, color: 'var(--gold)' }}>Verity's read</span>
-              </div>
-              <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ivory)', lineHeight: 1.55, margin: '0 0 24px', fontWeight: 300 }}>
-                {verityRead}
+            {/* Verity's overall read */}
+            <div style={{ background: 'var(--primary-deep)', borderRadius: 'var(--r-xl)', padding: '28px 24px' }}>
+              <div className="v-eyebrow" style={{ fontSize: 9, color: 'var(--gold)', marginBottom: 12 }}>Verity's overall read</div>
+              <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--ivory)', lineHeight: 1.55, margin: '0 0 20px', fontWeight: 300 }}>
+                {leader?.score === 'green'
+                  ? `"${leader.name.split(' ')[0]} is the cleanest file here. The record is clear, identity is verified, and the phone is a stable mobile line."`
+                  : leader?.score === 'yellow'
+                  ? `"No one here is a clear walk-away, but ${leader.name.split(' ')[0]} has the fewest flags. Read the detail before you decide."`
+                  : '"All files in this set carry flags. Review each one carefully before proceeding."'}
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+
+              {/* Score summary grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <div className="v-eyebrow" style={{ fontSize: 9, color: 'var(--gold-pale)', marginBottom: 6 }}>Highest expected</div>
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--ivory)', fontWeight: 400, lineHeight: 1 }}>{fmtMoney(leader?.proj.expected ?? 0)}</div>
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 4 }}>{leader?.name}</div>
+                  <div className="v-eyebrow" style={{ fontSize: 8, color: 'var(--gold-pale)', marginBottom: 5 }}>Cleanest file</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--ivory)', fontWeight: 400, lineHeight: 1.1 }}>{leader?.name}</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 3 }}>{leader ? SCORE_LABELS[leader.score] : '—'}</div>
                 </div>
                 <div>
-                  <div className="v-eyebrow" style={{ fontSize: 9, color: 'var(--gold-pale)', marginBottom: 6 }}>Highest ceiling</div>
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--ivory)', fontWeight: 400, lineHeight: 1 }}>{fmtMoney(highestCeiling?.proj.high ?? 0)}</div>
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 4 }}>{highestCeiling?.name}</div>
+                  <div className="v-eyebrow" style={{ fontSize: 8, color: 'var(--gold-pale)', marginBottom: 5 }}>Total public flags</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: totalFlags === 0 ? 'var(--sage)' : 'var(--honey)', fontWeight: 400, lineHeight: 1.1 }}>{totalFlags}</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 3 }}>across {people.length} files</div>
                 </div>
               </div>
             </div>
+
+            {/* Verification summary */}
+            <div style={{ background: 'var(--pearl)', borderRadius: 'var(--r-xl)', padding: '20px 20px', boxShadow: 'var(--shadow-sm)' }}>
+              <div className="v-eyebrow" style={{ fontSize: 9, marginBottom: 14 }}>Identity verification</div>
+              {ranked.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: SCORE_CONFIG[p.score].bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 10, color: SCORE_CONFIG[p.score].deep }}>{p.initials}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark)' }}>{p.name.split(' ')[0]}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 10.5, color: 'var(--dark-soft)' }}>verified by {p.verifiedBy} sources</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {Array.from({ length: 4 }, (_, j) => (
+                      <div key={j} style={{ width: 7, height: 7, borderRadius: '50%', background: j < p.verifiedBy ? SCORE_CONFIG[p.score].dot : 'var(--ivory-deep)' }} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Link href="/search" style={{
+              display: 'block', padding: '14px', borderRadius: 'var(--r-lg)',
+              background: 'var(--primary)', color: 'var(--ivory)',
+              fontFamily: 'var(--serif)', fontSize: 14, textAlign: 'center',
+              textDecoration: 'none', boxShadow: 'var(--shadow-pop)',
+            }}>
+              + Add another search
+            </Link>
           </div>
         </div>
       </div>
@@ -329,110 +380,11 @@ export default function ComparePage() {
   );
 }
 
-// ── Sparkline ──────────────────────────────────────────────────────────────
-
-function MiniSparkline({ person, year }: { person: ComparePerson; year: number }) {
-  const points = Array.from({ length: 30 }, (_, i) => ({ y: i + 1, expected: person.project(i + 1).expected }));
-  const maxVal = Math.max(...points.map(p => p.expected));
-  const minVal = Math.min(...points.map(p => p.expected));
-  const range = maxVal - minVal || 1;
-  const w = 340, h = 36;
-  const toX = (y: number) => ((y - 1) / 29) * w;
-  const toY = (v: number) => h - ((v - minVal) / range) * h;
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.y).toFixed(1)} ${toY(p.expected).toFixed(1)}`).join(' ');
-  const cx = toX(Math.min(year, 30));
-  const cy = toY(points[Math.min(year - 1, 29)].expected);
+function QuickFact({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ marginTop: 12 }}>
-      <svg width="100%" viewBox={`0 0 ${w} ${h + 4}`} style={{ overflow: 'visible' }}>
-        <path d={pathD} stroke={person.color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.8} />
-        <circle cx={cx} cy={cy} r={4} fill={person.color} />
-      </svg>
-    </div>
-  );
-}
-
-// ── Trajectory chart ───────────────────────────────────────────────────────
-
-function TrajectoryChart({ men, year }: { men: ComparePerson[]; year: number }) {
-  const w = 560, h = 320;
-  const pL = 52, pR = 16, pT = 16, pB = 36;
-  const cW = w - pL - pR, cH = h - pT - pB;
-  const maxYears = 50;
-  const toX = (y: number) => pL + (y / maxYears) * cW;
-  const toY = (v: number) => pT + cH - logY(v) * cH;
-
-  const ticks = [50000, 100000, 250000, 500000, 1000000, 2500000, 5000000, 10000000, 25000000];
-  const tickLabels: Record<number, string> = {
-    50000: '$50K', 100000: '$100K', 250000: '$250K', 500000: '$500K',
-    1000000: '$1M', 2500000: '$2.5M', 5000000: '$5M', 10000000: '$10M', 25000000: '$25M',
-  };
-
-  const allPoints = men.map(person => ({
-    person,
-    points: Array.from({ length: maxYears + 1 }, (_, i) => ({ y: i, proj: person.project(i || 0.01) })),
-  }));
-
-  return (
-    <div style={{ background: 'var(--pearl)', borderRadius: 'var(--r-xl)', padding: '22px 20px', boxShadow: 'var(--shadow-sm)' }}>
-      {/* Chart header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <div className="v-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>50-year trajectories</div>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 400, color: 'var(--dark)', lineHeight: 1.1 }}>
-            Side by side, <em style={{ color: 'var(--rose)' }}>compounded.</em>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {men.map(m => (
-            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: m.color }} />
-              <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)' }}>{m.name.split(' ')[0]}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <svg width="100%" viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible' }}>
-        {ticks.map(tick => {
-          const cy = toY(tick);
-          return (
-            <g key={tick}>
-              <line x1={pL} y1={cy} x2={w - pR} y2={cy} stroke="var(--ivory-deep)" strokeWidth={0.7} />
-              <text x={pL - 5} y={cy + 3.5} textAnchor="end" fontSize={8.5} fill="var(--mauve-deep)" fontFamily="Outfit, sans-serif">{tickLabels[tick]}</text>
-            </g>
-          );
-        })}
-        {[0, 10, 20, 30, 40, 50].map(y => (
-          <text key={y} x={toX(y)} y={h - pB + 14} textAnchor="middle" fontSize={9.5} fill="var(--mauve-deep)" fontFamily="Outfit, sans-serif">
-            {y === 0 ? 'now' : `${y}y`}
-          </text>
-        ))}
-        {allPoints.map(({ person, points }) => {
-          const band = [
-            points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.y).toFixed(1)} ${toY(p.proj.high).toFixed(1)}`).join(' '),
-            points.slice().reverse().map(p => `L ${toX(p.y).toFixed(1)} ${toY(p.proj.low).toFixed(1)}`).join(' '),
-            'Z',
-          ].join(' ');
-          return <path key={`b-${person.id}`} d={band} fill={person.color} opacity={0.1} />;
-        })}
-        {allPoints.map(({ person, points }) => (
-          <path key={`l-${person.id}`}
-            d={points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.y).toFixed(1)} ${toY(p.proj.expected).toFixed(1)}`).join(' ')}
-            stroke={person.color} strokeWidth={2} fill="none" strokeLinecap="round"
-          />
-        ))}
-        <line x1={toX(year)} y1={pT} x2={toX(year)} y2={h - pB} stroke="var(--primary)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.6} />
-        {allPoints.map(({ person }) => {
-          const proj = person.project(Math.min(year, maxYears));
-          return <circle key={`d-${person.id}`} cx={toX(Math.min(year, maxYears))} cy={toY(proj.expected)} r={5} fill={person.color} stroke="var(--pearl)" strokeWidth={2} />;
-        })}
-        <text x={toX(year)} y={pT - 4} textAnchor="middle" fontSize={9.5} fill="var(--primary)" fontFamily="Outfit, sans-serif" fontWeight="600">{year}y</text>
-      </svg>
-
-      <p style={{ fontFamily: 'var(--sans)', fontSize: 10.5, color: 'var(--mauve-deep)', margin: '10px 0 0', letterSpacing: 0.2, lineHeight: 1.5 }}>
-        Faded bands show 80% confidence range · log y-axis · drag to scrub the year
-      </p>
+    <div>
+      <div style={{ fontFamily: 'var(--sans)', fontSize: 9.5, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark)', lineHeight: 1.3 }}>{value}</div>
     </div>
   );
 }
