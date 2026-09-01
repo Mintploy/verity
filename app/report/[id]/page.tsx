@@ -427,7 +427,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           It tells you what's true today, so you can decide tomorrow.
         </div>
         <div style={{ marginTop: 14, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', letterSpacing: 0.3, lineHeight: 1.6 }}>
-          Sources: Whitepages Pro, ATTOM, BeenVerified, PACER, FEC, NSOPW, PDL
+          Sources: Whitepages Pro, ATTOM, PDL, PACER, FEC, NSOPW
         </div>
       </div>
     </main>

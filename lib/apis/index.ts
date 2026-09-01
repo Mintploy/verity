@@ -2,40 +2,25 @@ import { SearchRequest, Report, ScoreState } from '../types';
 
 import { lookupWhitepages } from './whitepages';
 import { lookupAddress } from './attom';
-import { runBackgroundCheck, generateSocialCandidates } from './beenverified';
+import { generateSocialCandidates } from './social';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { checkSexOffenderRegistry } from './nsopw';
 import { lookupProfessional } from './pdl';
 
-// Cross-references two marital status sources. Flags conflicts (e.g. "Single" vs "Married")
-// since a mismatch between WP public records and BV aggregated data is itself meaningful.
-function resolveMaritalStatus(wpStatus?: string, bgStatus?: string): string {
-  const wp = wpStatus?.trim();
-  const bg = bgStatus?.trim();
-  if (!wp && !bg) return '—';
-  if (!wp) return bg!;
-  if (!bg) return wp;
-  if (wp.toLowerCase() === bg.toLowerCase()) return wp;
-  // Sources disagree — surface both so the reader can see the discrepancy
-  return `${bg} (public records show: ${wp})`;
-}
 
 export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
-  const [wpResult, bgCheck, publicRecs, soRegistry] = await Promise.allSettled([
+  const [wpResult, publicRecs, soRegistry] = await Promise.allSettled([
     lookupWhitepages(req.phone, req.name),
-    runBackgroundCheck(req.phone, req.name),
     lookupPublicRecords(req.name, req.phone),
     checkSexOffenderRegistry(req.name),
   ]);
 
   const wpCombined = wpResult.status === 'fulfilled' ? wpResult.value : null;
   const wp = wpCombined?.person ?? null;
-  const nameFromWp = wp?.fullName;
-  const nameFromBg = bgCheck.status === 'fulfilled' ? bgCheck.value?.fullName : req.name;
-  const bestName = nameFromWp ?? nameFromBg;
+  const bestName = wp?.fullName ?? req.name;
 
   // Pass Whitepages addresses to ATTOM for property enrichment.
   // enrichHistorical gates whether we look up 1 address (default) or up to 3.
@@ -49,7 +34,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
 
   const flags: string[] = [];
   if (wpCombined?.phone?.lineType === 'voip') flags.push('voip');
-  if (bgCheck.status === 'fulfilled' && bgCheck.value?.hasFlags) flags.push('bgcheck');
   if (publicRecs.status === 'fulfilled' && publicRecs.value?.hasFlags) flags.push('public');
   if (soRegistry.status === 'fulfilled' && soRegistry.value?.onRegistry) flags.push('soregistry');
 
@@ -62,7 +46,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     : 'yellow';
 
   const phone = wpCombined?.phone ?? null;
-  const bg = bgCheck.status === 'fulfilled' ? bgCheck.value : null;
   const pub = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
   const prof = profData.status === 'fulfilled' ? profData.value : null;
   const addr = addressData.status === 'fulfilled' ? addressData.value : null;
@@ -82,11 +65,11 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     };
   });
 
-  const resolvedName = wp?.fullName ?? bg?.fullName ?? req.name ?? 'Unknown';
-  const resolvedAge = wp?.age ?? bg?.age ?? 0;
-  const resolvedDob = wp?.dob ?? bg?.dob ?? '—';
-  const resolvedAliases = wp?.aliases?.length ? wp.aliases : bg?.aliases;
-  const resolvedAssociates = wp?.associates?.length ? wp.associates : (bg?.associates ?? []);
+  const resolvedName = wp?.fullName ?? req.name ?? 'Unknown';
+  const resolvedAge = wp?.age ?? 0;
+  const resolvedDob = wp?.dob ?? '—';
+  const resolvedAliases = wp?.aliases?.length ? wp.aliases : undefined;
+  const resolvedAssociates = wp?.associates ?? [];
 
   const report: Report = {
     id: searchId,
@@ -121,10 +104,10 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     addresses: addressHistory,
     propertyIntelligence: addr?.propertyIntelligence ?? [],
     relationships: {
-      status: resolveMaritalStatus(wp?.maritalStatus, bg?.maritalStatus),
-      spouse: wp?.spouseName ?? bg?.spouse,
-      priors: '—',
-      relatives: (wp?.relatives && wp.relatives.length > 0) ? wp.relatives : (bg?.relatives ?? []),
+      status: wp?.maritalStatus ?? '—',
+      spouse: wp?.spouseName,
+      priors: wp?.priorMarriages ?? '—',
+      relatives: wp?.relatives ?? [],
       associates: (wp?.associates && wp.associates.length > 0)
         ? wp.associates
         : (wp?.additionalPhones && wp.additionalPhones.length > 0)
@@ -136,11 +119,11 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       company: wp?.company ?? prof?.company ?? '—',
       tenure: prof?.tenure ?? '—',
       llcs: prof?.llcs ?? 'None found.',
-      licenses: prof?.licenses ?? '—',
+      licenses: wp?.licenses ?? prof?.licenses ?? '—',
     },
     publicRecords: buildPublicRecords(pub, fec, prof?.licenses),
     social: {
-      handles: wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : [],
+      handles: wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : (wp?.emails?.length ? wp.emails.map(e => `Email: ${e}`) : []),
       candidates: generateSocialCandidates(resolvedName),
       presence: wp?.linkedinUrl ? 'LinkedIn profile found via Whitepages.' : 'No confirmed profiles found. Possible matches listed below.',
       inconsistency: 'None flagged.',

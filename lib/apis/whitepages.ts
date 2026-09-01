@@ -42,6 +42,9 @@ export interface WhitepagesPeopleResult {
   additionalPhones?: string[];
   maritalStatus?: string;
   spouseName?: string;
+  priorMarriages?: string;
+  licenses?: string;
+  education?: string[];
 }
 
 export interface WhitepagesCombined {
@@ -120,11 +123,38 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
 
     const dob = best.date_of_birth ? parseDob(best.date_of_birth) : undefined;
 
-    // Marital status
+    // Marital status + prior marriages
     const wpMaritalStatus: string | undefined = best.marital_status ?? undefined;
     const wpSpouse = (best.associated_people ?? best.relatives ?? [])
       .find((r: any) => r.relation?.toLowerCase() === 'spouse' || r.type?.toLowerCase() === 'spouse');
     const wpSpouseName: string | undefined = wpSpouse?.name ?? undefined;
+
+    const divorceDates: string[] = best.divorce_dates ?? [];
+    const marriageDates: string[] = best.marriage_dates ?? [];
+    let priorMarriages: string | undefined;
+    if (divorceDates.length > 0) {
+      const years = divorceDates.map((d: string) => new Date(d).getFullYear()).join(', ');
+      priorMarriages = divorceDates.length === 1
+        ? `1 prior marriage · divorced ${years}`
+        : `${divorceDates.length} prior marriages · divorced ${years}`;
+    } else if (marriageDates.length > 1) {
+      priorMarriages = `${marriageDates.length - 1} prior marriage(s) on record`;
+    } else if (wpMaritalStatus === 'Divorced' || wpMaritalStatus === 'Separated') {
+      priorMarriages = 'At least 1 (currently divorced)';
+    } else if (wpMaritalStatus === 'Widowed') {
+      priorMarriages = 'At least 1 (widowed)';
+    }
+
+    // Professional licenses — available from state public records in some WP tiers
+    const wpLicenseList: string[] = (best.professional_licenses ?? []).map((l: any) => {
+      return [l.type ?? l.name, l.state, l.status ? `(${l.status})` : null].filter(Boolean).join(' · ');
+    }).filter(Boolean);
+    const licenses: string | undefined = wpLicenseList.length > 0 ? wpLicenseList.join('; ') : undefined;
+
+    // Education
+    const education: string[] = (best.education ?? []).map((e: any) => {
+      return [e.school_name ?? e.name, e.degree, e.graduation_year ? `${e.graduation_year}` : null].filter(Boolean).join(', ');
+    }).filter(Boolean);
 
     const personResult: WhitepagesPeopleResult = {
       fullName: best.name ?? undefined,
@@ -163,6 +193,9 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
         .filter((p: any) => p.number?.replace(/\D/g, '') !== cleaned && (p.score ?? 0) >= 70)
         .map((p: any) => `${p.number} (${p.type})`)
         .slice(0, 3),
+      priorMarriages,
+      licenses,
+      education: education.length > 0 ? education : undefined,
     };
 
     return { phone: phoneResult, person: personResult };

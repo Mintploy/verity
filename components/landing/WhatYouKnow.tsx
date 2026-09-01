@@ -25,7 +25,7 @@ export function WhatYouKnow() {
               fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.6,
               margin: '24px 0 0', maxWidth: 380, fontWeight: 300,
             }}>
-              We cross-reference seven independent sources — Whitepages Pro, ATTOM, BeenVerified, Proxycurl, PACER, FEC, NSOPW — and write you the report your brilliant older sister would, if she had access to a PI.
+              We cross-reference six independent sources — Whitepages Pro, ATTOM, PDL, PACER, FEC, NSOPW — and write you the report your brilliant older sister would, if she had access to a PI.
             </p>
           </div>
 
