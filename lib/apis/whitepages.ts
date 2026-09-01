@@ -120,8 +120,27 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       dob,
       aliases: best.aliases ?? [],
       addresses: [...currentAddrs, ...historicAddrs],
-      relatives: (best.relatives ?? []).map((r: any) => r.name).filter(Boolean),
-      associates: [],
+      relatives: (best.relatives ?? []).map((r: any) => {
+        const parts: string[] = [];
+        if (r.name) parts.push(r.name);
+        if (r.age) parts.push(`age ${r.age}`);
+        const relPhone = r.phones?.[0]?.number;
+        if (relPhone) parts.push(relPhone);
+        const relAddr = r.current_addresses?.[0];
+        if (relAddr) {
+          const city = relAddr.city;
+          const state = relAddr.state;
+          if (city && state) parts.push(`${city}, ${state}`);
+        }
+        return parts.join(' · ');
+      }).filter(Boolean),
+      associates: (best.associates ?? []).map((a: any) => {
+        const parts: string[] = [];
+        if (a.name) parts.push(a.name);
+        const assocPhone = a.phones?.[0]?.number;
+        if (assocPhone) parts.push(assocPhone);
+        return parts.join(' · ');
+      }).filter(Boolean),
       emails: (best.emails ?? []).filter((e: any) => (e.score ?? 0) >= 50).map((e: any) => e.email).slice(0, 3),
       company: best.company_name ?? undefined,
       jobTitle: best.job_title ?? undefined,
@@ -282,10 +301,17 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
       .map((e: any) => e.email)
       .slice(0, 3);
 
-    // Relatives
-    const relatives = (person.relatives ?? [])
-      .map((r: any) => r.name)
-      .filter(Boolean);
+    // Relatives — include phone and city when available
+    const relatives = (person.relatives ?? []).map((r: any) => {
+      const parts: string[] = [];
+      if (r.name) parts.push(r.name);
+      if (r.age) parts.push(`age ${r.age}`);
+      const relPhone = r.phones?.[0]?.number;
+      if (relPhone) parts.push(relPhone);
+      const relAddr = r.current_addresses?.[0];
+      if (relAddr?.city && relAddr?.state) parts.push(`${relAddr.city}, ${relAddr.state}`);
+      return parts.join(' · ');
+    }).filter(Boolean);
 
     return {
       fullName: person.name ?? undefined,
@@ -294,7 +320,13 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
       aliases: person.aliases ?? [],
       addresses: [...currentAddrs, ...historicAddrs],
       relatives,
-      associates: [],
+      associates: (person.associates ?? []).map((a: any) => {
+        const parts: string[] = [];
+        if (a.name) parts.push(a.name);
+        const assocPhone = a.phones?.[0]?.number;
+        if (assocPhone) parts.push(assocPhone);
+        return parts.join(' · ');
+      }).filter(Boolean),
       emails,
       company: person.company_name ?? undefined,
       jobTitle: person.job_title ?? undefined,
