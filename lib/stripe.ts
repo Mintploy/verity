@@ -4,43 +4,44 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? 'sk_placeholde
   apiVersion: '2026-04-22.dahlia',
 });
 
-export const YEARLY_PRICE_ID = process.env.STRIPE_PRICE_ID!;
-export const MEMBERSHIP_AMOUNT = 9900; // $99.00 in cents
+export const STRIPE_PRICE_FOUNDING = process.env.STRIPE_PRICE_FOUNDING!;
+export const STRIPE_PRICE_ANNUAL = process.env.STRIPE_PRICE_ANNUAL!;
+export const STRIPE_PRICE_SINGLE = process.env.STRIPE_PRICE_SINGLE!;
+
+export type Plan = 'founding' | 'annual' | 'single';
 
 export async function createCheckoutSession({
   customerId,
   successUrl,
   cancelUrl,
   email,
+  plan,
 }: {
   customerId?: string;
   successUrl: string;
   cancelUrl: string;
   email?: string;
+  plan: Plan;
 }) {
+  const priceMap: Record<Plan, string> = {
+    founding: STRIPE_PRICE_FOUNDING,
+    annual: STRIPE_PRICE_ANNUAL,
+    single: STRIPE_PRICE_SINGLE,
+  };
+  const isSubscription = plan !== 'single';
+  const mode = isSubscription ? 'subscription' : 'payment';
+
   const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
+    mode,
     payment_method_types: ['card'],
-    line_items: [
-      {
-        price: YEARLY_PRICE_ID,
-        quantity: 1,
-      },
-    ],
+    line_items: [{ price: priceMap[plan], quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
     allow_promotion_codes: true,
     ...(customerId ? { customer: customerId } : {}),
     ...(email ? { customer_email: email } : {}),
-    subscription_data: {
-      metadata: {
-        app: 'verity',
-        plan: 'yearly',
-      },
-    },
-    metadata: {
-      app: 'verity',
-    },
+    ...(isSubscription ? { subscription_data: { metadata: { app: 'verity', plan } } } : {}),
+    metadata: { app: 'verity', plan },
   });
   return session;
 }

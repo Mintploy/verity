@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { generateReport } from '@/lib/apis/index';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { consumeSearch } from '@/lib/quota';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +20,11 @@ export async function POST(req: NextRequest) {
 
     if (!phone) {
       return Response.json({ error: 'Phone number is required' }, { status: 400 });
+    }
+
+    const quota = await consumeSearch(session.email);
+    if (!quota.allowed) {
+      return Response.json({ error: 'Monthly search limit reached', remaining: 0 }, { status: 429 });
     }
 
     const report = await generateReport({ phone, name, userId: session.email });

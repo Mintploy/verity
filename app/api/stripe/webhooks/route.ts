@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createMagicLinkToken } from '@/lib/auth';
 import { sendWelcomeEmail } from '@/lib/email';
+import { getServiceSupabase } from '@/lib/supabase';
 import type Stripe from 'stripe';
 
 export async function POST(req: NextRequest) {
@@ -29,9 +30,22 @@ export async function POST(req: NextRequest) {
         const customerId = session.customer as string;
 
         if (email && customerId) {
+          const plan = (session.metadata?.plan ?? 'annual') as string;
+
+          const sb = getServiceSupabase();
+          await sb.from('user_profiles').upsert(
+            {
+              user_id: email,
+              plan,
+              searches_this_month: 0,
+              searches_reset_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id', ignoreDuplicates: false }
+          );
+
           const token = await createMagicLinkToken(email, customerId);
           await sendWelcomeEmail(email, token);
-          console.log(`✓ Welcome email sent to ${email}`);
+          console.log(`✓ Welcome email sent to ${email} (plan: ${plan})`);
         }
         break;
       }
