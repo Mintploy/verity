@@ -30,6 +30,7 @@ export async function lookupPublicRecords(name?: string, phone?: string): Promis
       }
     );
 
+    console.log('COURTLISTENER_STATUS:', res.status);
     if (!res.ok) return getMockPublicRecords(phone, false);
 
     const data = await res.json();

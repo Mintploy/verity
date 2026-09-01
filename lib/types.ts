@@ -4,6 +4,7 @@ export interface SearchRequest {
   phone: string;
   name?: string;
   userId?: string;
+  enrichHistorical?: boolean;
 }
 
 export interface PhoneIntelligence {

@@ -24,7 +24,7 @@ export async function getFoundingCount(): Promise<number> {
 // Checks quota and, if allowed, atomically increments and returns the result.
 // Returns { allowed: false } if quota is exhausted or no profile exists.
 // Single-report plan is capped at 1 search total (no monthly reset).
-export async function consumeSearch(userId: string): Promise<{ allowed: boolean; remaining: number }> {
+export async function consumeSearch(userId: string): Promise<{ allowed: boolean; remaining: number; plan: string | null }> {
   const sb = getServiceSupabase();
   const now = new Date();
 
@@ -35,7 +35,7 @@ export async function consumeSearch(userId: string): Promise<{ allowed: boolean;
     .maybeSingle();
 
   if (error) throw error;
-  if (!profile) return { allowed: false, remaining: 0 };
+  if (!profile) return { allowed: false, remaining: 0, plan: null };
 
   const plan = profile.plan as string | null;
   const limit = limitForPlan(plan);
@@ -48,11 +48,11 @@ export async function consumeSearch(userId: string): Promise<{ allowed: boolean;
       .from('user_profiles')
       .update({ searches_this_month: 1, searches_reset_at: now.toISOString() })
       .eq('user_id', userId);
-    return { allowed: true, remaining: limit - 1 };
+    return { allowed: true, remaining: limit - 1, plan };
   }
 
   if (used >= limit) {
-    return { allowed: false, remaining: 0 };
+    return { allowed: false, remaining: 0, plan };
   }
 
   await sb
@@ -60,5 +60,5 @@ export async function consumeSearch(userId: string): Promise<{ allowed: boolean;
     .update({ searches_this_month: used + 1 })
     .eq('user_id', userId);
 
-  return { allowed: true, remaining: limit - used - 1 };
+  return { allowed: true, remaining: limit - used - 1, plan };
 }

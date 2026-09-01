@@ -1,4 +1,5 @@
 // Whitepages API v2
+// Single consolidated call returns both phone intelligence and person data.
 
 export interface WhitepagesPhoneResult {
   carrier: string;
@@ -28,6 +29,114 @@ export interface WhitepagesPeopleResult {
   jobTitle?: string;
   linkedinUrl?: string;
   additionalPhones?: string[];
+}
+
+export interface WhitepagesCombined {
+  phone: WhitepagesPhoneResult;
+  person: WhitepagesPeopleResult;
+}
+
+// Single-call replacement for lookupPhone + lookupPerson — saves one billable /v2/person hit.
+export async function lookupWhitepages(phone: string, name?: string): Promise<WhitepagesCombined> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
+  const apiKey = process.env.WHITEPAGES_API_KEY;
+
+  if (!liveAllowed || !apiKey || apiKey === 'YOUR_WHITEPAGES_PRO_KEY') {
+    return { phone: getMockPhoneData(phone), person: {} };
+  }
+
+  try {
+    const cleaned = phone.replace(/\D/g, '');
+    const params = new URLSearchParams({ phone: cleaned, include_historical_locations: 'true' });
+    if (name) {
+      const parts = name.trim().split(' ');
+      if (parts.length >= 2) {
+        params.set('first_name', parts[0]);
+        params.set('last_name', parts.slice(1).join(' '));
+      } else {
+        params.set('name', name.trim());
+      }
+    }
+
+    const res = await fetch(`https://api.whitepages.com/v2/person?${params.toString()}`, {
+      headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' },
+    });
+    console.log('WP_STATUS:', res.status);
+    if (!res.ok) return { phone: getMockPhoneData(phone), person: {} };
+
+    const data = await res.json();
+    const results = data.results ?? [];
+    console.log('WP_COUNT:', results.length);
+    if (!results.length) return { phone: getMockPhoneData(phone), person: {} };
+
+    const best = results
+      .filter((r: any) => r.matched_by?.includes('phone'))
+      .sort((a: any, b: any) => (b.match_score ?? 0) - (a.match_score ?? 0))[0] ?? results[0];
+
+    // --- Phone intelligence ---
+    const phoneRecord = best.phones?.find((p: any) => p.number?.replace(/\D/g, '') === cleaned) ?? best.phones?.[0];
+    const lineType: WhitepagesPhoneResult['lineType'] = phoneRecord?.type === 'voip' ? 'voip'
+      : phoneRecord?.type === 'mobile' ? 'mobile' : 'landline';
+    const phoneResult: WhitepagesPhoneResult = {
+      carrier: phoneRecord?.carrier_name ?? phoneRecord?.type ?? 'Unknown',
+      lineType,
+      voipFlag: lineType === 'voip' ? 'Number registered to a VoIP service. May indicate a secondary or temporary line.' : undefined,
+      numberAge: '—',
+      origin: 'United States',
+      active: !best.is_dead,
+    };
+
+    // --- Person data ---
+    const currentAddrs = (best.current_addresses ?? []).map((a: any) => ({
+      addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
+      years: 'Current',
+      current: true,
+      detail: (best.owned_properties ?? []).some((p: any) => a.full_address && p.address?.includes(a.city)) ? 'Owned property' : 'Residential',
+      owned: (best.owned_properties ?? []).some((p: any) => a.full_address && p.address?.includes(a.city)),
+    }));
+    const historicAddrs = (best.historic_addresses ?? []).slice(0, 4).map((a: any, i: number) => ({
+      addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
+      years: `Previous ${i + 1} of ${Math.min(4, (best.historic_addresses ?? []).length)} · Date range pending property records`,
+      current: false,
+      detail: `Historic address · ${a.city}, ${a.state}`,
+      owned: false,
+    }));
+
+    const dob = best.date_of_birth ? (() => {
+      const parts = best.date_of_birth.split('-');
+      if (parts.length >= 2) {
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const month = months[parseInt(parts[1]) - 1] ?? '';
+        const year = parts[0];
+        const day = parts[2] && parts[2] !== '00' ? ` ${parseInt(parts[2])},` : ',';
+        return `${month}${day} ${year}`;
+      }
+      return best.date_of_birth;
+    })() : undefined;
+
+    const personResult: WhitepagesPeopleResult = {
+      fullName: best.name ?? undefined,
+      age: best.age ?? undefined,
+      dob,
+      aliases: best.aliases ?? [],
+      addresses: [...currentAddrs, ...historicAddrs],
+      relatives: (best.relatives ?? []).map((r: any) => r.name).filter(Boolean),
+      associates: [],
+      emails: (best.emails ?? []).filter((e: any) => (e.score ?? 0) >= 50).map((e: any) => e.email).slice(0, 3),
+      company: best.company_name ?? undefined,
+      jobTitle: best.job_title ?? undefined,
+      linkedinUrl: best.linkedin_url ?? undefined,
+      additionalPhones: (best.phones ?? [])
+        .filter((p: any) => p.number?.replace(/\D/g, '') !== cleaned && (p.score ?? 0) >= 70)
+        .map((p: any) => `${p.number} (${p.type})`)
+        .slice(0, 3),
+    };
+
+    return { phone: phoneResult, person: personResult };
+  } catch (e) {
+    console.log('WP_ERROR:', String(e));
+    return { phone: getMockPhoneData(phone), person: {} };
+  }
 }
 
 export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult> {

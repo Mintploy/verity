@@ -20,6 +20,7 @@ export async function checkSexOffenderRegistry(name?: string): Promise<NsopwResu
     const res = await fetch(url, {
       headers: { 'Accept': 'application/json' },
     });
+    console.log('NSOPW_STATUS:', res.status);
 
     if (!res.ok) return { onRegistry: false };
 

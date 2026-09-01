@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Monthly search limit reached', remaining: 0 }, { status: 429 });
     }
 
-    const report = await generateReport({ phone, name, userId: session.email });
+    const enrichHistorical = quota.plan === 'founding' || quota.plan === 'annual';
+    const report = await generateReport({ phone, name, userId: session.email, enrichHistorical });
 
     return Response.json({ report, searchId: report.searchId, demoMode: process.env.ALLOW_LIVE_LOOKUPS !== 'true' });
   } catch (err: any) {

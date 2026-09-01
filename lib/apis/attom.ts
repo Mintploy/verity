@@ -132,7 +132,9 @@ async function fetchPropertyIntelligence(fullAddress: string, apiKey: string): P
   }
 }
 
-export async function lookupAddress(name?: string, phone?: string, addresses?: string[]): Promise<AttomAddressResult> {
+// enrichHistorical: founding/annual members only — looks up up to 3 addresses.
+// Default (false): current address only — 3 ATTOM calls instead of 9.
+export async function lookupAddress(name?: string, phone?: string, addresses?: string[], enrichHistorical = false): Promise<AttomAddressResult> {
   const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const apiKey = process.env.ATTOM_API_KEY;
 
@@ -141,7 +143,8 @@ export async function lookupAddress(name?: string, phone?: string, addresses?: s
   }
 
   try {
-    const topAddresses = addresses.slice(0, 3);
+    const limit = enrichHistorical ? 3 : 1;
+    const topAddresses = addresses.slice(0, limit);
     const results = await Promise.allSettled(
       topAddresses.map(addr => fetchPropertyIntelligence(addr, apiKey))
     );

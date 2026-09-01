@@ -1,6 +1,6 @@
 import { SearchRequest, Report, ScoreState } from '../types';
 
-import { lookupPhone, lookupPerson } from './whitepages';
+import { lookupWhitepages } from './whitepages';
 import { lookupAddress } from './attom';
 import { runBackgroundCheck } from './beenverified';
 import { lookupPublicRecords } from './pacer';
@@ -11,30 +11,31 @@ import { lookupProfessional } from './pdl';
 export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
-  const [phoneData, bgCheck, publicRecs, soRegistry, wpPeople] = await Promise.allSettled([
-    lookupPhone(req.phone),
+  const [wpResult, bgCheck, publicRecs, soRegistry] = await Promise.allSettled([
+    lookupWhitepages(req.phone, req.name),
     runBackgroundCheck(req.phone, req.name),
     lookupPublicRecords(req.name, req.phone),
     checkSexOffenderRegistry(req.name),
-    lookupPerson(req.phone, req.name),
   ]);
 
-  const wp = wpPeople.status === 'fulfilled' ? wpPeople.value : null;
+  const wpCombined = wpResult.status === 'fulfilled' ? wpResult.value : null;
+  const wp = wpCombined?.person ?? null;
   const nameFromWp = wp?.fullName;
   const nameFromBg = bgCheck.status === 'fulfilled' ? bgCheck.value?.fullName : req.name;
   const bestName = nameFromWp ?? nameFromBg;
 
-  // Pass Whitepages addresses to ATTOM for property enrichment
+  // Pass Whitepages addresses to ATTOM for property enrichment.
+  // enrichHistorical gates whether we look up 1 address (default) or up to 3.
   const wpAddresses = wp?.addresses?.map((a: any) => a.addr).filter(Boolean) ?? [];
 
   const [profData, addressData, fecData] = await Promise.allSettled([
     lookupProfessional(bestName),
-    lookupAddress(bestName, req.phone, wpAddresses.length ? wpAddresses : undefined),
+    lookupAddress(bestName, req.phone, wpAddresses.length ? wpAddresses : undefined, req.enrichHistorical),
     lookupDonations(bestName),
   ]);
 
   const flags: string[] = [];
-  if (phoneData.status === 'fulfilled' && phoneData.value?.lineType === 'voip') flags.push('voip');
+  if (wpCombined?.phone?.lineType === 'voip') flags.push('voip');
   if (bgCheck.status === 'fulfilled' && bgCheck.value?.hasFlags) flags.push('bgcheck');
   if (publicRecs.status === 'fulfilled' && publicRecs.value?.hasFlags) flags.push('public');
   if (soRegistry.status === 'fulfilled' && soRegistry.value?.onRegistry) flags.push('soregistry');
@@ -47,16 +48,26 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     ? 'green'
     : 'yellow';
 
-  const phone = phoneData.status === 'fulfilled' ? phoneData.value : null;
+  const phone = wpCombined?.phone ?? null;
   const bg = bgCheck.status === 'fulfilled' ? bgCheck.value : null;
   const pub = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
   const prof = profData.status === 'fulfilled' ? profData.value : null;
   const addr = addressData.status === 'fulfilled' ? addressData.value : null;
   const fec = fecData.status === 'fulfilled' ? fecData.value : null;
 
-  const addressHistory = (wp?.addresses && wp.addresses.length > 0)
-    ? wp.addresses
-    : addr?.addresses ?? [];
+  // Merge ATTOM yearsOwned into WP address list so historical addresses show real dates.
+  // ATTOM only enriches the current address for single-plan users (enrichHistorical=false).
+  const baseAddresses = (wp?.addresses && wp.addresses.length > 0) ? wp.addresses : addr?.addresses ?? [];
+  const attomProps = addr?.propertyIntelligence ?? [];
+  const addressHistory = baseAddresses.map((wpAddr: any, i: number) => {
+    const attom = attomProps[i];
+    if (!attom) return wpAddr;
+    return {
+      ...wpAddr,
+      years: attom.yearsOwned ?? attom.purchaseDate ?? wpAddr.years,
+      detail: [attom.propertyType, attom.currentValue ? `Est. value ${attom.currentValue}` : null, attom.estimatedRent ? `Est. rent ${attom.estimatedRent}` : null].filter(Boolean).join(' · ') || wpAddr.detail,
+    };
+  });
 
   const resolvedName = wp?.fullName ?? bg?.fullName ?? req.name ?? 'Unknown';
   const resolvedAge = wp?.age ?? bg?.age ?? 0;
