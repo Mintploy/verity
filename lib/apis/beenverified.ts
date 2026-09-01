@@ -2,6 +2,43 @@
 // Contact: enterprise@beenverified.com
 // Alternatives: Spokeo, Intelius, Swordfish AI
 
+export interface SocialCandidate {
+  platform: string;
+  handle: string;
+  url: string;
+  verified: boolean;
+}
+
+// Generates likely social media profile candidates from a full name.
+// These are inferred — user must verify manually before trusting.
+export function generateSocialCandidates(fullName?: string): SocialCandidate[] {
+  if (!fullName) return [];
+  const parts = fullName.trim().toLowerCase().split(/\s+/);
+  if (parts.length < 2) return [];
+  const [first, ...rest] = parts;
+  const last = rest[rest.length - 1];
+  const middle = rest.length > 1 ? rest[0] : '';
+
+  // Common handle patterns
+  const handles = [
+    `${first}${last}`,
+    `${first}.${last}`,
+    `${first[0]}${last}`,
+    `${first}_${last}`,
+    ...(middle ? [`${first}${middle[0]}${last}`, `${first}.${middle[0]}.${last}`] : []),
+  ];
+  const primary = handles[0]; // e.g. "johnsmith"
+  const dotted = handles[1];  // e.g. "john.smith"
+
+  return [
+    { platform: 'LinkedIn', handle: dotted, url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(fullName)}`, verified: false },
+    { platform: 'Instagram', handle: `@${primary}`, url: `https://www.instagram.com/${primary}/`, verified: false },
+    { platform: 'Facebook', handle: fullName, url: `https://www.facebook.com/search/people?q=${encodeURIComponent(fullName)}`, verified: false },
+    { platform: 'X / Twitter', handle: `@${primary}`, url: `https://x.com/search?q=${encodeURIComponent(fullName)}&f=user`, verified: false },
+    { platform: 'TikTok', handle: `@${primary}`, url: `https://www.tiktok.com/@${primary}`, verified: false },
+  ];
+}
+
 export interface BackgroundCheckResult {
   fullName?: string;
   age?: number;

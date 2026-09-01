@@ -149,21 +149,22 @@ export async function lookupAddress(name?: string, phone?: string, addresses?: s
       topAddresses.map(addr => fetchPropertyIntelligence(addr, apiKey))
     );
 
-    const propertyIntelligence = results
-      .map(r => r.status === 'fulfilled' ? r.value : null)
-      .filter(Boolean) as AttomPropertyResult[];
+    // Keep nulls to preserve index alignment — don't filter here
+    const propByIndex: (AttomPropertyResult | null)[] = results
+      .map(r => r.status === 'fulfilled' ? r.value : null);
 
+    const propertyIntelligence = propByIndex.filter(Boolean) as AttomPropertyResult[];
     console.log('ATTOM_PROPS_FOUND:', propertyIntelligence.length);
 
     return {
       addresses: addresses.map((addr, i) => ({
         addr,
-        years: propertyIntelligence[i]?.yearsOwned ?? (i === 0 ? 'Current' : 'Previous'),
+        years: propByIndex[i]?.yearsOwned ?? propByIndex[i]?.purchaseDate ?? (i === 0 ? 'Current' : 'Previous address'),
         current: i === 0,
-        detail: propertyIntelligence[i]
-          ? [propertyIntelligence[i].propertyType, propertyIntelligence[i].currentValue ? `Est. value ${propertyIntelligence[i].currentValue}` : null, propertyIntelligence[i].estimatedRent ? `Est. rent ${propertyIntelligence[i].estimatedRent}` : null].filter(Boolean).join(' · ')
+        detail: propByIndex[i]
+          ? [propByIndex[i]!.propertyType, propByIndex[i]!.currentValue ? `Est. value ${propByIndex[i]!.currentValue}` : null, propByIndex[i]!.estimatedRent ? `Est. rent ${propByIndex[i]!.estimatedRent}` : null].filter(Boolean).join(' · ')
           : 'Residential',
-        owned: propertyIntelligence[i]?.ownerType !== undefined,
+        owned: propByIndex[i]?.ownerType !== undefined,
       })),
       propertyIntelligence,
     };

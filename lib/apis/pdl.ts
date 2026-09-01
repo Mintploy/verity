@@ -7,6 +7,7 @@ export interface PdlResult {
   company?: string;
   tenure?: string;
   llcs?: string;
+  licenses?: string;
 }
 
 export async function lookupProfessional(name?: string): Promise<PdlResult> {
@@ -27,14 +28,20 @@ export async function lookupProfessional(name?: string): Promise<PdlResult> {
     if (!res.ok) return getMockProfessionalData(name);
 
     const data = await res.json();
-    const exp = data.data?.experience?.[0];
-    const llcs = data.data?.company_names?.filter((c: string) => c !== exp?.company?.name).join(', ');
+    const d = data.data;
+    const exp = d?.experience?.[0];
+    const llcs = d?.company_names?.filter((c: string) => c !== exp?.company?.name).join(', ');
+
+    // Extract certifications/licenses (bar admissions, real estate, medical, CPA, etc.)
+    const certs = (d?.certifications ?? []).map((c: any) => [c.name, c.organization].filter(Boolean).join(' — ')).filter(Boolean);
+    const licenseStr = certs.length > 0 ? certs.join('; ') : '—';
 
     return {
       title: exp?.title?.name ?? '—',
       company: exp?.company?.name ?? '—',
       tenure: exp?.start_date ? `${new Date().getFullYear() - new Date(exp.start_date).getFullYear()} years` : '—',
       llcs: llcs || 'None found.',
+      licenses: licenseStr,
     };
   } catch {
     return getMockProfessionalData(name);

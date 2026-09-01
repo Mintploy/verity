@@ -381,23 +381,44 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       </Section>
 
       <Section id="sec-7" eyebrow="07" title="Social footprint">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 32 }}>
-          <div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 10 }}>Known handles</div>
+        {report.social.handles.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 8 }}>Confirmed handles</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {report.social.handles.map((h, i) => (
-                <div key={i} style={{ padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)' }}>{h}</div>
+                <div key={i} style={{ padding: '10px 14px', background: 'var(--sage-pale)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--sage-deep)' }}>{h}</div>
               ))}
             </div>
           </div>
-          <div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 10 }}>Presence</div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.6, fontWeight: 300 }}>{report.social.presence}</div>
-            {report.social.inconsistency !== 'None flagged.' && (
-              <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.social.inconsistency}</FlagNote>
-            )}
-          </div>
+        )}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 4 }}>Summary</div>
+          <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.6, fontWeight: 300 }}>{report.social.presence}</div>
+          {report.social.inconsistency !== 'None flagged.' && (
+            <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.social.inconsistency}</FlagNote>
+          )}
         </div>
+        {report.social.candidates && report.social.candidates.length > 0 && (
+          <div>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 4 }}>Possible profiles to check</div>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)', marginBottom: 10, fontStyle: 'italic' }}>Based on name · not verified · click to search each platform</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {report.social.candidates.map((c, i) => (
+                <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)',
+                  textDecoration: 'none', gap: 8,
+                }}>
+                  <div>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 600, color: 'var(--dark)', letterSpacing: 0.2 }}>{c.platform}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 2 }}>{c.handle}</div>
+                  </div>
+                  <span style={{ color: 'var(--mauve)', fontSize: 12 }}>↗</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </Section>
 
       <div style={{ textAlign: 'center', marginTop: 12, padding: '16px 0' }}>

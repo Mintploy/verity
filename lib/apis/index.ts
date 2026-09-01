@@ -2,7 +2,7 @@ import { SearchRequest, Report, ScoreState } from '../types';
 
 import { lookupWhitepages } from './whitepages';
 import { lookupAddress } from './attom';
-import { runBackgroundCheck } from './beenverified';
+import { runBackgroundCheck, generateSocialCandidates } from './beenverified';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { checkSexOffenderRegistry } from './nsopw';
@@ -123,26 +123,27 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     relationships: {
       status: resolveMaritalStatus(wp?.maritalStatus, bg?.maritalStatus),
       spouse: wp?.spouseName ?? bg?.spouse,
-      priors: bg?.priorMarriages ?? '—',
+      priors: '—',
       relatives: (wp?.relatives && wp.relatives.length > 0) ? wp.relatives : (bg?.relatives ?? []),
-      associates: (wp?.additionalPhones && wp.additionalPhones.length > 0)
-        ? [`Additional numbers on file: ${wp.additionalPhones.join(', ')}`]
-        : resolvedAssociates,
+      associates: (wp?.associates && wp.associates.length > 0)
+        ? wp.associates
+        : (wp?.additionalPhones && wp.additionalPhones.length > 0)
+          ? [`Additional numbers on file: ${wp.additionalPhones.join(', ')}`]
+          : resolvedAssociates,
     },
     professional: {
       title: wp?.jobTitle ?? prof?.title ?? '—',
       company: wp?.company ?? prof?.company ?? '—',
       tenure: prof?.tenure ?? '—',
       llcs: prof?.llcs ?? 'None found.',
+      licenses: prof?.licenses ?? '—',
     },
-    publicRecords: buildPublicRecords(pub, fec),
+    publicRecords: buildPublicRecords(pub, fec, prof?.licenses),
     social: {
-      handles: [
-        ...(wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : []),
-        ...(bg?.socialHandles ?? []),
-      ],
-      presence: wp?.linkedinUrl ? 'LinkedIn profile found via Whitepages.' : bg?.socialPresence ?? '—',
-      inconsistency: bg?.socialInconsistency ?? 'None flagged.',
+      handles: wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : [],
+      candidates: generateSocialCandidates(resolvedName),
+      presence: wp?.linkedinUrl ? 'LinkedIn profile found via Whitepages.' : 'No confirmed profiles found. Possible matches listed below.',
+      inconsistency: 'None flagged.',
     },
     nextSteps: getNextSteps(score, flags),
   };
@@ -162,14 +163,15 @@ function getSummary(score: ScoreState): string {
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
-function buildPublicRecords(pub: any, fec: any): Array<any> {
+function buildPublicRecords(pub: any, fec: any, pdlLicenses?: string): Array<any> {
+  const licenseValue = pdlLicenses && pdlLicenses !== '—' ? pdlLicenses : (pub?.licenses ?? '—');
   return [
     { label: 'Sex offender registry', value: pub?.soRegistry ?? 'Not listed', good: !pub?.soRegistry || pub.soRegistry === 'Not listed' },
     { label: 'Bankruptcy', value: pub?.bankruptcy ?? 'None found', good: !pub?.bankruptcy || pub.bankruptcy === 'None found' },
     { label: 'Lawsuits & judgments', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
     { label: 'Evictions', value: pub?.evictions ?? 'None found', good: !pub?.evictions || pub.evictions === 'None found' },
     { label: 'Criminal record', value: pub?.criminal ?? 'None found', good: !pub?.criminal || pub.criminal === 'None found' },
-    { label: 'Professional licenses', value: pub?.licenses ?? '—', neutral: true },
+    { label: 'Professional licenses', value: licenseValue, neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
     { label: 'Voter registration', value: pub?.voter ?? '—', neutral: true },
   ];

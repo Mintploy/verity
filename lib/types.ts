@@ -62,6 +62,7 @@ export interface Professional {
   company: string;
   tenure: string;
   llcs: string;
+  licenses?: string;
 }
 
 export interface PublicRecord {
@@ -72,8 +73,16 @@ export interface PublicRecord {
   neutral?: boolean;
 }
 
+export interface SocialCandidate {
+  platform: string;
+  handle: string;
+  url: string;
+  verified: boolean;
+}
+
 export interface SocialFootprint {
   handles: string[];
+  candidates: SocialCandidate[];
   presence: string;
   inconsistency: string;
 }

@@ -1,4 +1,15 @@
 // Whitepages API v2
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function parseDob(raw: string): string {
+  const parts = raw.split('-');
+  if (parts.length < 2) return raw;
+  const month = MONTHS[parseInt(parts[1]) - 1] ?? '';
+  const year = parts[0];
+  const dayNum = parts[2] && parts[2] !== '00' ? parseInt(parts[2]) : null;
+  return dayNum ? `${month} ${dayNum}, ${year}` : `${month} ${year}`;
+}
+
 // Single consolidated call returns both phone intelligence and person data.
 
 export interface WhitepagesPhoneResult {
@@ -76,16 +87,19 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       .sort((a: any, b: any) => (b.match_score ?? 0) - (a.match_score ?? 0))[0] ?? results[0];
 
     // --- Phone intelligence ---
+    // WP v2 API uses line_type (not type) and carrier or carrier_name depending on tier
     const phoneRecord = best.phones?.find((p: any) => p.number?.replace(/\D/g, '') === cleaned) ?? best.phones?.[0];
-    const lineType: WhitepagesPhoneResult['lineType'] = phoneRecord?.type === 'voip' ? 'voip'
-      : phoneRecord?.type === 'mobile' ? 'mobile' : 'landline';
+    const rawLineType = (phoneRecord?.line_type ?? phoneRecord?.type ?? '').toLowerCase();
+    const lineType: WhitepagesPhoneResult['lineType'] = rawLineType.includes('voip') ? 'voip'
+      : rawLineType === 'mobile' ? 'mobile' : 'landline';
+    const carrierName = phoneRecord?.carrier_name ?? phoneRecord?.carrier ?? phoneRecord?.line_type ?? 'Unknown';
     const phoneResult: WhitepagesPhoneResult = {
-      carrier: phoneRecord?.carrier_name ?? phoneRecord?.type ?? 'Unknown',
+      carrier: carrierName,
       lineType,
       voipFlag: lineType === 'voip' ? 'Number registered to a VoIP service. May indicate a secondary or temporary line.' : undefined,
-      numberAge: '—',
-      origin: 'United States',
-      active: !best.is_dead,
+      numberAge: phoneRecord?.prepaid ? 'Prepaid line' : '—',
+      origin: phoneRecord?.country_calling_code === '1' || !phoneRecord?.country_calling_code ? 'United States' : 'International',
+      active: !(best.is_dead ?? false),
     };
 
     // --- Person data ---
@@ -96,27 +110,17 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       detail: (best.owned_properties ?? []).some((p: any) => a.full_address && p.address?.includes(a.city)) ? 'Owned property' : 'Residential',
       owned: (best.owned_properties ?? []).some((p: any) => a.full_address && p.address?.includes(a.city)),
     }));
-    const historicAddrs = (best.historic_addresses ?? []).slice(0, 4).map((a: any, i: number) => ({
+    const historicAddrs = (best.historic_addresses ?? []).slice(0, 4).map((a: any) => ({
       addr: a.full_address ?? [a.line1, a.city, a.state, a.zip].filter(Boolean).join(', '),
-      years: `Previous ${i + 1} of ${Math.min(4, (best.historic_addresses ?? []).length)} · Date range pending property records`,
+      years: 'Previous address',
       current: false,
-      detail: `Historic address · ${a.city}, ${a.state}`,
+      detail: [a.city, a.state].filter(Boolean).join(', ') || 'Historic address',
       owned: false,
     }));
 
-    const dob = best.date_of_birth ? (() => {
-      const parts = best.date_of_birth.split('-');
-      if (parts.length >= 2) {
-        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        const month = months[parseInt(parts[1]) - 1] ?? '';
-        const year = parts[0];
-        const day = parts[2] && parts[2] !== '00' ? ` ${parseInt(parts[2])},` : ',';
-        return `${month}${day} ${year}`;
-      }
-      return best.date_of_birth;
-    })() : undefined;
+    const dob = best.date_of_birth ? parseDob(best.date_of_birth) : undefined;
 
-    // Marital status — available in some Whitepages Pro packages
+    // Marital status
     const wpMaritalStatus: string | undefined = best.marital_status ?? undefined;
     const wpSpouse = (best.associated_people ?? best.relatives ?? [])
       .find((r: any) => r.relation?.toLowerCase() === 'spouse' || r.type?.toLowerCase() === 'spouse');
@@ -283,20 +287,7 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
   owned: false,
 }));
 
-    // DOB
-    const dob = person.date_of_birth
-      ? (() => {
-          const parts = person.date_of_birth.split('-');
-          if (parts.length >= 2) {
-            const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-            const month = months[parseInt(parts[1]) - 1] ?? '';
-            const year = parts[0];
-            const day = parts[2] && parts[2] !== '00' ? ` ${parseInt(parts[2])},` : ',';
-            return `${month}${day} ${year}`;
-          }
-          return person.date_of_birth;
-        })()
-      : undefined;
+    const dob = person.date_of_birth ? parseDob(person.date_of_birth) : undefined;
 
     // Additional phones (beyond the searched one)
     const cleanedInput = phone.replace(/\D/g, '');
