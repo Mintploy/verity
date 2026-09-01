@@ -8,6 +8,19 @@ import { lookupDonations } from './fec';
 import { checkSexOffenderRegistry } from './nsopw';
 import { lookupProfessional } from './pdl';
 
+// Cross-references two marital status sources. Flags conflicts (e.g. "Single" vs "Married")
+// since a mismatch between WP public records and BV aggregated data is itself meaningful.
+function resolveMaritalStatus(wpStatus?: string, bgStatus?: string): string {
+  const wp = wpStatus?.trim();
+  const bg = bgStatus?.trim();
+  if (!wp && !bg) return '—';
+  if (!wp) return bg!;
+  if (!bg) return wp;
+  if (wp.toLowerCase() === bg.toLowerCase()) return wp;
+  // Sources disagree — surface both so the reader can see the discrepancy
+  return `${bg} (public records show: ${wp})`;
+}
+
 export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -108,8 +121,8 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     addresses: addressHistory,
     propertyIntelligence: addr?.propertyIntelligence ?? [],
     relationships: {
-      status: bg?.maritalStatus ?? '—',
-      spouse: bg?.spouse,
+      status: resolveMaritalStatus(wp?.maritalStatus, bg?.maritalStatus),
+      spouse: wp?.spouseName ?? bg?.spouse,
       priors: bg?.priorMarriages ?? '—',
       relatives: (wp?.relatives && wp.relatives.length > 0) ? wp.relatives : (bg?.relatives ?? []),
       associates: (wp?.additionalPhones && wp.additionalPhones.length > 0)

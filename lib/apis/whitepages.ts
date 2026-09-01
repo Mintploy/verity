@@ -29,6 +29,8 @@ export interface WhitepagesPeopleResult {
   jobTitle?: string;
   linkedinUrl?: string;
   additionalPhones?: string[];
+  maritalStatus?: string;
+  spouseName?: string;
 }
 
 export interface WhitepagesCombined {
@@ -114,12 +116,20 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       return best.date_of_birth;
     })() : undefined;
 
+    // Marital status — available in some Whitepages Pro packages
+    const wpMaritalStatus: string | undefined = best.marital_status ?? undefined;
+    const wpSpouse = (best.associated_people ?? best.relatives ?? [])
+      .find((r: any) => r.relation?.toLowerCase() === 'spouse' || r.type?.toLowerCase() === 'spouse');
+    const wpSpouseName: string | undefined = wpSpouse?.name ?? undefined;
+
     const personResult: WhitepagesPeopleResult = {
       fullName: best.name ?? undefined,
       age: best.age ?? undefined,
       dob,
       aliases: best.aliases ?? [],
       addresses: [...currentAddrs, ...historicAddrs],
+      maritalStatus: wpMaritalStatus,
+      spouseName: wpSpouseName,
       relatives: (best.relatives ?? []).map((r: any) => {
         const parts: string[] = [];
         if (r.name) parts.push(r.name);
