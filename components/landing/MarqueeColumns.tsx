@@ -25,7 +25,7 @@ const col2: Card[] = [
   { type: 'quote', text: 'He had an active warrant. I nearly went on that date.', attr: 'Priya M. · 31 · Chicago' },
   { type: 'data', label: 'Employer', val: 'Accenture · Senior Manager · est. $140k' },
   { type: 'tag', text: 'VoIP secondary line detected', tone: 'flag' },
-  { type: 'data', label: 'Sources checked', val: 'Whitepages · ATTOM · PACER · FEC · NSOPW' },
+  { type: 'data', label: 'Sources checked', val: 'Whitepages · ATTOM · CourtListener · FEC · NSOPW' },
   { type: 'score', score: 'green', label: 'Green light', sub: 'Proceed with ease.' },
   { type: 'tag', text: 'Age verified across profiles', tone: 'clear' },
 ];
