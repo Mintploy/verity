@@ -139,7 +139,7 @@ export async function lookupAddress(name?: string, phone?: string, addresses?: s
   const apiKey = process.env.ATTOM_API_KEY;
 
   if (!liveAllowed || !apiKey || apiKey === 'YOUR_ATTOM_KEY' || !addresses?.length) {
-    return getMockAddressData(phone);
+    return { addresses: [], propertyIntelligence: [] };
   }
 
   try {
@@ -170,34 +170,6 @@ export async function lookupAddress(name?: string, phone?: string, addresses?: s
     };
   } catch (e) {
     console.log('ATTOM_LOOKUP_ERROR:', String(e));
-    return getMockAddressData(phone);
+    return { addresses: [], propertyIntelligence: [] };
   }
-}
-
-const ADDRESS_SETS = [
-  [
-    { addr: '2847 Oak Canyon Dr, Scottsdale, AZ 85255', years: '3 years', current: true, detail: 'Single-family · Est. value $1.2M · Est. rent $4,800/mo', owned: false },
-    { addr: '1205 N 68th St, Unit 4, Phoenix, AZ 85008', years: '2019–2021', current: false, detail: 'Apartment, rented.' },
-    { addr: '9332 E Shea Blvd, Scottsdale, AZ 85260', years: '2016–2019', current: false, detail: 'Condo · Sold 2019 · $340,000.' },
-  ],
-  [
-    { addr: '184 W 10th St, Apt 12C, New York, NY 10014', years: '5 years', current: true, detail: 'Apartment · Est. rent $6,200/mo', owned: false },
-    { addr: '220 Riverside Blvd, Apt 8D, New York, NY 10069', years: '2016–2019', current: false, detail: 'Apartment, rented.' },
-  ],
-  [
-    { addr: '1742 Mulholland Dr, Los Angeles, CA 90046', years: '2 years', current: true, detail: 'Single-family · Owned · Est. value $3.4M', owned: true },
-    { addr: '8534 Fountain Ave, West Hollywood, CA 90069', years: '2018–2022', current: false, detail: 'Apartment, rented.' },
-    { addr: '3300 S Sepulveda Blvd, Unit 210, Los Angeles, CA 90034', years: '2015–2018', current: false, detail: 'Condo, rented.' },
-  ],
-];
-
-function phoneSeed(phone: string): number {
-  const d = phone.replace(/\D/g, '');
-  return d.slice(-4).split('').reduce((a, c, i) => a + parseInt(c) * (i + 1), 0);
-}
-
-function getMockAddressData(phone?: string): AttomAddressResult {
-  const s = phoneSeed(phone ?? '5000');
-  const set = ADDRESS_SETS[Math.abs(s) % ADDRESS_SETS.length];
-  return { addresses: set };
 }

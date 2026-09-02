@@ -373,22 +373,6 @@ export async function lookupPerson(phone: string, name?: string): Promise<Whitep
   }
 }
 
-function phoneSeed(phone: string): number {
-  const d = phone.replace(/\D/g, '');
-  return d.slice(-4).split('').reduce((a, c, i) => a + parseInt(c) * (i + 1), 0);
-}
-
-function pick<T>(arr: T[], n: number): T { return arr[Math.abs(n) % arr.length]; }
-
-function getMockPhoneData(phone: string): WhitepagesPhoneResult {
-  const s = phoneSeed(phone);
-  const isVoip = s % 9 === 0;
-  const carriers = ['T-Mobile', 'AT&T', 'Verizon', 'Google Fi', 'US Cellular', 'Metro by T-Mobile', 'Cricket Wireless', 'Boost Mobile'];
-  const ages = ['8 months', '2 years', '3 years', '5 years', '6 years', '8 years', '11 years', '14 years'];
-
-  if (isVoip) {
-    return { carrier: 'TextNow (VoIP)', lineType: 'voip', numberAge: '—', origin: 'United States', active: true,
-      voipFlag: 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.' };
-  }
-  return { carrier: pick(carriers, s), lineType: 'mobile', numberAge: pick(ages, s + 3), origin: 'United States', active: true };
+function getMockPhoneData(_phone: string): WhitepagesPhoneResult {
+  return { carrier: '—', lineType: 'mobile', numberAge: '—', origin: '—', active: true };
 }
