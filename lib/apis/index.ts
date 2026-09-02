@@ -118,7 +118,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       llcs: 'None found.',
       licenses: wp?.licenses ?? '—',
     },
-    publicRecords: buildPublicRecords(pub, fec),
+    publicRecords: buildPublicRecords(pub, fec, wp),
     social: {
       handles: wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : (wp?.emails?.length ? wp.emails.map(e => `Email: ${e}`) : []),
       candidates: generateSocialCandidates(resolvedName),
@@ -143,13 +143,19 @@ function getSummary(score: ScoreState): string {
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
-function buildPublicRecords(pub: any, fec: any): Array<any> {
+function buildPublicRecords(pub: any, fec: any, wp: any): Array<any> {
+  const criminal = wp?.criminal ?? pub?.criminal;
+  const bankruptcy = wp?.bankruptcy ?? pub?.bankruptcy;
+  const evictions = wp?.evictions ?? pub?.evictions;
+  const traffic = wp?.trafficRecords;
+
   return [
     { label: 'Sex offender registry', value: pub?.soRegistry ?? 'Not listed', good: !pub?.soRegistry || pub.soRegistry === 'Not listed' },
-    { label: 'Bankruptcy', value: pub?.bankruptcy ?? 'None found', good: !pub?.bankruptcy || pub.bankruptcy === 'None found' },
-    { label: 'Lawsuits & judgments', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
-    { label: 'Evictions', value: pub?.evictions ?? 'None found', good: !pub?.evictions || pub.evictions === 'None found' },
-    { label: 'Criminal record', value: pub?.criminal ?? 'None found', good: !pub?.criminal || pub.criminal === 'None found' },
+    { label: 'Criminal record', value: criminal ?? 'None found', good: !criminal, flag: !!criminal },
+    { label: 'Bankruptcy', value: bankruptcy ?? 'None found', good: !bankruptcy, flag: !!bankruptcy },
+    { label: 'Evictions', value: evictions ?? 'None found', good: !evictions, flag: !!evictions },
+    { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
+    ...(traffic ? [{ label: 'Traffic records', value: traffic, neutral: true }] : []),
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
     { label: 'Voter registration', value: pub?.voter ?? '—', neutral: true },
   ];

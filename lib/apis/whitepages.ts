@@ -45,6 +45,10 @@ export interface WhitepagesPeopleResult {
   priorMarriages?: string;
   licenses?: string;
   education?: string[];
+  criminal?: string;
+  bankruptcy?: string;
+  evictions?: string;
+  trafficRecords?: string;
 }
 
 export interface WhitepagesCombined {
@@ -156,6 +160,51 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       return [e.school_name ?? e.name, e.degree, e.graduation_year ? `${e.graduation_year}` : null].filter(Boolean).join(', ');
     }).filter(Boolean);
 
+    // Criminal records (available on higher WP tiers)
+    const criminalRecs: any[] = best.criminal_records ?? best.criminal ?? [];
+    let criminal: string | undefined;
+    if (Array.isArray(criminalRecs) && criminalRecs.length > 0) {
+      const summaries = criminalRecs.map((c: any) => {
+        return [c.charge ?? c.description ?? c.type, c.disposition, c.date ? new Date(c.date).getFullYear() : null, c.state].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+      criminal = summaries.join('; ') || `${criminalRecs.length} record${criminalRecs.length !== 1 ? 's' : ''} found`;
+    }
+
+    // Traffic records
+    const trafficRecs: any[] = best.traffic_records ?? best.traffic ?? [];
+    let trafficRecords: string | undefined;
+    if (Array.isArray(trafficRecs) && trafficRecs.length > 0) {
+      const summaries = trafficRecs.map((t: any) => {
+        return [t.violation ?? t.description ?? t.type, t.disposition, t.date ? new Date(t.date).getFullYear() : null, t.state].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+      trafficRecords = summaries.join('; ') || `${trafficRecs.length} record${trafficRecs.length !== 1 ? 's' : ''} found`;
+    }
+
+    // Bankruptcy records
+    const bankruptcyRecs: any[] = best.bankruptcies ?? best.bankruptcy_records ?? [];
+    let bankruptcy: string | undefined;
+    if (Array.isArray(bankruptcyRecs) && bankruptcyRecs.length > 0) {
+      const summaries = bankruptcyRecs.map((b: any) => {
+        const chapter = b.chapter ? `Chapter ${b.chapter}` : b.type;
+        const year = b.filing_date ? new Date(b.filing_date).getFullYear() : null;
+        const disposition = b.disposition ?? b.status;
+        return [chapter, disposition, year].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+      bankruptcy = summaries.join('; ') || `${bankruptcyRecs.length} filing${bankruptcyRecs.length !== 1 ? 's' : ''} found`;
+    }
+
+    // Eviction records
+    const evictionRecs: any[] = best.evictions ?? best.eviction_records ?? [];
+    let evictions: string | undefined;
+    if (Array.isArray(evictionRecs) && evictionRecs.length > 0) {
+      const summaries = evictionRecs.map((e: any) => {
+        const year = e.filing_date ? new Date(e.filing_date).getFullYear() : null;
+        const disposition = e.disposition ?? e.status;
+        return [year, disposition, e.state].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+      evictions = summaries.join('; ') || `${evictionRecs.length} filing${evictionRecs.length !== 1 ? 's' : ''} found`;
+    }
+
     const personResult: WhitepagesPeopleResult = {
       fullName: best.name ?? undefined,
       age: best.age ?? undefined,
@@ -196,6 +245,10 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       priorMarriages,
       licenses,
       education: education.length > 0 ? education : undefined,
+      criminal,
+      trafficRecords,
+      bankruptcy,
+      evictions,
     };
 
     return { phone: phoneResult, person: personResult };
