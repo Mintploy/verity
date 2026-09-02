@@ -231,8 +231,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
 
       <div id="sec-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <Section eyebrow="01" title="Phone intelligence">
-          <KVRow label="Carrier" value={report.phone.carrier} />
-          <KVRow label="Line type" value={report.phone.lineType === 'voip' ? 'Mobile + VoIP secondary' : report.phone.lineType === 'mobile' ? 'Mobile, single line' : 'Landline'} />
+          <KVRow label="Number type" value={report.phone.lineType === 'voip' ? 'VoIP — not a carrier line' : report.phone.lineType === 'mobile' ? 'Mobile (carrier line)' : 'Landline'} />
           <KVRow label="Number age" value={report.phone.numberAge} />
           <KVRow label="Origin" value={report.phone.origin} />
           {report.phone.voipFlag && <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.phone.voipFlag}</FlagNote>}

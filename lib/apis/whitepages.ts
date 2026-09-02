@@ -99,7 +99,7 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
     const phoneResult: WhitepagesPhoneResult = {
       carrier: carrierName,
       lineType,
-      voipFlag: lineType === 'voip' ? 'Number registered to a VoIP service. May indicate a secondary or temporary line.' : undefined,
+      voipFlag: lineType === 'voip' ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.' : undefined,
       numberAge: phoneRecord?.prepaid ? 'Prepaid line' : '—',
       origin: phoneRecord?.country_calling_code === '1' || !phoneRecord?.country_calling_code ? 'United States' : 'International',
       active: !(best.is_dead ?? false),
@@ -246,7 +246,7 @@ export async function lookupPhone(phone: string): Promise<WhitepagesPhoneResult>
     return {
       carrier: phoneRecord?.type ?? 'Unknown',
       lineType,
-      voipFlag: lineType === 'voip' ? 'Number registered to a VoIP service. May indicate a secondary or temporary line.' : undefined,
+      voipFlag: lineType === 'voip' ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.' : undefined,
       numberAge: '—',
       origin: 'United States',
       active: !best.is_dead,
@@ -388,7 +388,7 @@ function getMockPhoneData(phone: string): WhitepagesPhoneResult {
 
   if (isVoip) {
     return { carrier: 'TextNow (VoIP)', lineType: 'voip', numberAge: '—', origin: 'United States', active: true,
-      voipFlag: 'Number registered to a VoIP service — not a carrier-issued line. May indicate a secondary or temporary number.' };
+      voipFlag: 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.' };
   }
   return { carrier: pick(carriers, s), lineType: 'mobile', numberAge: pick(ages, s + 3), origin: 'United States', active: true };
 }

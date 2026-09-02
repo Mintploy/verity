@@ -1,6 +1,5 @@
 import { Nav } from '@/components/nav/Nav';
 import { Hero } from '@/components/landing/Hero';
-import { PressStrip } from '@/components/landing/PressStrip';
 import { HowItWorks } from '@/components/landing/HowItWorks';
 import { MarqueeColumns } from '@/components/landing/MarqueeColumns';
 import { WhatYouKnow } from '@/components/landing/WhatYouKnow';
@@ -13,7 +12,6 @@ export default function HomePage() {
     <main style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav showCompare />
       <Hero />
-      <PressStrip />
       <HowItWorks />
       <MarqueeColumns />
       <WhatYouKnow />
