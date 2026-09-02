@@ -6,7 +6,6 @@ import { generateSocialCandidates } from './social';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { checkSexOffenderRegistry } from './nsopw';
-import { lookupProfessional } from './pdl';
 
 
 export async function generateReport(req: SearchRequest): Promise<Report> {
@@ -26,8 +25,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   // enrichHistorical gates whether we look up 1 address (default) or up to 3.
   const wpAddresses = wp?.addresses?.map((a: any) => a.addr).filter(Boolean) ?? [];
 
-  const [profData, addressData, fecData] = await Promise.allSettled([
-    lookupProfessional(bestName),
+  const [addressData, fecData] = await Promise.allSettled([
     lookupAddress(bestName, req.phone, wpAddresses.length ? wpAddresses : undefined, req.enrichHistorical),
     lookupDonations(bestName),
   ]);
@@ -47,7 +45,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
 
   const phone = wpCombined?.phone ?? null;
   const pub = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
-  const prof = profData.status === 'fulfilled' ? profData.value : null;
   const addr = addressData.status === 'fulfilled' ? addressData.value : null;
   const fec = fecData.status === 'fulfilled' ? fecData.value : null;
 
@@ -78,7 +75,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     headline: getHeadline(score),
     summary: getSummary(score),
     confidence: wp?.fullName ? 96 : 88,
-    sources: wp?.fullName ? 8 : 7,
+    sources: wp?.fullName ? 5 : 4,
     generatedAt: new Date().toISOString(),
     subject: {
       name: resolvedName,
@@ -115,13 +112,13 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
           : resolvedAssociates,
     },
     professional: {
-      title: wp?.jobTitle ?? prof?.title ?? '—',
-      company: wp?.company ?? prof?.company ?? '—',
-      tenure: prof?.tenure ?? '—',
-      llcs: prof?.llcs ?? 'None found.',
-      licenses: wp?.licenses ?? prof?.licenses ?? '—',
+      title: wp?.jobTitle ?? '—',
+      company: wp?.company ?? '—',
+      tenure: '—',
+      llcs: 'None found.',
+      licenses: wp?.licenses ?? '—',
     },
-    publicRecords: buildPublicRecords(pub, fec, prof?.licenses),
+    publicRecords: buildPublicRecords(pub, fec),
     social: {
       handles: wp?.linkedinUrl ? [`LinkedIn: ${wp.linkedinUrl}`] : (wp?.emails?.length ? wp.emails.map(e => `Email: ${e}`) : []),
       candidates: generateSocialCandidates(resolvedName),
@@ -146,15 +143,13 @@ function getSummary(score: ScoreState): string {
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
-function buildPublicRecords(pub: any, fec: any, pdlLicenses?: string): Array<any> {
-  const licenseValue = pdlLicenses && pdlLicenses !== '—' ? pdlLicenses : (pub?.licenses ?? '—');
+function buildPublicRecords(pub: any, fec: any): Array<any> {
   return [
     { label: 'Sex offender registry', value: pub?.soRegistry ?? 'Not listed', good: !pub?.soRegistry || pub.soRegistry === 'Not listed' },
     { label: 'Bankruptcy', value: pub?.bankruptcy ?? 'None found', good: !pub?.bankruptcy || pub.bankruptcy === 'None found' },
     { label: 'Lawsuits & judgments', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
     { label: 'Evictions', value: pub?.evictions ?? 'None found', good: !pub?.evictions || pub.evictions === 'None found' },
     { label: 'Criminal record', value: pub?.criminal ?? 'None found', good: !pub?.criminal || pub.criminal === 'None found' },
-    { label: 'Professional licenses', value: licenseValue, neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
     { label: 'Voter registration', value: pub?.voter ?? '—', neutral: true },
   ];

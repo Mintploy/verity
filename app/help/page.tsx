@@ -21,7 +21,7 @@ const faqs = [
       },
       {
         q: 'What sources do you use?',
-        a: "Whitepages Pro (carrier, identity, and professional data), ATTOM (property and address history), PDL (professional background), PACER (federal court records), FEC (political donations), and NSOPW (sex offender registry). Six sources, cross-referenced and scored.",
+        a: "Whitepages Pro (carrier, identity, and professional data), ATTOM (property and address history), CourtListener (federal court records), FEC (political donations), and NSOPW (sex offender registry). Five sources, cross-referenced and scored.",
       },
     ],
   },
