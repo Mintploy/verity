@@ -1,40 +1,31 @@
 import { SearchRequest, Report, ScoreState } from '../types';
 
-import { lookupWhitepages } from './whitepages';
-import { lookupAddress } from './attom';
+import { lookupEnformion } from './enformion';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { checkSexOffenderRegistry } from './nsopw';
-import { lookupBusinessEntities } from './opencorporates';
-import { generateNarrative } from './narrative';
 
 export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
-  const [wpResult, publicRecs, soRegistry] = await Promise.allSettled([
-    lookupWhitepages(req.phone, req.name),
+  const [enResult, publicRecs, soRegistry] = await Promise.allSettled([
+    lookupEnformion(req.phone, req.name),
     lookupPublicRecords(req.name, req.phone),
     checkSexOffenderRegistry(req.name),
   ]);
 
-  const wpCombined = wpResult.status === 'fulfilled' ? wpResult.value : null;
-  const wp = wpCombined?.person ?? null;
-  const bestName = wp?.fullName ?? req.name;
-
-  const wpAddresses = wp?.addresses?.map((a: any) => a.addr).filter(Boolean) ?? [];
-
-  const [addressData, fecData, bizData] = await Promise.allSettled([
-    lookupAddress(bestName, req.phone, wpAddresses.length ? wpAddresses : undefined, req.enrichHistorical),
-    lookupDonations(bestName),
-    lookupBusinessEntities(bestName),
-  ]);
+  const en = enResult.status === 'fulfilled' ? enResult.value : null;
+  const person = en?.person ?? {};
+  const phone = en?.phone ?? null;
 
   const flags: string[] = [];
-  if (wpCombined?.phone?.lineType === 'voip') flags.push('voip');
+  if (phone?.lineType === 'voip') flags.push('voip');
   if (publicRecs.status === 'fulfilled' && publicRecs.value?.hasFlags) flags.push('public');
   if (soRegistry.status === 'fulfilled' && soRegistry.value?.onRegistry) flags.push('soregistry');
+  if (person.criminal) flags.push('criminal');
+  if (person.bankruptcy) flags.push('bankruptcy');
 
-  const score: ScoreState = soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry
+  const score: ScoreState = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry) || person.criminal
     ? 'red'
     : flags.length >= 2
     ? 'yellow'
@@ -42,44 +33,20 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     ? 'green'
     : 'yellow';
 
-  const phone = wpCombined?.phone ?? null;
   const pub = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
-  const addr = addressData.status === 'fulfilled' ? addressData.value : null;
-  const fec = fecData.status === 'fulfilled' ? fecData.value : null;
-  const biz = bizData.status === 'fulfilled' ? bizData.value : null;
+  const fecResult = await lookupDonations(person.fullName ?? req.name).catch(() => null);
 
-  // Merge ATTOM purchase date into WP address list for accurate duration labels.
-  const baseAddresses = (wp?.addresses && wp.addresses.length > 0) ? wp.addresses : addr?.addresses ?? [];
-  const attomProps = addr?.propertyIntelligence ?? [];
-  const addressHistory = baseAddresses.map((wpAddr: any, i: number) => {
-    const attom = attomProps[i];
-    if (!attom) return wpAddr;
-    return {
-      ...wpAddr,
-      years: attom.yearsOwned ?? attom.purchaseDate ?? wpAddr.years,
-      detail: [attom.propertyType, attom.currentValue ? `Est. value ${attom.currentValue}` : null, attom.estimatedRent ? `Est. rent ${attom.estimatedRent}` : null].filter(Boolean).join(' · ') || wpAddr.detail,
-    };
-  });
+  const resolvedName = person.fullName ?? req.name ?? 'Unknown';
+  const resolvedAge = person.age ?? 0;
+  const resolvedDob = person.dob ?? '—';
+  const resolvedAliases = person.aliases?.length ? person.aliases : undefined;
 
-  const resolvedName = wp?.fullName ?? req.name ?? 'Unknown';
-  const resolvedAge = wp?.age ?? 0;
-  const resolvedDob = wp?.dob ?? '—';
-  const resolvedAliases = wp?.aliases?.length ? wp.aliases : undefined;
-  const resolvedAssociates = wp?.associates ?? [];
+  const businessEntities = person.businessEntities ?? 'None found.';
 
-  // Business entities: WP affiliations + OpenCorporates
-  const wpBizLines = wp?.businessAffiliations ?? [];
-  const ocBizLines = (biz?.businessEntities && biz.businessEntities !== 'None found.')
-    ? biz.businessEntities.split('\n') : [];
-  const allBizLines = [...new Set([...wpBizLines, ...ocBizLines])];
-  const businessEntities = allBizLines.length ? allBizLines.join('\n') : 'None found.';
+  const publicRecords = buildPublicRecords(pub, fecResult, person);
 
-  const publicRecords = buildPublicRecords(pub, fec);
-
-  // LinkedIn URL from WP is the only confirmed social handle we can verify
   const confirmedHandles: string[] = [];
-  if (wp?.linkedinUrl) confirmedHandles.push(`LinkedIn: ${wp.linkedinUrl}`);
-  if (wp?.emails?.length) wp.emails.forEach((e: string) => confirmedHandles.push(`Email: ${e}`));
+  if (person.emails?.length) person.emails.forEach((e: string) => confirmedHandles.push(`Email: ${e}`));
 
   const report: Report = {
     id: searchId,
@@ -87,8 +54,8 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     score,
     headline: getHeadline(score),
     summary: getSummary(score),
-    confidence: wp?.fullName ? 96 : 88,
-    sources: wp?.fullName ? 5 : 4,
+    confidence: person.fullName ? 96 : 88,
+    sources: person.fullName ? 4 : 3,
     generatedAt: new Date().toISOString(),
     subject: {
       name: resolvedName,
@@ -97,10 +64,10 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       dob: resolvedDob,
     },
     phone: {
-      carrier: phone?.carrier ?? '—',
+      carrier: '—',
       lineType: phone?.lineType ?? 'mobile',
       voipFlag: phone?.voipFlag,
-      numberAge: phone?.numberAge ?? '—',
+      numberAge: '—',
       origin: phone?.origin ?? '—',
       active: phone?.active ?? true,
     },
@@ -108,59 +75,38 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       fullName: resolvedName,
       age: resolvedAge,
       dob: resolvedDob,
-      verifiedBy: wp?.fullName ? 4 : 3,
+      verifiedBy: person.fullName ? 4 : 3,
       aliases: resolvedAliases,
     },
-    addresses: addressHistory,
-    propertyIntelligence: addr?.propertyIntelligence ?? [],
+    addresses: person.addresses ?? [],
+    propertyIntelligence: person.propertyIntelligence ?? [],
     relationships: {
-      status: wp?.maritalStatus ?? '—',
-      spouse: wp?.spouseName,
-      priors: wp?.priorMarriages ?? '—',
-      relatives: wp?.relatives ?? [],
-      associates: (wp?.associates && wp.associates.length > 0)
-        ? wp.associates
-        : (wp?.additionalPhones && wp.additionalPhones.length > 0)
-          ? [`Additional numbers on file: ${wp.additionalPhones.join(', ')}`]
-          : resolvedAssociates,
+      status: person.maritalStatus ?? '—',
+      spouse: person.spouseName,
+      priors: person.priorMarriages ?? '—',
+      relatives: person.relatives ?? [],
+      associates: person.associates?.length
+        ? person.associates
+        : person.additionalPhones?.length
+          ? [`Additional numbers on file: ${person.additionalPhones.join(', ')}`]
+          : [],
     },
     professional: {
-      title: wp?.jobTitle ?? '—',
-      company: wp?.company ?? '—',
+      title: person.jobTitle ?? '—',
+      company: person.company ?? '—',
       tenure: '—',
       llcs: 'None found.',
-      licenses: wp?.licenses ?? '—',
+      licenses: person.licenses ?? '—',
       businessEntities,
     },
     publicRecords,
     social: {
       handles: confirmedHandles,
-      presence: confirmedHandles.length > 0 ? 'Confirmed profile(s) found via Whitepages.' : 'No confirmed profiles found.',
+      presence: confirmedHandles.length > 0 ? 'Confirmed profile(s) found.' : 'No confirmed profiles found.',
       inconsistency: 'None flagged.',
     },
     nextSteps: getNextSteps(score, flags),
   };
-
-  // Generate AI narrative last (non-blocking — if it fails the report still returns)
-  const narrative = await generateNarrative({
-    name: resolvedName,
-    age: resolvedAge || undefined,
-    dob: resolvedDob !== '—' ? resolvedDob : undefined,
-    maritalStatus: report.relationships.status !== '—' ? report.relationships.status : undefined,
-    priorMarriages: report.relationships.priors !== '—' ? report.relationships.priors : undefined,
-    spouse: report.relationships.spouse,
-    jobTitle: report.professional.title !== '—' ? report.professional.title : undefined,
-    company: report.professional.company !== '—' ? report.professional.company : undefined,
-    businessEntities: businessEntities !== 'None found.' ? businessEntities : undefined,
-    licenses: report.professional.licenses !== '—' ? report.professional.licenses : undefined,
-    addresses: addressHistory,
-    propertyIntelligence: addr?.propertyIntelligence,
-    publicRecords,
-    phoneLineType: phone?.lineType,
-    score,
-  }).catch(() => null);
-
-  if (narrative) report.narrative = narrative;
 
   return report;
 }
@@ -177,13 +123,16 @@ function getSummary(score: ScoreState): string {
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
-function buildPublicRecords(pub: any, fec: any): Array<any> {
-  return [
+function buildPublicRecords(pub: any, fec: any, person: any): Array<any> {
+  const records = [
     { label: 'Sex offender registry', value: pub?.soRegistry ?? 'Not listed', good: !pub?.soRegistry || pub.soRegistry === 'Not listed' },
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
+    { label: 'Criminal record', value: person?.criminal ?? 'None found', good: !person?.criminal, flag: !!person?.criminal },
+    { label: 'Bankruptcy filings', value: person?.bankruptcy ?? 'None found', good: !person?.bankruptcy, flag: !!person?.bankruptcy },
+    { label: 'Evictions', value: person?.evictions ?? 'None found', good: !person?.evictions, flag: !!person?.evictions },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
-    { label: 'Voter registration', value: pub?.voter ?? '—', neutral: true },
   ];
+  return records;
 }
 
 function getNextSteps(score: ScoreState, flags: string[]): string[] {

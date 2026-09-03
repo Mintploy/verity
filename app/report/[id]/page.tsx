@@ -229,27 +229,6 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </div>
       </div>
 
-      {report.narrative && (
-        <Section eyebrow="Profile overview" title={`${report.subject.name}`} accent="var(--blush-pale)">
-          <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 17, lineHeight: 1.75, color: 'var(--dark)', margin: '0 0 28px', fontWeight: 400 }}>
-            {report.narrative.scoop}
-          </p>
-          {report.narrative.highlights.length > 0 && (
-            <>
-              <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.4, textTransform: 'uppercase' as const, marginBottom: 12 }}>Summary</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                {report.narrative.highlights.map((h, i) => (
-                  <div key={i} style={{ padding: '16px 18px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', borderTop: '2px solid var(--rose)' }}>
-                    <div style={{ fontFamily: 'var(--sans)', fontSize: 10, fontWeight: 600, letterSpacing: 0.6, color: 'var(--rose)', textTransform: 'uppercase' as const, marginBottom: 6 }}>{h.label}</div>
-                    <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.55, fontWeight: 300 }}>{h.detail}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </Section>
-      )}
-
       <div id="sec-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <Section eyebrow="01" title="Phone intelligence">
           <KVRow label="Number type" value={report.phone.lineType === 'voip' ? 'VoIP — not a carrier line' : report.phone.lineType === 'mobile' ? 'Mobile (carrier line)' : 'Landline'} />
@@ -355,7 +334,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
             ))}
           </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--mauve-deep)', marginTop: 12, fontStyle: 'italic' }}>
-            Property data sourced from ATTOM Data Solutions. Values are estimates and may not reflect current market conditions.
+            Property data sourced from Enformion. Values are estimates and may not reflect current market conditions.
           </div>
         </Section>
       )}
@@ -427,7 +406,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           It tells you what's true today, so you can decide tomorrow.
         </div>
         <div style={{ marginTop: 14, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', letterSpacing: 0.3, lineHeight: 1.6 }}>
-          Sources: Whitepages Pro, ATTOM, CourtListener, FEC, NSOPW
+          Sources: Enformion, CourtListener, FEC, NSOPW
         </div>
       </div>
     </main>
