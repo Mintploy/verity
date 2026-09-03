@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export interface NarrativeResult {
   scoop: string;
-  vibes: Array<{ label: string; detail: string }>;
+  highlights: Array<{ label: string; detail: string }>;
 }
 
 export async function generateNarrative(data: {
@@ -65,18 +65,20 @@ export async function generateNarrative(data: {
     if (clean.length) lines.push(`Clean records: ${clean.map(r => r.label).join(', ')}`);
   }
 
-  const prompt = `You are Verity, a women's safety intelligence service. You just completed a background search on a man a woman is considering dating. Your role is the brilliant older sister — warm, direct, honest, never alarmist.
+  const prompt = `You are Verity, a private intelligence service trusted by accomplished, discerning women. Your reader is a high-achieving professional — she is perceptive, values precision, and expects to be treated as an equal. She has run a background profile on a man she is considering spending time with.
 
-Write "The Scoop" — a 2-3 sentence summary of what matters about this person, based only on the data below. Do not speculate or invent anything not in the data. If data is sparse, keep it short and honest. Then produce 3-6 "Key Vibes" — short cards (a label and one sentence) covering the most notable facts.
+Write a concise, authoritative 2-3 sentence profile summary based strictly on the data below. Do not speculate beyond the data. If information is limited, say so plainly — she will respect honesty over filler. Tone: measured, factual, quietly direct. Not casual. Not alarmist. Think senior analyst briefing a partner, not a friend texting.
+
+Then produce 3-6 profile highlights — brief labeled facts covering the most material points: employment, property, relationship history, financial standing, and any flags worth noting.
 
 DATA:
 ${lines.join('\n')}
 
 Return valid JSON only:
 {
-  "scoop": "2-3 sentence paragraph",
-  "vibes": [
-    { "label": "Short label", "detail": "One sentence fact." }
+  "scoop": "2-3 sentence profile summary",
+  "highlights": [
+    { "label": "Concise label", "detail": "One precise sentence." }
   ]
 }`;
 
@@ -91,7 +93,7 @@ Return valid JSON only:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.scoop || !Array.isArray(parsed.vibes)) return null;
+    if (!parsed.scoop || !Array.isArray(parsed.highlights)) return null;
     return parsed as NarrativeResult;
   } catch (e) {
     console.log('NARRATIVE_ERROR:', String(e));

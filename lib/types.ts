@@ -68,7 +68,7 @@ export interface Professional {
 
 export interface Narrative {
   scoop: string;
-  vibes: Array<{ label: string; detail: string }>;
+  highlights: Array<{ label: string; detail: string }>;
 }
 
 export interface PublicRecord {

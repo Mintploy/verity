@@ -230,19 +230,22 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       </div>
 
       {report.narrative && (
-        <Section eyebrow="The Scoop" title={`Here's what we found on ${report.subject.name.split(' ')[0]}`} accent="var(--blush-pale)">
-          <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 17, lineHeight: 1.75, color: 'var(--dark)', margin: '0 0 24px', fontWeight: 400 }}>
-            "{report.narrative.scoop}"
+        <Section eyebrow="Profile overview" title={`${report.subject.name}`} accent="var(--blush-pale)">
+          <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 17, lineHeight: 1.75, color: 'var(--dark)', margin: '0 0 28px', fontWeight: 400 }}>
+            {report.narrative.scoop}
           </p>
-          {report.narrative.vibes.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-              {report.narrative.vibes.map((v, i) => (
-                <div key={i} style={{ padding: '14px 16px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', borderTop: '2px solid var(--rose)' }}>
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 10, fontWeight: 600, letterSpacing: 0.6, color: 'var(--rose)', textTransform: 'uppercase' as const, marginBottom: 6 }}>{v.label}</div>
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', lineHeight: 1.5, fontWeight: 300 }}>{v.detail}</div>
-                </div>
-              ))}
-            </div>
+          {report.narrative.highlights.length > 0 && (
+            <>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.4, textTransform: 'uppercase' as const, marginBottom: 12 }}>Summary</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                {report.narrative.highlights.map((h, i) => (
+                  <div key={i} style={{ padding: '16px 18px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', borderTop: '2px solid var(--rose)' }}>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 10, fontWeight: 600, letterSpacing: 0.6, color: 'var(--rose)', textTransform: 'uppercase' as const, marginBottom: 6 }}>{h.label}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.55, fontWeight: 300 }}>{h.detail}</div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </Section>
       )}
