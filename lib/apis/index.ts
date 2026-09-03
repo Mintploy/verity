@@ -22,10 +22,11 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (phone?.lineType === 'voip') flags.push('voip');
   if (publicRecs.status === 'fulfilled' && publicRecs.value?.hasFlags) flags.push('public');
   if (soRegistry.status === 'fulfilled' && soRegistry.value?.onRegistry) flags.push('soregistry');
-  if (person.criminal) flags.push('criminal');
-  if (person.bankruptcy) flags.push('bankruptcy');
+  if (person.hasBankruptcy) flags.push('bankruptcy');
+  if (person.hasEvictions) flags.push('evictions');
+  if (person.hasJudgments || person.hasLiens || person.hasForeclosures) flags.push('financial');
 
-  const score: ScoreState = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry) || person.criminal
+  const score: ScoreState = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
     ? 'red'
     : flags.length >= 2
     ? 'yellow'
@@ -41,7 +42,8 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const resolvedDob = person.dob ?? '—';
   const resolvedAliases = person.aliases?.length ? person.aliases : undefined;
 
-  const businessEntities = person.businessEntities ?? 'None found.';
+  // Employment/business not available in person search response — indicator only
+  const businessEntities = person.hasBusinessRecords ? 'Business affiliations on record — details require further lookup.' : 'None found.';
 
   const publicRecords = buildPublicRecords(pub, fecResult, person);
 
@@ -64,7 +66,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       dob: resolvedDob,
     },
     phone: {
-      carrier: '—',
+      carrier: phone?.carrier ?? '—',
       lineType: phone?.lineType ?? 'mobile',
       voipFlag: phone?.voipFlag,
       numberAge: '—',
@@ -79,7 +81,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       aliases: resolvedAliases,
     },
     addresses: person.addresses ?? [],
-    propertyIntelligence: person.propertyIntelligence ?? [],
+    propertyIntelligence: [],
     relationships: {
       status: person.maritalStatus ?? '—',
       spouse: person.spouseName,
@@ -127,9 +129,9 @@ function buildPublicRecords(pub: any, fec: any, person: any): Array<any> {
   const records = [
     { label: 'Sex offender registry', value: pub?.soRegistry ?? 'Not listed', good: !pub?.soRegistry || pub.soRegistry === 'Not listed' },
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
-    { label: 'Criminal record', value: person?.criminal ?? 'None found', good: !person?.criminal, flag: !!person?.criminal },
-    { label: 'Bankruptcy filings', value: person?.bankruptcy ?? 'None found', good: !person?.bankruptcy, flag: !!person?.bankruptcy },
-    { label: 'Evictions', value: person?.evictions ?? 'None found', good: !person?.evictions, flag: !!person?.evictions },
+    { label: 'Bankruptcy filings', value: person?.hasBankruptcy ? 'On file — details require further review' : 'None on file', good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
+    { label: 'Eviction records', value: person?.hasEvictions ? 'On file — details require further review' : 'None on file', good: !person?.hasEvictions, flag: !!person?.hasEvictions },
+    { label: 'Judgments / liens', value: (person?.hasJudgments || person?.hasLiens) ? 'On file — details require further review' : 'None on file', good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
   ];
   return records;
