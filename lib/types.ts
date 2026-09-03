@@ -63,6 +63,12 @@ export interface Professional {
   tenure: string;
   llcs: string;
   licenses?: string;
+  businessEntities?: string;
+}
+
+export interface Narrative {
+  scoop: string;
+  vibes: Array<{ label: string; detail: string }>;
 }
 
 export interface PublicRecord {
@@ -82,7 +88,6 @@ export interface SocialCandidate {
 
 export interface SocialFootprint {
   handles: string[];
-  candidates: SocialCandidate[];
   presence: string;
   inconsistency: string;
 }
@@ -111,6 +116,7 @@ export interface Report {
   publicRecords: PublicRecord[];
   social: SocialFootprint;
   nextSteps: string[];
+  narrative?: Narrative;
 }
 
 export interface VerificationStatus {

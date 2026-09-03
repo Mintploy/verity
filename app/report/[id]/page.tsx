@@ -229,11 +229,28 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </div>
       </div>
 
+      {report.narrative && (
+        <Section eyebrow="The Scoop" title={`Here's what we found on ${report.subject.name.split(' ')[0]}`} accent="var(--blush-pale)">
+          <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 17, lineHeight: 1.75, color: 'var(--dark)', margin: '0 0 24px', fontWeight: 400 }}>
+            "{report.narrative.scoop}"
+          </p>
+          {report.narrative.vibes.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+              {report.narrative.vibes.map((v, i) => (
+                <div key={i} style={{ padding: '14px 16px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', borderTop: '2px solid var(--rose)' }}>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 10, fontWeight: 600, letterSpacing: 0.6, color: 'var(--rose)', textTransform: 'uppercase' as const, marginBottom: 6 }}>{v.label}</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', lineHeight: 1.5, fontWeight: 300 }}>{v.detail}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
       <div id="sec-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <Section eyebrow="01" title="Phone intelligence">
           <KVRow label="Number type" value={report.phone.lineType === 'voip' ? 'VoIP — not a carrier line' : report.phone.lineType === 'mobile' ? 'Mobile (carrier line)' : 'Landline'} />
-          <KVRow label="Number age" value={report.phone.numberAge} />
-          <KVRow label="Origin" value={report.phone.origin} />
+          {report.phone.origin && report.phone.origin !== '—' && <KVRow label="Origin" value={report.phone.origin} />}
           {report.phone.voipFlag && <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.phone.voipFlag}</FlagNote>}
         </Section>
 
@@ -356,8 +373,11 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
             <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--dark)', lineHeight: 1.2 }}>{report.professional.title}</div>
             <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 4 }}>{report.professional.company} · {report.professional.tenure}</div>
           </div>
+          {report.professional.licenses && report.professional.licenses !== '—' && (
+            <KVRow label="Licenses" value={report.professional.licenses} />
+          )}
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Business entities</div>
-          <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, fontWeight: 300 }}>{report.professional.llcs}</div>
+          <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.7, fontWeight: 300, whiteSpace: 'pre-line' }}>{report.professional.businessEntities ?? report.professional.llcs}</div>
         </Section>
       </div>
 
@@ -390,34 +410,12 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
             </div>
           </div>
         )}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 4 }}>Summary</div>
+        <div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.6, fontWeight: 300 }}>{report.social.presence}</div>
           {report.social.inconsistency !== 'None flagged.' && (
             <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.social.inconsistency}</FlagNote>
           )}
         </div>
-        {report.social.candidates && report.social.candidates.length > 0 && (
-          <div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 4 }}>Possible profiles to check</div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--dark-soft)', marginBottom: 10, fontStyle: 'italic' }}>Based on name · not verified · click to search each platform</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {report.social.candidates.map((c, i) => (
-                <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)',
-                  textDecoration: 'none', gap: 8,
-                }}>
-                  <div>
-                    <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 600, color: 'var(--dark)', letterSpacing: 0.2 }}>{c.platform}</div>
-                    <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 2 }}>{c.handle}</div>
-                  </div>
-                  <span style={{ color: 'var(--mauve)', fontSize: 12 }}>↗</span>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
       </Section>
 
       <div style={{ textAlign: 'center', marginTop: 12, padding: '16px 0' }}>

@@ -29,6 +29,19 @@ export interface AttomAddressResult {
   propertyIntelligence?: AttomPropertyResult[];
 }
 
+const COMMERCIAL_TYPES = new Set(['COMM', 'COMML', 'RETAIL', 'OFFICE', 'IND', 'INDUSTRIAL', 'HOTEL', 'MOTEL', 'WAREHOUSE', 'MXD', 'SPECIAL']);
+const RESIDENTIAL_TYPES = new Set(['SFR', 'CONDO', 'CONDOMINIUM', 'APT', 'APARTMENT', 'TWNHS', 'TOWNHOUSE', 'MFR', 'MH', 'MOBILEHOME', 'DUPLEX', 'TRIPLEX', 'QUADPLEX', 'COOPERATIVE']);
+
+function classifyPropertyType(raw: string): string {
+  const upper = raw.toUpperCase().replace(/[\s_-]/g, '');
+  if (COMMERCIAL_TYPES.has(upper)) return `Commercial — ${raw}`;
+  if (RESIDENTIAL_TYPES.has(upper)) {
+    const labels: Record<string, string> = { SFR: 'Single-family home', CONDO: 'Condominium', CONDOMINIUM: 'Condominium', APT: 'Apartment', TWNHS: 'Townhouse', MH: 'Mobile home', DUPLEX: 'Duplex', TRIPLEX: 'Triplex', COOPERATIVE: 'Co-op' };
+    return labels[upper] ?? raw;
+  }
+  return raw || 'Residential';
+}
+
 function splitAddress(fullAddress: string): { address1: string; address2: string } {
   const parts = fullAddress.split(',');
   if (parts.length >= 3) {
@@ -93,11 +106,11 @@ async function fetchPropertyIntelligence(fullAddress: string, apiKey: string): P
         if (sale?.calculation?.recordingDate) {
           const d = new Date(sale.calculation.recordingDate);
           purchaseDate = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          const years = new Date().getFullYear() - d.getFullYear();
-          yearsOwned = years <= 1 ? 'Less than 1 year' : `${years} years`;
+          yearsOwned = `Since ${purchaseDate}`;
         }
 
-        propertyType = prop.summary?.propType ?? undefined;
+        const rawPropType: string = prop.summary?.propSubType ?? prop.summary?.propType ?? '';
+        propertyType = classifyPropertyType(rawPropType);
         beds = prop.building?.rooms?.beds ?? undefined;
         baths = prop.building?.rooms?.bathsTotal ?? undefined;
         sqft = prop.building?.size?.universalSize ?? undefined;

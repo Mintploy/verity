@@ -45,10 +45,7 @@ export interface WhitepagesPeopleResult {
   priorMarriages?: string;
   licenses?: string;
   education?: string[];
-  criminal?: string;
-  bankruptcy?: string;
-  evictions?: string;
-  trafficRecords?: string;
+  businessAffiliations?: string[];
 }
 
 export interface WhitepagesCombined {
@@ -160,50 +157,16 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       return [e.school_name ?? e.name, e.degree, e.graduation_year ? `${e.graduation_year}` : null].filter(Boolean).join(', ');
     }).filter(Boolean);
 
-    // Criminal records (available on higher WP tiers)
-    const criminalRecs: any[] = best.criminal_records ?? best.criminal ?? [];
-    let criminal: string | undefined;
-    if (Array.isArray(criminalRecs) && criminalRecs.length > 0) {
-      const summaries = criminalRecs.map((c: any) => {
-        return [c.charge ?? c.description ?? c.type, c.disposition, c.date ? new Date(c.date).getFullYear() : null, c.state].filter(Boolean).join(' · ');
-      }).filter(Boolean);
-      criminal = summaries.join('; ') || `${criminalRecs.length} record${criminalRecs.length !== 1 ? 's' : ''} found`;
-    }
+    // Business affiliations — WP returns employer, company, and sometimes associated businesses
+    const wpCompany = best.company_name ?? best.employer ?? best.company ?? undefined;
+    const wpTitle = best.job_title ?? best.title ?? undefined;
+    const wpBusinesses: any[] = best.associated_businesses ?? best.business_associations ?? best.businesses ?? [];
+    const businessAffiliations: string[] = wpBusinesses.map((b: any) => {
+      return [b.name ?? b.company_name, b.role ?? b.position, b.state].filter(Boolean).join(' · ');
+    }).filter(Boolean);
 
-    // Traffic records
-    const trafficRecs: any[] = best.traffic_records ?? best.traffic ?? [];
-    let trafficRecords: string | undefined;
-    if (Array.isArray(trafficRecs) && trafficRecs.length > 0) {
-      const summaries = trafficRecs.map((t: any) => {
-        return [t.violation ?? t.description ?? t.type, t.disposition, t.date ? new Date(t.date).getFullYear() : null, t.state].filter(Boolean).join(' · ');
-      }).filter(Boolean);
-      trafficRecords = summaries.join('; ') || `${trafficRecs.length} record${trafficRecs.length !== 1 ? 's' : ''} found`;
-    }
-
-    // Bankruptcy records
-    const bankruptcyRecs: any[] = best.bankruptcies ?? best.bankruptcy_records ?? [];
-    let bankruptcy: string | undefined;
-    if (Array.isArray(bankruptcyRecs) && bankruptcyRecs.length > 0) {
-      const summaries = bankruptcyRecs.map((b: any) => {
-        const chapter = b.chapter ? `Chapter ${b.chapter}` : b.type;
-        const year = b.filing_date ? new Date(b.filing_date).getFullYear() : null;
-        const disposition = b.disposition ?? b.status;
-        return [chapter, disposition, year].filter(Boolean).join(' · ');
-      }).filter(Boolean);
-      bankruptcy = summaries.join('; ') || `${bankruptcyRecs.length} filing${bankruptcyRecs.length !== 1 ? 's' : ''} found`;
-    }
-
-    // Eviction records
-    const evictionRecs: any[] = best.evictions ?? best.eviction_records ?? [];
-    let evictions: string | undefined;
-    if (Array.isArray(evictionRecs) && evictionRecs.length > 0) {
-      const summaries = evictionRecs.map((e: any) => {
-        const year = e.filing_date ? new Date(e.filing_date).getFullYear() : null;
-        const disposition = e.disposition ?? e.status;
-        return [year, disposition, e.state].filter(Boolean).join(' · ');
-      }).filter(Boolean);
-      evictions = summaries.join('; ') || `${evictionRecs.length} filing${evictionRecs.length !== 1 ? 's' : ''} found`;
-    }
+    // Log fields useful for debugging marital/relatives availability
+    console.log('WP_MARITAL:', best.marital_status, '| WP_RELATIVES_COUNT:', (best.relatives ?? []).length, '| WP_COMPANY:', wpCompany, '| WP_TITLE:', wpTitle);
 
     const personResult: WhitepagesPeopleResult = {
       fullName: best.name ?? undefined,
@@ -235,8 +198,8 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
         return parts.join(' · ');
       }).filter(Boolean),
       emails: (best.emails ?? []).filter((e: any) => (e.score ?? 0) >= 50).map((e: any) => e.email).slice(0, 3),
-      company: best.company_name ?? undefined,
-      jobTitle: best.job_title ?? undefined,
+      company: wpCompany,
+      jobTitle: wpTitle,
       linkedinUrl: best.linkedin_url ?? undefined,
       additionalPhones: (best.phones ?? [])
         .filter((p: any) => p.number?.replace(/\D/g, '') !== cleaned && (p.score ?? 0) >= 70)
@@ -245,10 +208,7 @@ export async function lookupWhitepages(phone: string, name?: string): Promise<Wh
       priorMarriages,
       licenses,
       education: education.length > 0 ? education : undefined,
-      criminal,
-      trafficRecords,
-      bankruptcy,
-      evictions,
+      businessAffiliations: businessAffiliations.length > 0 ? businessAffiliations : undefined,
     };
 
     return { phone: phoneResult, person: personResult };
