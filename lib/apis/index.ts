@@ -35,6 +35,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     : 'yellow';
 
   const pub = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
+  const so = soRegistry.status === 'fulfilled' ? soRegistry.value : null;
   const fecResult = await lookupDonations(person.fullName ?? req.name).catch(() => null);
 
   const resolvedName = person.fullName ?? req.name ?? 'Unknown';
@@ -46,7 +47,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     ? 'Business affiliations on record — details require further lookup.'
     : 'None found.';
 
-  const publicRecords = buildPublicRecords(pub, fecResult, person);
+  const publicRecords = buildPublicRecords(pub, fecResult, person, so);
 
   const confirmedHandles: string[] = [];
   if (person.emails?.length) person.emails.forEach((e: string) => confirmedHandles.push(`Email: ${e}`));
@@ -126,9 +127,9 @@ function getSummary(score: ScoreState): string {
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
-function buildPublicRecords(pub: any, fec: any, person: any): Array<any> {
+function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<any> {
   const records = [
-    { label: 'Sex offender registry', value: pub?.soRegistry ?? 'Not listed', good: !pub?.soRegistry || pub.soRegistry === 'Not listed' },
+    { label: 'Sex offender registry', value: so?.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed', good: !so?.onRegistry, flag: !!so?.onRegistry },
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
     { label: 'Bankruptcy filings', value: person?.hasBankruptcy ? 'On file — details require further review' : 'None on file', good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
     { label: 'Eviction records', value: person?.hasEvictions ? 'On file — details require further review' : 'None on file', good: !person?.hasEvictions, flag: !!person?.hasEvictions },

@@ -147,6 +147,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       method: 'POST',
       headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
     });
 
     console.log('ENFORMION_STATUS:', res.status);
@@ -331,8 +332,9 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         hasPropertyRecords,
       },
     };
-  } catch (e) {
-    console.log('ENFORMION_ERROR:', String(e));
+  } catch (e: any) {
+    const cause = e?.cause ?? e?.reason;
+    console.log('ENFORMION_ERROR:', String(e), cause ? `| cause: ${String(cause)}` : '');
     return { phone: emptyPhone(), person: {} };
   }
 }
@@ -363,6 +365,7 @@ async function lookupPropertyV2(
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_PROPERTY),
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
   });
 
   console.log('ENFORMION_PROPERTY_STATUS:', res.status);
