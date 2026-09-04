@@ -165,7 +165,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     console.log('ENFORMION_REQUEST:', JSON.stringify(body));
     const res = await fetch(BASE_URL, {
       method: 'POST',
-      headers: makeHeaders(username, password),
+      headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });
