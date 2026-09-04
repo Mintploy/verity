@@ -134,63 +134,87 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
   const raw = phone.replace(/\D/g, '');
   const cleaned = raw.length === 11 && raw.startsWith('1') ? raw.slice(1) : raw;
 
-  try {
-    const body: Record<string, unknown> = {
-      Phone: cleaned,
-      Includes: [
-        'Akas',
-        'Addresses',
-        'PhoneNumbers',
-        'EmailAddresses',
-        'DatesOfBirth',
-        'DatesOfDeath',
-        'DeathRecords',
-        'WorkPlace',
-        'RelativesSummary',
-        'AssociatesSummary',
-        'Indicators',
-        'Criminal',
-        'Marriage',
-        'Divorce',
-        'VehicleRegistrations',
-      ],
-      FilterOptions: ['IncludeLowQualityAddresses'],
-      ResultsPerPage: 5,
-    };
-    if (name) {
-      const parts = name.trim().split(' ');
-      body.FirstName = parts[0];
-      body.LastName = parts.slice(1).join(' ');
-    }
+  const INCLUDES = [
+    'Akas',
+    'Addresses',
+    'PhoneNumbers',
+    'EmailAddresses',
+    'DatesOfBirth',
+    'DatesOfDeath',
+    'DeathRecords',
+    'WorkPlace',
+    'RelativesSummary',
+    'AssociatesSummary',
+    'Indicators',
+    'Criminal',
+    'Marriage',
+    'Divorce',
+    'VehicleRegistrations',
+  ];
 
-    // Run PersonSearch + ReversePhoneSearch in parallel
-    console.log('ENFORMION_REQUEST:', JSON.stringify(body));
-    const [res, phoneRes] = await Promise.all([
-      fetch(BASE_URL, {
+  const nameParts = name?.trim().split(/\s+/) ?? [];
+  const firstName = nameParts[0];
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+
+  // Search variants, tried in order until one returns results.
+  // Phone-only first: combining phone AND name over-constrains the query, so a
+  // name that doesn't exactly match Enformion's record yields zero rows.
+  const variants: Array<{ label: string; body: Record<string, unknown> }> = [
+    { label: 'phone', body: { Phone: cleaned } },
+    { label: 'phones-array', body: { Phones: [cleaned] } },
+  ];
+  if (firstName && lastName) {
+    variants.push({ label: 'name', body: { FirstName: firstName, LastName: lastName } });
+    variants.push({ label: 'name+phone', body: { FirstName: firstName, LastName: lastName, Phone: cleaned } });
+  }
+
+  try {
+    // ReversePhoneSearch runs independently for carrier / line-type intelligence
+    const phoneResPromise = fetch(PHONE_URL, {
+      method: 'POST',
+      headers: makeHeaders(username, password, SEARCH_TYPE_PHONE),
+      body: JSON.stringify({ Phone: cleaned, ResultsPerPage: 1 }),
+      signal: AbortSignal.timeout(15000),
+    }).catch(() => null);
+
+    let results: any[] = [];
+    for (const variant of variants) {
+      const body: Record<string, unknown> = {
+        ...variant.body,
+        Includes: INCLUDES,
+        FilterOptions: ['IncludeLowQualityAddresses'],
+        ResultsPerPage: 5,
+      };
+
+      console.log(`ENFORMION_TRY[${variant.label}]:`, JSON.stringify(body));
+      const res = await fetch(BASE_URL, {
         method: 'POST',
         headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(20000),
-      }),
-      fetch(PHONE_URL, {
-        method: 'POST',
-        headers: makeHeaders(username, password, SEARCH_TYPE_PHONE),
-        body: JSON.stringify({ Phone: cleaned, ResultsPerPage: 1 }),
-        signal: AbortSignal.timeout(15000),
-      }).catch(() => null),
-    ]);
+      });
 
-    console.log('ENFORMION_STATUS:', res.status);
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      console.log('ENFORMION_ERROR_BODY:', errText.slice(0, 2000));
-      return { phone: emptyPhone(), person: {} };
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.log(`ENFORMION_ERROR[${variant.label}]:`, res.status, errText.slice(0, 1000));
+        continue;
+      }
+
+      const data = await res.json();
+      const got: any[] = data.results ?? data.Results ?? [];
+      console.log(`ENFORMION_RESULTS[${variant.label}]:`, got.length);
+      if (got.length) {
+        results = got;
+        break;
+      }
     }
 
-    const data = await res.json();
-    const results: any[] = data.results ?? [];
-    console.log('ENFORMION_RESULTS:', results.length);
-    if (!results.length) return { phone: emptyPhone(), person: {} };
+    const phoneRes = await phoneResPromise;
+
+    if (!results.length) {
+      console.log('ENFORMION_NO_RESULTS: all variants exhausted for', cleaned);
+      return { phone: emptyPhone(), person: {} };
+    }
 
     const best = results[0];
 
