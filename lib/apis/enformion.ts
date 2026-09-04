@@ -1,9 +1,10 @@
 // Enformion — comprehensive people intelligence API
 // Auth: galaxy-ap-name / galaxy-ap-password headers + galaxy-search-type
 // Env vars: ENFORMION_USERNAME (galaxy-ap-name), ENFORMION_PASSWORD (galaxy-ap-password)
-// Base endpoint: POST https://gw.enformion.com/1.0/person/search
+// Base endpoint: POST https://devapi.enformion.com/PersonSearch
 
-const BASE_URL = 'https://gw.enformion.com/1.0/person/search';
+const BASE_URL = 'https://devapi.enformion.com/PersonSearch';
+const PROPERTY_URL = 'https://devapi.enformion.com/PropertySearch';
 
 // galaxy-search-type values
 const SEARCH_TYPE_PERSON = 'ReversePhonePerson'; // full data, phone-based
@@ -361,7 +362,7 @@ async function lookupPropertyV2(
     body.AddressLine2 = commaIdx > -1 ? currentAddress.slice(commaIdx + 1).trim() : '';
   }
 
-  const res = await fetch(BASE_URL, {
+  const res = await fetch(PROPERTY_URL, {
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_PROPERTY),
     body: JSON.stringify(body),
