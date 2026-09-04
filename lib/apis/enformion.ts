@@ -134,7 +134,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
   const raw = phone.replace(/\D/g, '');
   const cleaned = raw.length === 11 && raw.startsWith('1') ? raw.slice(1) : raw;
 
-  const INCLUDES = [
+  // Includes available on an initial (identifier-less) search.
+  const CORE_INCLUDES = [
     'Akas',
     'Addresses',
     'PhoneNumbers',
@@ -146,26 +147,30 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     'RelativesSummary',
     'AssociatesSummary',
     'Indicators',
-    'Criminal',
-    'Marriage',
-    'Divorce',
-    'VehicleRegistrations',
   ];
+
+  // Drill-down includes. Enformion rejects these without a unique identifier
+  // ("Unique identifiers must be provided for the requested includes"), so they
+  // are requested in a second call keyed on the TahoeId from the first.
+  const DETAIL_INCLUDES = ['Criminal', 'Marriage', 'Divorce', 'VehicleRegistrations'];
 
   const nameParts = name?.trim().split(/\s+/) ?? [];
   const firstName = nameParts[0];
   const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
 
-  // Search variants, tried in order until one returns results.
-  // Phone-only first: combining phone AND name over-constrains the query, so a
-  // name that doesn't exactly match Enformion's record yields zero rows.
-  const variants: Array<{ label: string; body: Record<string, unknown> }> = [
+  // Search variants, tried in order until one returns rows.
+  // Phone-only first: combining phone AND name ANDs the conditions, so a name
+  // that doesn't match Enformion's record for that phone yields zero rows.
+  // The bare variant isolates whether heavy includes are suppressing results.
+  const variants: Array<{ label: string; body: Record<string, unknown>; includes?: string[] }> = [
     { label: 'phone', body: { Phone: cleaned } },
-    { label: 'phones-array', body: { Phones: [cleaned] } },
+    { label: 'phone-bare', body: { Phone: cleaned }, includes: [] },
   ];
   if (firstName && lastName) {
     variants.push({ label: 'name', body: { FirstName: firstName, LastName: lastName } });
-    variants.push({ label: 'name+phone', body: { FirstName: firstName, LastName: lastName, Phone: cleaned } });
+    variants.push({ label: 'name-bare', body: { FirstName: firstName, LastName: lastName }, includes: [] });
+  } else if (firstName) {
+    variants.push({ label: 'firstname-only', body: { FirstName: firstName }, includes: [] });
   }
 
   try {
@@ -179,9 +184,10 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
 
     let results: any[] = [];
     for (const variant of variants) {
+      const inc = variant.includes ?? CORE_INCLUDES;
       const body: Record<string, unknown> = {
         ...variant.body,
-        Includes: INCLUDES,
+        ...(inc.length ? { Includes: inc } : {}),
         FilterOptions: ['IncludeLowQualityAddresses'],
         ResultsPerPage: 5,
       };
@@ -217,6 +223,12 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     }
 
     const best = results[0];
+
+    // --- Drill-down: heavy includes require the TahoeId from the search above ---
+    if (best.tahoeId) {
+      const detail = await lookupDetail(username, password, best.tahoeId, DETAIL_INCLUDES);
+      if (detail) Object.assign(best, detail);
+    }
 
     // --- Phone intelligence (from ReversePhoneSearch; fallback to PhoneNumbers in person result) ---
     let phoneResult: EnformionPhone = emptyPhone();
@@ -546,6 +558,38 @@ async function lookupPropertyV2(
       yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
     };
   }).filter((p: any) => p.address);
+}
+
+// Second-pass lookup for includes that Enformion only serves against a unique
+// identifier (Criminal, Marriage, Divorce, VehicleRegistrations).
+async function lookupDetail(
+  username: string,
+  password: string,
+  tahoeId: string,
+  includes: string[],
+): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(BASE_URL, {
+      method: 'POST',
+      headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
+      body: JSON.stringify({ TahoeId: tahoeId, Includes: includes, ResultsPerPage: 1 }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.log('ENFORMION_DETAIL_ERROR:', res.status, errText.slice(0, 600));
+      return null;
+    }
+
+    const data = await res.json();
+    const row = (data.results ?? data.Results ?? [])[0] ?? null;
+    console.log('ENFORMION_DETAIL_OK:', !!row);
+    return row;
+  } catch (e: any) {
+    console.log('ENFORMION_DETAIL_EXCEPTION:', String(e));
+    return null;
+  }
 }
 
 async function lookupLinkedIn(
