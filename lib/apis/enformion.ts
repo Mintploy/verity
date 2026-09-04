@@ -131,7 +131,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     return { phone: emptyPhone(), person: {} };
   }
 
-  const cleaned = phone.replace(/\D/g, '');
+  const raw = phone.replace(/\D/g, '');
+  const cleaned = raw.length === 11 && raw.startsWith('1') ? raw.slice(1) : raw;
 
   try {
     const body: Record<string, unknown> = {
