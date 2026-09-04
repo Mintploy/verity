@@ -21,10 +21,16 @@ export async function getFoundingCount(): Promise<number> {
   return count ?? 0;
 }
 
+const UNLIMITED_EMAILS = (process.env.UNLIMITED_TEST_EMAILS ?? '')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
 // Checks quota and, if allowed, atomically increments and returns the result.
 // Returns { allowed: false } if quota is exhausted or no profile exists.
 // Single-report plan is capped at 1 search total (no monthly reset).
 export async function consumeSearch(userId: string): Promise<{ allowed: boolean; remaining: number; plan: string | null }> {
+  if (UNLIMITED_EMAILS.includes(userId.toLowerCase())) {
+    return { allowed: true, remaining: 9999, plan: 'annual' };
+  }
   const sb = getServiceSupabase();
   const now = new Date();
 
