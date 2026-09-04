@@ -51,6 +51,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
 
   const confirmedHandles: string[] = [];
   if (person.emails?.length) person.emails.forEach((e: string) => confirmedHandles.push(`Email: ${e}`));
+  if (person.linkedInUrl) confirmedHandles.push(`LinkedIn: ${person.linkedInUrl}${person.linkedInHeadline ? ` · ${person.linkedInHeadline}` : ''}`);
 
   const report: Report = {
     id: searchId,
@@ -82,7 +83,11 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       verifiedBy: person.fullName ? 4 : 3,
       aliases: resolvedAliases,
     },
-    addresses: person.addresses ?? [],
+    addresses: (person.addresses ?? []).map((a, i) =>
+      i === 0 && person.censusNeighborhood
+        ? { ...a, detail: `${a.detail} · ${person.censusNeighborhood}` }
+        : a
+    ),
     propertyIntelligence: person.propertyIntelligence ?? [],
     relationships: {
       status: person.maritalStatus ?? '—',

@@ -6,11 +6,17 @@
 const BASE_URL = 'https://devapi.enformion.com/PersonSearch';
 const PROPERTY_URL = 'https://devapi.enformion.com/PropertyV2Search';
 const DIVORCE_URL = 'https://devapi.enformion.com/DivorceSearch';
+const PHONE_URL = 'https://devapi.enformion.com/ReversePhoneSearch';
+const LINKEDIN_URL = 'https://devapi.enformion.com/LinkedIn/Id';
+const CENSUS_URL = 'https://devapi.enformion.com/CensusSearch';
 
 // galaxy-search-type values
-const SEARCH_TYPE_PERSON = 'ReversePhonePerson'; // full data, phone-based
+const SEARCH_TYPE_PERSON = 'ReversePhonePerson';
+const SEARCH_TYPE_PHONE = 'ReversePhone';
 const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
+const SEARCH_TYPE_LINKEDIN = 'LinkedIn';
+const SEARCH_TYPE_CENSUS = 'Census';
 
 export interface EnformionPhone {
   lineType: 'mobile' | 'voip' | 'landline';
@@ -70,6 +76,9 @@ export interface EnformionPerson {
   hasBusinessRecords?: boolean;
   hasDivorceRecords?: boolean;
   hasPropertyRecords?: boolean;
+  linkedInUrl?: string;
+  linkedInHeadline?: string;
+  censusNeighborhood?: string;
 }
 
 export interface EnformionResult {
@@ -300,11 +309,17 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const hasDivorceRecords = (indicators.hasDivorceRecords ?? 0) > 0;
     const hasPropertyRecords = (indicators.hasPropertyV2Records ?? indicators.hasPropertyRecords ?? 0) > 0;
 
-    // --- Property V2 + Divorce (parallel, fire-and-forget) ---
-    const [propertyIntelligence, divorceDetail] = await Promise.all([
+    // --- Secondary lookups (parallel) ---
+    const [propertyIntelligence, divorceDetail, linkedInResult, censusResult] = await Promise.all([
       lookupPropertyV2(username, password, best.tahoeId, addresses[0]?.addr, fullName).catch(() => []),
       hasDivorceRecords
         ? lookupDivorce(username, password, best.tahoeId, fullName).catch(() => null)
+        : Promise.resolve(null),
+      best.tahoeId
+        ? lookupLinkedIn(username, password, best.tahoeId).catch(() => null)
+        : Promise.resolve(null),
+      addresses[0]?.addr
+        ? lookupCensus(username, password, addresses[0].addr).catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -335,6 +350,9 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         hasBusinessRecords,
         hasDivorceRecords,
         hasPropertyRecords,
+        linkedInUrl: linkedInResult?.url,
+        linkedInHeadline: linkedInResult?.headline,
+        censusNeighborhood: censusResult?.neighborhood,
       },
     };
   } catch (e: any) {
@@ -407,6 +425,66 @@ async function lookupPropertyV2(
       yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
     };
   }).filter((p: any) => p.address);
+}
+
+async function lookupLinkedIn(
+  username: string,
+  password: string,
+  tahoeId: string,
+): Promise<{ url?: string; headline?: string } | null> {
+  const res = await fetch(LINKEDIN_URL, {
+    method: 'POST',
+    headers: makeHeaders(username, password, SEARCH_TYPE_LINKEDIN),
+    body: JSON.stringify({ TahoeId: tahoeId }),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  console.log('ENFORMION_LINKEDIN_STATUS:', res.status);
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const results: any[] = data.results ?? data.Results ?? [];
+  if (!results.length) return null;
+
+  const r = results[0];
+  const url = r.linkedInUrl ?? r.LinkedInUrl ?? r.url ?? r.URL ?? r.profileUrl ?? r.ProfileUrl;
+  const headline = r.headline ?? r.Headline ?? r.title ?? r.Title ?? r.jobTitle ?? r.JobTitle;
+
+  console.log('ENFORMION_LINKEDIN_FOUND:', !!url);
+  return { url, headline };
+}
+
+async function lookupCensus(
+  username: string,
+  password: string,
+  address: string,
+): Promise<{ neighborhood?: string } | null> {
+  const commaIdx = address.indexOf(';');
+  const body: Record<string, unknown> = {
+    AddressLine1: commaIdx > -1 ? address.slice(0, commaIdx).trim() : address,
+    AddressLine2: commaIdx > -1 ? address.slice(commaIdx + 1).trim() : '',
+    ResultsPerPage: 1,
+  };
+
+  const res = await fetch(CENSUS_URL, {
+    method: 'POST',
+    headers: makeHeaders(username, password, SEARCH_TYPE_CENSUS),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  console.log('ENFORMION_CENSUS_STATUS:', res.status);
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const results: any[] = data.results ?? data.Results ?? [];
+  if (!results.length) return null;
+
+  const r = results[0];
+  const neighborhood = r.neighborhood ?? r.Neighborhood ?? r.tract ?? r.Tract
+    ?? r.censusBlock ?? r.CensusBlock ?? r.area ?? r.Area;
+
+  return { neighborhood };
 }
 
 async function lookupDivorce(
