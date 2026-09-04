@@ -154,6 +154,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       body.LastName = parts.slice(1).join(' ');
     }
 
+    console.log('ENFORMION_REQUEST:', JSON.stringify(body));
     const res = await fetch(BASE_URL, {
       method: 'POST',
       headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
@@ -162,7 +163,11 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     });
 
     console.log('ENFORMION_STATUS:', res.status);
-    if (!res.ok) return { phone: emptyPhone(), person: {} };
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.log('ENFORMION_ERROR_BODY:', errText.slice(0, 500));
+      return { phone: emptyPhone(), person: {} };
+    }
 
     const data = await res.json();
     const results: any[] = data.results ?? [];
