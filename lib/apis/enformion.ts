@@ -11,7 +11,7 @@ const LINKEDIN_URL = 'https://devapi.enformion.com/LinkedIn/Id';
 const CENSUS_URL = 'https://devapi.enformion.com/CensusSearch';
 
 // galaxy-search-type values
-const SEARCH_TYPE_PERSON = 'ReversePhonePerson';
+const SEARCH_TYPE_PERSON = 'Person';
 const SEARCH_TYPE_PHONE = 'ReversePhone';
 const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
@@ -162,13 +162,22 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       body.LastName = parts.slice(1).join(' ');
     }
 
+    // Run PersonSearch + ReversePhoneSearch in parallel
     console.log('ENFORMION_REQUEST:', JSON.stringify(body));
-    const res = await fetch(BASE_URL, {
-      method: 'POST',
-      headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
-    });
+    const [res, phoneRes] = await Promise.all([
+      fetch(BASE_URL, {
+        method: 'POST',
+        headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      }),
+      fetch(PHONE_URL, {
+        method: 'POST',
+        headers: makeHeaders(username, password, SEARCH_TYPE_PHONE),
+        body: JSON.stringify({ Phone: cleaned, ResultsPerPage: 1 }),
+        signal: AbortSignal.timeout(15000),
+      }).catch(() => null),
+    ]);
 
     console.log('ENFORMION_STATUS:', res.status);
     if (!res.ok) {
@@ -182,27 +191,48 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     console.log('ENFORMION_RESULTS:', results.length);
     if (!results.length) return { phone: emptyPhone(), person: {} };
 
-    // ReversePhonePerson ranking puts best match first
     const best = results[0];
 
-    // --- Phone intelligence ---
-    const phoneNumbers: any[] = best.phoneNumbers ?? [];
-    const matchedPhone = phoneNumbers.find(
-      (p: any) => (p.phoneNumber ?? '').replace(/\D/g, '') === cleaned
-    ) ?? phoneNumbers.sort((a: any, b: any) => (a.phoneOrder ?? 999) - (b.phoneOrder ?? 999))[0];
-
-    const rawLineType = matchedPhone?.phoneType ?? '';
-    const lineType = classifyLineType(rawLineType);
-
-    const phoneResult: EnformionPhone = {
-      lineType,
-      carrier: matchedPhone?.company ?? undefined,
-      voipFlag: lineType === 'voip'
-        ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
-        : undefined,
-      origin: 'United States',
-      active: !(best.deathRecords?.isDeceased ?? false),
-    };
+    // --- Phone intelligence (from ReversePhoneSearch; fallback to PhoneNumbers in person result) ---
+    let phoneResult: EnformionPhone = emptyPhone();
+    if (phoneRes?.ok) {
+      const phoneData = await phoneRes.json().catch(() => null);
+      const pr = (phoneData?.results ?? [])[0];
+      console.log('ENFORMION_PHONE_STATUS:', phoneRes.status, 'results:', phoneData?.results?.length ?? 0);
+      if (pr) {
+        const rawLineType = pr.phoneType ?? pr.lineType ?? pr.type ?? '';
+        const lineType = classifyLineType(rawLineType);
+        phoneResult = {
+          lineType,
+          carrier: pr.carrier ?? pr.company ?? pr.Company ?? undefined,
+          voipFlag: lineType === 'voip'
+            ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
+            : undefined,
+          origin: 'United States',
+          active: !(best.deathRecords?.isDeceased ?? false),
+        };
+      }
+    }
+    // Fallback: phone data from PhoneNumbers include in person result
+    if (phoneResult.lineType === 'mobile' && !phoneResult.carrier) {
+      const phoneNumbers: any[] = best.phoneNumbers ?? [];
+      const matchedPhone = phoneNumbers.find(
+        (p: any) => (p.phoneNumber ?? '').replace(/\D/g, '') === cleaned
+      ) ?? phoneNumbers.sort((a: any, b: any) => (a.phoneOrder ?? 999) - (b.phoneOrder ?? 999))[0];
+      if (matchedPhone) {
+        const rawLineType = matchedPhone?.phoneType ?? '';
+        const lineType = classifyLineType(rawLineType);
+        phoneResult = {
+          lineType,
+          carrier: matchedPhone?.company ?? undefined,
+          voipFlag: lineType === 'voip'
+            ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
+            : undefined,
+          origin: 'United States',
+          active: !(best.deathRecords?.isDeceased ?? false),
+        };
+      }
+    }
 
     // --- Identity ---
     const fullName: string | undefined = best.fullName
@@ -214,6 +244,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const dobRaw: string | undefined = (best.dob && best.dob !== '')
       ? best.dob
       : dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth ?? undefined;
+
+    const phoneNumbers: any[] = best.phoneNumbers ?? [];
 
     const aliases: string[] = (best.akas ?? [])
       .map((a: any) => buildName(a))
