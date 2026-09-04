@@ -1,7 +1,14 @@
 // Enformion — comprehensive people intelligence API
-// Replaces Whitepages (identity/phone) + ATTOM (property) + OpenCorporates (business)
-// Auth: HTTP Basic Auth — ENFORMION_USERNAME + ENFORMION_PASSWORD
-// Endpoint: POST https://gw.enformion.com/1.0/person/search
+// Auth: galaxy-ap-name / galaxy-ap-password headers + galaxy-search-type
+// Env vars: ENFORMION_USERNAME (galaxy-ap-name), ENFORMION_PASSWORD (galaxy-ap-password)
+// Base endpoint: POST https://gw.enformion.com/1.0/person/search
+
+const BASE_URL = 'https://gw.enformion.com/1.0/person/search';
+
+// galaxy-search-type values
+const SEARCH_TYPE_PERSON = 'ReversePhonePerson'; // full data, phone-based
+const SEARCH_TYPE_PROPERTY = 'PropertyV2';
+const SEARCH_TYPE_DIVORCE = 'Divorce';
 
 export interface EnformionPhone {
   lineType: 'mobile' | 'voip' | 'landline';
@@ -16,10 +23,27 @@ export interface EnformionAddress {
   years: string;
   current: boolean;
   detail: string;
-  owned?: boolean;
+  flag?: boolean;
+}
+
+export interface EnformionProperty {
+  address: string;
+  ownerName?: string;
+  ownerType?: string;
+  purchasePrice?: string;
+  purchaseDate?: string;
+  yearsOwned?: string;
+  currentValue?: string;
+  estimatedRent?: string;
+  propertyType?: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  yearBuilt?: number;
 }
 
 export interface EnformionPerson {
+  tahoeId?: string;
   fullName?: string;
   age?: number;
   dob?: string;
@@ -28,15 +52,14 @@ export interface EnformionPerson {
   relatives?: string[];
   associates?: string[];
   emails?: string[];
-  company?: string;
   jobTitle?: string;
+  company?: string;
   additionalPhones?: string[];
   maritalStatus?: string;
   spouseName?: string;
   priorMarriages?: string;
-  licenses?: string;
-  businessEntities?: string;
-  // Indicator-based flags (no detail text — requires separate API call)
+  propertyIntelligence?: EnformionProperty[];
+  // Indicator flags (count > 0 means records exist; details via separate lookup)
   hasBankruptcy?: boolean;
   hasEvictions?: boolean;
   hasForeclosures?: boolean;
@@ -65,11 +88,23 @@ function buildName(obj: { firstName?: string; middleName?: string; lastName?: st
 }
 
 function birthYearToApproxAge(dobStr: string): number | null {
-  // DOB format from Enformion: "1/XX/1964" — only year is reliable
+  // Enformion DOB format: "1/XX/1964" — only year is reliable
   const parts = dobStr.split('/');
   const year = parseInt(parts[parts.length - 1]);
   if (!year || year < 1900) return null;
   return new Date().getFullYear() - year;
+}
+
+function makeHeaders(username: string, password: string, searchType: string) {
+  const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+  return {
+    'Authorization': `Basic ${credentials}`,
+    'galaxy-ap-name': username,
+    'galaxy-ap-password': password,
+    'galaxy-search-type': searchType,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
 }
 
 export async function lookupEnformion(phone: string, name?: string): Promise<EnformionResult> {
@@ -81,26 +116,36 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     return { phone: emptyPhone(), person: {} };
   }
 
-  const credentials = Buffer.from(`${username}:${password}`).toString('base64');
-  const headers = {
-    'Authorization': `Basic ${credentials}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
   const cleaned = phone.replace(/\D/g, '');
 
   try {
-    const body: Record<string, string> = { Phone: cleaned };
+    const body: Record<string, unknown> = {
+      Phone: cleaned,
+      Includes: [
+        'AKAs',
+        'Addresses',
+        'PhoneNumbers',
+        'EmailAddresses',
+        'DateOfBirth',
+        'DateOfDeath',
+        'DeathRecords',
+        'WorkplaceSummary',
+        'RelativesSummary',
+        'AssociatesSummary',
+        'Indicators',
+      ],
+      FilterOptions: ['IncludeLowQualityAddresses'],
+      ResultsPerPage: 5,
+    };
     if (name) {
       const parts = name.trim().split(' ');
       body.FirstName = parts[0];
       body.LastName = parts.slice(1).join(' ');
     }
 
-    const res = await fetch('https://gw.enformion.com/1.0/person/search', {
+    const res = await fetch(BASE_URL, {
       method: 'POST',
-      headers,
+      headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
       body: JSON.stringify(body),
     });
 
@@ -108,12 +153,11 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     if (!res.ok) return { phone: emptyPhone(), person: {} };
 
     const data = await res.json();
-    // Actual field is lowercase "results"
     const results: any[] = data.results ?? [];
     console.log('ENFORMION_RESULTS:', results.length);
     if (!results.length) return { phone: emptyPhone(), person: {} };
 
-    // Phone search ranking puts best match first
+    // ReversePhonePerson ranking puts best match first
     const best = results[0];
 
     // --- Phone intelligence ---
@@ -124,11 +168,10 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
 
     const rawLineType = matchedPhone?.phoneType ?? '';
     const lineType = classifyLineType(rawLineType);
-    const carrier = matchedPhone?.company ?? undefined;
 
     const phoneResult: EnformionPhone = {
       lineType,
-      carrier,
+      carrier: matchedPhone?.company ?? undefined,
       voipFlag: lineType === 'voip'
         ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
         : undefined,
@@ -139,10 +182,13 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     // --- Identity ---
     const fullName: string | undefined = best.fullName
       ?? (best.name ? buildName(best.name) : undefined);
-
-    // DOB is often empty in search; datesOfBirth has only {age}
     const age: number | undefined = best.age ?? undefined;
-    const dob: string | undefined = (best.dob && best.dob !== '') ? best.dob : undefined;
+
+    // With DateOfBirth include enabled, datesOfBirth may now have actual dates
+    const dobRecord = (best.datesOfBirth ?? [])[0];
+    const dobRaw: string | undefined = (best.dob && best.dob !== '')
+      ? best.dob
+      : dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth ?? undefined;
 
     const aliases: string[] = (best.akas ?? [])
       .map((a: any) => buildName(a))
@@ -151,10 +197,9 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
 
     // --- Addresses ---
     const rawAddresses: any[] = best.addresses ?? [];
-    // addressOrder 1 = most recently seen; sort ascending
     const sortedAddresses = [...rawAddresses]
       .sort((a: any, b: any) => (a.addressOrder ?? 999) - (b.addressOrder ?? 999))
-      .slice(0, 8); // cap at 8
+      .slice(0, 8);
 
     const addresses: EnformionAddress[] = sortedAddresses.map((a: any, i: number) => {
       const addr = a.fullAddress ?? '';
@@ -173,15 +218,24 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
           years = `From ${fromYear}`;
         }
       }
-      const isHighRisk = a.highRiskMarker?.isHighRisk ?? false;
       return {
         addr,
         years,
         current: isCurrent,
         detail: isCurrent ? 'Current address' : 'Previous address',
-        flag: isHighRisk,
+        flag: !!(a.highRiskMarker?.isHighRisk),
       };
     }).filter((a: any) => a.addr);
+
+    // --- Employment (WorkplaceSummary include) ---
+    const workplaces: any[] = best.workplaceSummary ?? best.WorkplaceSummary ?? [];
+    const currentJob = workplaces.find(
+      (w: any) => w.isCurrent ?? w.IsCurrent ?? w.is_current
+    ) ?? workplaces[0];
+    const jobTitle: string | undefined = currentJob?.position ?? currentJob?.Position
+      ?? currentJob?.title ?? currentJob?.Title ?? currentJob?.jobTitle ?? undefined;
+    const company: string | undefined = currentJob?.employer ?? currentJob?.Employer
+      ?? currentJob?.company ?? currentJob?.Company ?? undefined;
 
     // --- Relatives + spouse detection ---
     const relativesSummary: any[] = best.relativesSummary ?? [];
@@ -189,15 +243,12 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const currentSpouse = relativesSummary.find(
       (r: any) => r.spouse === 1 && !r.oldSpouse && !r.isDeceased
     );
-    const spouseName: string | undefined = currentSpouse
-      ? buildName(currentSpouse)
-      : undefined;
+    const spouseName: string | undefined = currentSpouse ? buildName(currentSpouse) : undefined;
 
     const priorSpouses = relativesSummary.filter((r: any) => r.oldSpouse === true);
-    let priorMarriages: string | undefined;
-    if (priorSpouses.length > 0) {
-      priorMarriages = `${priorSpouses.length} prior marriage${priorSpouses.length !== 1 ? 's' : ''} on record`;
-    }
+    const priorMarriages: string | undefined = priorSpouses.length > 0
+      ? `${priorSpouses.length} prior marriage${priorSpouses.length !== 1 ? 's' : ''} on record`
+      : undefined;
 
     const maritalStatus: string | undefined = spouseName
       ? 'Married'
@@ -216,8 +267,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       .filter(Boolean);
 
     // --- Associates ---
-    const associatesSummary: any[] = best.associatesSummary ?? [];
-    const associates: string[] = associatesSummary
+    const associates: string[] = (best.associatesSummary ?? [])
       .slice(0, 8)
       .map((a: any) => buildName(a))
       .filter(Boolean);
@@ -229,14 +279,14 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       .slice(0, 3)
       .map((p: any) => `${p.phoneNumber} (${p.phoneType ?? 'unknown'})`);
 
-    // --- Emails ---
+    // --- Emails (personal only) ---
     const emails: string[] = (best.emailAddresses ?? [])
-      .filter((e: any) => e.nonBusiness === 1) // personal only
+      .filter((e: any) => e.nonBusiness === 1)
       .map((e: any) => e.emailAddress)
       .filter((e: any) => typeof e === 'string' && e.includes('@'))
       .slice(0, 3);
 
-    // --- Indicators (flags without details — separate API calls needed for full records) ---
+    // --- Indicators ---
     const indicators = best.indicators ?? {};
     const hasBankruptcy = (indicators.hasBankruptcyRecords ?? 0) > 0;
     const hasEvictions = (indicators.hasEvictionsRecords ?? 0) > 0;
@@ -245,23 +295,32 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const hasLiens = (indicators.hasLienRecords ?? 0) > 0;
     const hasBusinessRecords = (indicators.hasBusinessRecords ?? 0) > 0;
     const hasDivorceRecords = (indicators.hasDivorceRecords ?? 0) > 0;
-    const hasPropertyRecords = (indicators.hasPropertyRecords ?? 0) > 0;
+    const hasPropertyRecords = (indicators.hasPropertyV2Records ?? indicators.hasPropertyRecords ?? 0) > 0;
+
+    // --- Property V2 (fire-and-forget if current address available) ---
+    const propertyIntelligence = await lookupPropertyV2(
+      username, password, best.tahoeId, addresses[0]?.addr, fullName
+    ).catch(() => []);
 
     return {
       phone: phoneResult,
       person: {
+        tahoeId: best.tahoeId,
         fullName,
         age,
-        dob,
+        dob: dobRaw,
         aliases,
         addresses,
         relatives,
         associates,
         emails,
+        jobTitle,
+        company,
         additionalPhones,
         maritalStatus,
         spouseName,
         priorMarriages,
+        propertyIntelligence,
         hasBankruptcy,
         hasEvictions,
         hasForeclosures,
@@ -276,6 +335,70 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     console.log('ENFORMION_ERROR:', String(e));
     return { phone: emptyPhone(), person: {} };
   }
+}
+
+async function lookupPropertyV2(
+  username: string,
+  password: string,
+  tahoeId?: string,
+  currentAddress?: string,
+  fullName?: string,
+): Promise<EnformionProperty[]> {
+  if (!tahoeId && !currentAddress) return [];
+
+  const body: Record<string, unknown> = { ResultsPerPage: 3 };
+  if (tahoeId) {
+    body.TahoeId = tahoeId;
+  } else if (currentAddress && fullName) {
+    const nameParts = fullName.trim().split(' ');
+    body.FirstName = nameParts[0];
+    body.LastName = nameParts.slice(1).join(' ');
+    // Split address into line1 / line2 at the city boundary (after first comma)
+    const commaIdx = currentAddress.indexOf(';');
+    body.AddressLine1 = commaIdx > -1 ? currentAddress.slice(0, commaIdx).trim() : currentAddress;
+    body.AddressLine2 = commaIdx > -1 ? currentAddress.slice(commaIdx + 1).trim() : '';
+  }
+
+  const res = await fetch(BASE_URL, {
+    method: 'POST',
+    headers: makeHeaders(username, password, SEARCH_TYPE_PROPERTY),
+    body: JSON.stringify(body),
+  });
+
+  console.log('ENFORMION_PROPERTY_STATUS:', res.status);
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  const results: any[] = data.results ?? data.Results ?? [];
+  console.log('ENFORMION_PROPERTY_RESULTS:', results.length);
+
+  return results.slice(0, 4).map((p: any) => {
+    const addr = p.fullAddress ?? p.FullAddress
+      ?? [p.addressLine1 ?? p.AddressLine1, p.addressLine2 ?? p.AddressLine2].filter(Boolean).join(', ');
+    const purchaseDateRaw = p.saleDate ?? p.SaleDate ?? p.purchaseDate ?? p.PurchaseDate;
+    const purchaseDate = purchaseDateRaw
+      ? new Date(purchaseDateRaw).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      : undefined;
+    const saleAmt = p.saleAmount ?? p.SaleAmount ?? p.purchasePrice ?? p.PurchasePrice;
+    const avm = p.estimatedValue ?? p.EstimatedValue ?? p.avm ?? p.AVM;
+    const rent = p.estimatedRent ?? p.EstimatedRent;
+    const ownerName = p.ownerName ?? p.OwnerName ?? p.owner ?? p.Owner;
+    const rawType = p.propertyType ?? p.PropertyType ?? p.landUse ?? p.LandUse ?? '';
+    return {
+      address: addr,
+      ownerName,
+      purchasePrice: saleAmt ? `$${Number(saleAmt).toLocaleString()}` : undefined,
+      purchaseDate,
+      yearsOwned: purchaseDate ? `Since ${purchaseDate}` : undefined,
+      currentValue: avm ? `$${Number(avm).toLocaleString()}` : undefined,
+      estimatedRent: rent ? `$${Number(rent).toLocaleString()}/mo` : undefined,
+      propertyType: rawType || undefined,
+      beds: p.bedrooms ?? p.Bedrooms ?? p.beds ?? undefined,
+      baths: p.bathrooms ?? p.Bathrooms ?? p.baths ?? undefined,
+      sqft: p.squareFeet ?? p.SquareFeet ?? p.sqft ?? undefined,
+      yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
+    };
+  }).filter((p: any) => p.address);
 }
 
 function emptyPhone(): EnformionPhone {

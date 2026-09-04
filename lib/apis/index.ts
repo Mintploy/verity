@@ -42,8 +42,9 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const resolvedDob = person.dob ?? '—';
   const resolvedAliases = person.aliases?.length ? person.aliases : undefined;
 
-  // Employment/business not available in person search response — indicator only
-  const businessEntities = person.hasBusinessRecords ? 'Business affiliations on record — details require further lookup.' : 'None found.';
+  const businessEntities = person.hasBusinessRecords
+    ? 'Business affiliations on record — details require further lookup.'
+    : 'None found.';
 
   const publicRecords = buildPublicRecords(pub, fecResult, person);
 
@@ -81,7 +82,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       aliases: resolvedAliases,
     },
     addresses: person.addresses ?? [],
-    propertyIntelligence: [],
+    propertyIntelligence: person.propertyIntelligence ?? [],
     relationships: {
       status: person.maritalStatus ?? '—',
       spouse: person.spouseName,
@@ -94,11 +95,11 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
           : [],
     },
     professional: {
-      title: person.jobTitle ?? '—',
-      company: person.company ?? '—',
+      title: person.jobTitle !== undefined ? person.jobTitle : '—',
+      company: person.company !== undefined ? person.company : '—',
       tenure: '—',
       llcs: 'None found.',
-      licenses: person.licenses ?? '—',
+      licenses: '—',
       businessEntities,
     },
     publicRecords,
