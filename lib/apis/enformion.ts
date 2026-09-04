@@ -133,7 +133,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const body: Record<string, unknown> = {
       Phone: cleaned,
       Includes: [
-        'AKAs',
+        'Akas',
         'Addresses',
         'PhoneNumbers',
         'EmailAddresses',
@@ -165,7 +165,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     console.log('ENFORMION_STATUS:', res.status);
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      console.log('ENFORMION_ERROR_BODY:', errText.slice(0, 500));
+      console.log('ENFORMION_ERROR_BODY:', errText.slice(0, 2000));
       return { phone: emptyPhone(), person: {} };
     }
 
