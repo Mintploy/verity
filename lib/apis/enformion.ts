@@ -4,7 +4,8 @@
 // Base endpoint: POST https://devapi.enformion.com/PersonSearch
 
 const BASE_URL = 'https://devapi.enformion.com/PersonSearch';
-const PROPERTY_URL = 'https://devapi.enformion.com/PropertySearch';
+const PROPERTY_URL = 'https://devapi.enformion.com/PropertyV2Search';
+const DIVORCE_URL = 'https://devapi.enformion.com/DivorceSearch';
 
 // galaxy-search-type values
 const SEARCH_TYPE_PERSON = 'ReversePhonePerson'; // full data, phone-based
@@ -299,10 +300,13 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const hasDivorceRecords = (indicators.hasDivorceRecords ?? 0) > 0;
     const hasPropertyRecords = (indicators.hasPropertyV2Records ?? indicators.hasPropertyRecords ?? 0) > 0;
 
-    // --- Property V2 (fire-and-forget if current address available) ---
-    const propertyIntelligence = await lookupPropertyV2(
-      username, password, best.tahoeId, addresses[0]?.addr, fullName
-    ).catch(() => []);
+    // --- Property V2 + Divorce (parallel, fire-and-forget) ---
+    const [propertyIntelligence, divorceDetail] = await Promise.all([
+      lookupPropertyV2(username, password, best.tahoeId, addresses[0]?.addr, fullName).catch(() => []),
+      hasDivorceRecords
+        ? lookupDivorce(username, password, best.tahoeId, fullName).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
     return {
       phone: phoneResult,
@@ -321,7 +325,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         additionalPhones,
         maritalStatus,
         spouseName,
-        priorMarriages,
+        priorMarriages: divorceDetail ?? priorMarriages,
         propertyIntelligence,
         hasBankruptcy,
         hasEvictions,
@@ -403,6 +407,45 @@ async function lookupPropertyV2(
       yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
     };
   }).filter((p: any) => p.address);
+}
+
+async function lookupDivorce(
+  username: string,
+  password: string,
+  tahoeId?: string,
+  fullName?: string,
+): Promise<string | null> {
+  if (!tahoeId && !fullName) return null;
+
+  const body: Record<string, unknown> = { ResultsPerPage: 3 };
+  if (tahoeId) {
+    body.TahoeId = tahoeId;
+  } else if (fullName) {
+    const parts = fullName.trim().split(' ');
+    body.FirstName = parts[0];
+    body.LastName = parts.slice(1).join(' ');
+  }
+
+  const res = await fetch(DIVORCE_URL, {
+    method: 'POST',
+    headers: makeHeaders(username, password, SEARCH_TYPE_DIVORCE),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  console.log('ENFORMION_DIVORCE_STATUS:', res.status);
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const results: any[] = data.results ?? data.Results ?? [];
+  console.log('ENFORMION_DIVORCE_RESULTS:', results.length);
+  if (!results.length) return null;
+
+  const r = results[0];
+  const year = r.divorceDate ?? r.DivorceDate ?? r.filingDate ?? r.FilingDate;
+  const county = r.county ?? r.County ?? r.jurisdiction ?? r.Jurisdiction;
+  const parts = [year ? new Date(year).getFullYear() : null, county].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'Divorce record on file';
 }
 
 function emptyPhone(): EnformionPhone {
