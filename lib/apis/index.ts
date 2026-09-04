@@ -25,6 +25,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (person.hasBankruptcy) flags.push('bankruptcy');
   if (person.hasEvictions) flags.push('evictions');
   if (person.hasJudgments || person.hasLiens || person.hasForeclosures) flags.push('financial');
+  if (person.criminalRecords?.length) flags.push('criminal');
 
   const score: ScoreState = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
     ? 'red'
@@ -92,7 +93,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     relationships: {
       status: person.maritalStatus ?? '—',
       spouse: person.spouseName,
-      priors: person.priorMarriages ?? '—',
+      priors: person.divorceRecords?.join('; ') ?? person.priorMarriages ?? '—',
       relatives: person.relatives ?? [],
       associates: person.associates?.length
         ? person.associates
@@ -139,6 +140,8 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
     { label: 'Bankruptcy filings', value: person?.hasBankruptcy ? 'On file — details require further review' : 'None on file', good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
     { label: 'Eviction records', value: person?.hasEvictions ? 'On file — details require further review' : 'None on file', good: !person?.hasEvictions, flag: !!person?.hasEvictions },
     { label: 'Judgments / liens', value: (person?.hasJudgments || person?.hasLiens) ? 'On file — details require further review' : 'None on file', good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
+    { label: 'Criminal records', value: person?.criminalRecords?.length ? person.criminalRecords.join(' | ') : 'None found', good: !person?.criminalRecords?.length, flag: !!(person?.criminalRecords?.length) },
+    { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : 'None on file', neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
   ];
   return records;

@@ -79,6 +79,10 @@ export interface EnformionPerson {
   linkedInUrl?: string;
   linkedInHeadline?: string;
   censusNeighborhood?: string;
+  criminalRecords?: string[];
+  marriageRecords?: string[];
+  divorceRecords?: string[];
+  vehicles?: string[];
 }
 
 export interface EnformionResult {
@@ -137,13 +141,17 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         'Addresses',
         'PhoneNumbers',
         'EmailAddresses',
-        'DateOfBirth',
-        'DateOfDeath',
+        'DatesOfBirth',
+        'DatesOfDeath',
         'DeathRecords',
-        'WorkplaceSummary',
+        'WorkPlace',
         'RelativesSummary',
         'AssociatesSummary',
         'Indicators',
+        'Criminal',
+        'Marriage',
+        'Divorce',
+        'VehicleRegistrations',
       ],
       FilterOptions: ['IncludeLowQualityAddresses'],
       ResultsPerPage: 5,
@@ -244,8 +252,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       };
     }).filter((a: any) => a.addr);
 
-    // --- Employment (WorkplaceSummary include) ---
-    const workplaces: any[] = best.workplaceSummary ?? best.WorkplaceSummary ?? [];
+    // --- Employment (WorkPlace include) ---
+    const workplaces: any[] = best.workPlace ?? best.workplaceSummary ?? best.WorkPlace ?? [];
     const currentJob = workplaces.find(
       (w: any) => w.isCurrent ?? w.IsCurrent ?? w.is_current
     ) ?? workplaces[0];
@@ -314,10 +322,57 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const hasDivorceRecords = (indicators.hasDivorceRecords ?? 0) > 0;
     const hasPropertyRecords = (indicators.hasPropertyV2Records ?? indicators.hasPropertyRecords ?? 0) > 0;
 
+    // --- Criminal records ---
+    const criminalRecords: string[] = (best.criminal ?? best.Criminal ?? [])
+      .slice(0, 5)
+      .map((c: any) => {
+        const offense = c.offense ?? c.Offense ?? c.charge ?? c.Charge ?? c.description ?? c.Description ?? 'Record on file';
+        const year = c.date ?? c.Date ?? c.filingDate ?? c.FilingDate ?? c.arrestDate ?? c.ArrestDate;
+        const state = c.state ?? c.State ?? c.jurisdiction ?? c.Jurisdiction ?? '';
+        const parts = [offense, year ? new Date(year).getFullYear() : null, state].filter(Boolean);
+        return parts.join(' · ');
+      })
+      .filter(Boolean);
+
+    // --- Marriage records ---
+    const marriageRecords: string[] = (best.marriage ?? best.Marriage ?? [])
+      .slice(0, 3)
+      .map((m: any) => {
+        const spouse = buildName(m.spouse ?? m.Spouse ?? m);
+        const year = m.marriageDate ?? m.MarriageDate ?? m.date ?? m.Date;
+        const county = m.county ?? m.County ?? m.state ?? m.State ?? '';
+        const parts = [spouse || 'Marriage on record', year ? new Date(year).getFullYear() : null, county].filter(Boolean);
+        return parts.join(' · ');
+      })
+      .filter(Boolean);
+
+    // --- Divorce (inline from include, fallback to dedicated lookup) ---
+    const inlineDivorce: string[] = (best.divorce ?? best.Divorce ?? [])
+      .slice(0, 3)
+      .map((d: any) => {
+        const year = d.divorceDate ?? d.DivorceDate ?? d.date ?? d.Date;
+        const county = d.county ?? d.County ?? d.state ?? d.State ?? '';
+        const parts = [year ? new Date(year).getFullYear() : 'Divorce on record', county].filter(Boolean);
+        return parts.join(' · ');
+      })
+      .filter(Boolean);
+
+    // --- Vehicles ---
+    const vehicles: string[] = (best.vehicleRegistrations ?? best.VehicleRegistrations ?? [])
+      .slice(0, 4)
+      .map((v: any) => {
+        const year = v.modelYear ?? v.ModelYear ?? v.year ?? v.Year ?? '';
+        const make = v.make ?? v.Make ?? '';
+        const model = v.model ?? v.Model ?? '';
+        const color = v.color ?? v.Color ?? '';
+        return [year, make, model, color ? `(${color})` : ''].filter(Boolean).join(' ');
+      })
+      .filter(Boolean);
+
     // --- Secondary lookups (parallel) ---
     const [propertyIntelligence, divorceDetail, linkedInResult, censusResult] = await Promise.all([
       lookupPropertyV2(username, password, best.tahoeId, addresses[0]?.addr, fullName).catch(() => []),
-      hasDivorceRecords
+      hasDivorceRecords && inlineDivorce.length === 0
         ? lookupDivorce(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
       best.tahoeId
@@ -358,6 +413,10 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         linkedInUrl: linkedInResult?.url,
         linkedInHeadline: linkedInResult?.headline,
         censusNeighborhood: censusResult?.neighborhood,
+        criminalRecords: criminalRecords.length ? criminalRecords : undefined,
+        marriageRecords: marriageRecords.length ? marriageRecords : undefined,
+        divorceRecords: inlineDivorce.length ? inlineDivorce : divorceDetail ? [divorceDetail] : undefined,
+        vehicles: vehicles.length ? vehicles : undefined,
       },
     };
   } catch (e: any) {
