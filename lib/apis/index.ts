@@ -135,7 +135,11 @@ function getSummary(score: ScoreState): string {
 
 function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<any> {
   const records = [
-    { label: 'Sex offender registry', value: so?.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed', good: !so?.onRegistry, flag: !!so?.onRegistry },
+    // A failed check must never render as "Not listed" — that is a false
+    // assurance. Only claim the registry is clear when it was actually searched.
+    so?.checked
+      ? { label: 'Sex offender registry', value: so.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed', good: !so.onRegistry, flag: !!so.onRegistry }
+      : { label: 'Sex offender registry', value: 'Not verified — search nsopw.gov directly', neutral: true },
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
     { label: 'Bankruptcy filings', value: person?.hasBankruptcy ? 'On file — details require further review' : 'None on file', good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
     { label: 'Eviction records', value: person?.hasEvictions ? 'On file — details require further review' : 'None on file', good: !person?.hasEvictions, flag: !!person?.hasEvictions },

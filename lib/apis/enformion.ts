@@ -3,12 +3,16 @@
 // Env vars: ENFORMION_USERNAME (galaxy-ap-name), ENFORMION_PASSWORD (galaxy-ap-password)
 // Base endpoint: POST https://devapi.enformion.com/PersonSearch
 
-const BASE_URL = 'https://devapi.enformion.com/PersonSearch';
-const PROPERTY_URL = 'https://devapi.enformion.com/PropertyV2Search';
-const DIVORCE_URL = 'https://devapi.enformion.com/DivorceSearch';
-const PHONE_URL = 'https://devapi.enformion.com/ReversePhoneSearch';
-const LINKEDIN_URL = 'https://devapi.enformion.com/LinkedIn/Id';
-const CENSUS_URL = 'https://devapi.enformion.com/CensusSearch';
+// devapi.* is Enformion's sandbox and returns canned data only. Point
+// ENFORMION_HOST at the production host to get real records.
+const HOST = (process.env.ENFORMION_HOST ?? 'https://devapi.enformion.com').replace(/\/+$/, '');
+
+const BASE_URL = `${HOST}/PersonSearch`;
+const PROPERTY_URL = `${HOST}/PropertyV2Search`;
+const DIVORCE_URL = `${HOST}/DivorceSearch`;
+const PHONE_URL = `${HOST}/ReversePhoneSearch`;
+const LINKEDIN_URL = `${HOST}/LinkedIn/Id`;
+const CENSUS_URL = `${HOST}/CensusSearch`;
 
 // galaxy-search-type values
 const SEARCH_TYPE_PERSON = 'Person';
@@ -162,15 +166,19 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
   // Phone-only first: combining phone AND name ANDs the conditions, so a name
   // that doesn't match Enformion's record for that phone yields zero rows.
   // The bare variant isolates whether heavy includes are suppressing results.
+  // Phone is the primary key for this product and is the only search parameter
+  // Enformion treats as a unique identifier, so it is the only one that may
+  // carry Includes. Name searches must go bare or Enformion returns 400
+  // "Unique identifiers must be provided for the requested includes."
   const variants: Array<{ label: string; body: Record<string, unknown>; includes?: string[] }> = [
     { label: 'phone', body: { Phone: cleaned } },
-    { label: 'phone-bare', body: { Phone: cleaned }, includes: [] },
   ];
   if (firstName && lastName) {
-    variants.push({ label: 'name', body: { FirstName: firstName, LastName: lastName } });
-    variants.push({ label: 'name-bare', body: { FirstName: firstName, LastName: lastName }, includes: [] });
+    // Name only narrows; it never replaces the phone as the lookup key.
+    variants.push({ label: 'phone+name', body: { Phone: cleaned, FirstName: firstName, LastName: lastName } });
+    variants.push({ label: 'name', body: { FirstName: firstName, LastName: lastName }, includes: [] });
   } else if (firstName) {
-    variants.push({ label: 'firstname-only', body: { FirstName: firstName }, includes: [] });
+    variants.push({ label: 'firstname', body: { FirstName: firstName }, includes: [] });
   }
 
   try {
