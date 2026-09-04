@@ -110,13 +110,13 @@ function birthYearToApproxAge(dobStr: string): number | null {
   return new Date().getFullYear() - year;
 }
 
-function makeHeaders(username: string, password: string, searchType: string) {
+function makeHeaders(username: string, password: string, searchType?: string) {
   const credentials = Buffer.from(`${username}:${password}`).toString('base64');
   return {
     'Authorization': `Basic ${credentials}`,
     'galaxy-ap-name': username,
     'galaxy-ap-password': password,
-    'galaxy-search-type': searchType,
+    ...(searchType ? { 'galaxy-search-type': searchType } : {}),
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
@@ -165,7 +165,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     console.log('ENFORMION_REQUEST:', JSON.stringify(body));
     const res = await fetch(BASE_URL, {
       method: 'POST',
-      headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
+      headers: makeHeaders(username, password),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });
