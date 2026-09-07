@@ -25,8 +25,16 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (person.hasBankruptcy) flags.push('bankruptcy');
   if (person.hasEvictions) flags.push('evictions');
   if (person.hasJudgments || person.hasLiens || person.hasForeclosures) flags.push('financial');
+  if (person.criminalRecords?.length) flags.push('criminal');
+  if (person.ofacHits?.length) flags.push('sanctions');
 
-  const score: ScoreState = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
+  // A registry listing, a criminal record, or a sanctions hit each stand on
+  // their own — they are not one flag among several to be averaged away.
+  const gravest = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
+    || !!person.criminalRecords?.length
+    || !!person.ofacHits?.length;
+
+  const score: ScoreState = gravest
     ? 'red'
     : flags.length >= 2
     ? 'yellow'
@@ -157,6 +165,8 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
     { label: 'Bankruptcy filings', value: plural(person?.counts?.bankruptcy, 'filing'), good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
     { label: 'Eviction records', value: plural(person?.counts?.evictions, 'record'), good: !person?.hasEvictions, flag: !!person?.hasEvictions },
     { label: 'Judgments / liens', value: plural((person?.counts?.judgments ?? 0) + (person?.counts?.liens ?? 0), 'record'), good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
+    { label: 'Criminal records', value: person?.criminalRecords?.length ? person.criminalRecords.join(' | ') : 'None found', good: !person?.criminalRecords?.length, flag: !!person?.criminalRecords?.length },
+    { label: 'Sanctions / watchlists', value: person?.ofacHits?.length ? person.ofacHits.join(' | ') : 'Not listed', good: !person?.ofacHits?.length, flag: !!person?.ofacHits?.length },
     { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : plural(person?.counts?.vehicles, 'registration'), neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
   ];

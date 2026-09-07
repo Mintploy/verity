@@ -14,6 +14,13 @@ const PHONE_URL = `${HOST}/ReversePhoneSearch`;
 const LINKEDIN_URL = `${HOST}/LinkedIn/Id`;
 const CENSUS_URL = `${HOST}/CensusSearch`;
 
+// Detail products. Person Search's `indicators` say what exists; these
+// endpoints return the records themselves. Criminal and OFAC have no indicator
+// and are queried directly.
+const CRIMINAL_URL = `${HOST}/CriminalSearchV2`;
+const OFAC_URL = `${HOST}/OfacSearch`;
+const WORKPLACE_URL = `${HOST}/WorkplaceSearch`;
+
 // galaxy-search-type values
 const SEARCH_TYPE_PERSON = 'Person';
 const SEARCH_TYPE_PHONE = 'ReversePhone';
@@ -21,6 +28,9 @@ const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
 const SEARCH_TYPE_LINKEDIN = 'LinkedIn';
 const SEARCH_TYPE_CENSUS = 'Census';
+const SEARCH_TYPE_CRIMINAL = 'CriminalV2';
+const SEARCH_TYPE_OFAC = 'Ofac';
+const SEARCH_TYPE_WORKPLACE = 'Workplace';
 
 export interface EnformionPhone {
   lineType: 'mobile' | 'voip' | 'landline';
@@ -83,6 +93,8 @@ export interface EnformionPerson {
   linkedInUrl?: string;
   linkedInHeadline?: string;
   censusNeighborhood?: string;
+  criminalRecords?: string[];
+  ofacHits?: string[];
   marriageRecords?: string[];
   divorceRecords?: string[];
   vehicles?: string[];
@@ -162,6 +174,62 @@ function pickBestMatch(results: any[], digits: string): any {
 function readDetailList(raw: any, format: (row: any) => string, limit: number): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.slice(0, limit).map(format).filter(Boolean);
+}
+
+// Calls one of the detail endpoints and logs the response's actual key names.
+// The docs host is unreachable from the build environment, so the shapes below
+// are inferred from the confirmed Person Search pattern; ENFORMION_SHAPE lines
+// in production report the real keys so the parsers can be pinned to them.
+async function proSearch(
+  username: string,
+  password: string,
+  url: string,
+  searchType: string,
+  body: Record<string, unknown>,
+  label: string,
+): Promise<any[]> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: makeHeaders(username, password, searchType),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(12000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.log(`ENFORMION_${label}_ERROR:`, res.status, errText.slice(0, 500));
+      return [];
+    }
+
+    const data = await res.json();
+    const rows: any[] = Array.isArray(data) ? data : (data.results ?? data.Results ?? []);
+    console.log(`ENFORMION_${label}_RESULTS:`, rows.length);
+    if (rows[0]) console.log(`ENFORMION_SHAPE[${label}]:`, Object.keys(rows[0]).join(','));
+    return rows;
+  } catch (e: any) {
+    console.log(`ENFORMION_${label}_EXCEPTION:`, String(e), e?.cause ? `| ${String(e.cause)}` : '');
+    return [];
+  }
+}
+
+// Picks the first non-empty value among candidate keys, case-insensitively.
+// Used only until ENFORMION_SHAPE logs confirm each endpoint's real key names.
+function pick(row: any, ...keys: string[]): string | undefined {
+  if (!row) return undefined;
+  const lower: Record<string, any> = {};
+  for (const k of Object.keys(row)) lower[k.toLowerCase()] = row[k];
+  for (const k of keys) {
+    const v = lower[k.toLowerCase()];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+  }
+  return undefined;
+}
+
+function yearOf(raw?: string): string | null {
+  if (!raw) return null;
+  const y = new Date(raw).getFullYear();
+  return Number.isFinite(y) && y > 1900 ? String(y) : null;
 }
 
 function makeHeaders(username: string, password: string, searchType?: string) {
@@ -285,12 +353,6 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     // the record where the searched number ranks best is its real owner.
     const best = pickBestMatch(results, cleaned);
     console.log('ENFORMION_MATCH:', best?.fullName, 'of', results.length, 'results');
-
-    // --- Drill-down: heavy includes require the TahoeId from the search above ---
-    if (best.tahoeId) {
-      const detail = await lookupDetail(username, password, best.tahoeId, DETAIL_INCLUDES);
-      if (detail) Object.assign(best, detail);
-    }
 
     // --- Phone intelligence (from ReversePhoneSearch; fallback to PhoneNumbers in person result) ---
     let phoneResult: EnformionPhone = emptyPhone();
@@ -497,9 +559,17 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       [v.modelYear ?? v.year, v.make, v.model, v.color ? `(${v.color})` : '']
         .filter(Boolean).join(' '), 4);
 
-    // --- Secondary lookups (parallel) ---
-    const [propertyIntelligence, divorceDetail, linkedInResult, censusResult] = await Promise.all([
-      lookupPropertyV2(username, password, best.tahoeId, addresses[0]?.addr, fullName).catch(() => []),
+    // --- Detail lookups (parallel) ---
+    // Where an indicator exists it gates the call, so we only spend a request
+    // when Person Search has already said there is something to fetch.
+    // Criminal and OFAC have no indicator and are always queried.
+    const [
+      propertyIntelligence, divorceDetail, linkedInResult, censusResult,
+      criminalRecords, ofacHits, workplace,
+    ] = await Promise.all([
+      counts.property > 0
+        ? lookupPropertyV2(username, password, best.tahoeId, addresses[0]?.addr, fullName).catch(() => [])
+        : Promise.resolve([] as EnformionProperty[]),
       hasDivorceRecords && inlineDivorce.length === 0
         ? lookupDivorce(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
@@ -508,6 +578,11 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         : Promise.resolve(null),
       addresses[0]?.addr
         ? lookupCensus(username, password, addresses[0].addr).catch(() => null)
+        : Promise.resolve(null),
+      lookupCriminal(username, password, best.tahoeId, fullName).catch(() => []),
+      lookupOfac(username, password, fullName).catch(() => []),
+      counts.workplace > 0
+        ? lookupWorkplace(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -523,8 +598,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         relatives,
         associates,
         emails,
-        jobTitle,
-        company,
+        jobTitle: jobTitle ?? workplace?.title,
+        company: company ?? workplace?.company,
         additionalPhones,
         maritalStatus,
         spouseName,
@@ -542,6 +617,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         linkedInHeadline: linkedInResult?.headline,
         censusNeighborhood: censusResult?.neighborhood,
         counts,
+        criminalRecords: criminalRecords.length ? criminalRecords : undefined,
+        ofacHits: ofacHits.length ? ofacHits : undefined,
         marriageRecords: marriageRecords.length ? marriageRecords : undefined,
         divorceRecords: inlineDivorce.length ? inlineDivorce : divorceDetail ? [divorceDetail] : undefined,
         vehicles: vehicles.length ? vehicles : undefined,
@@ -619,36 +696,68 @@ async function lookupPropertyV2(
   }).filter((p: any) => p.address);
 }
 
-// Second-pass lookup for includes that Enformion only serves against a unique
-// identifier (Criminal, Marriage, Divorce, VehicleRegistrations).
-async function lookupDetail(
-  username: string,
-  password: string,
-  tahoeId: string,
-  includes: string[],
-): Promise<Record<string, unknown> | null> {
-  try {
-    const res = await fetch(BASE_URL, {
-      method: 'POST',
-      headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
-      body: JSON.stringify({ TahoeId: tahoeId, Includes: includes, ResultsPerPage: 1 }),
-      signal: AbortSignal.timeout(15000),
-    });
+// Criminal Search V2. There is no criminal counter in `indicators`, so this is
+// queried directly rather than gated on one.
+async function lookupCriminal(
+  username: string, password: string, tahoeId?: string, fullName?: string,
+): Promise<string[]> {
+  const body = identityBody(tahoeId, fullName, 5);
+  if (!body) return [];
+  const rows = await proSearch(username, password, CRIMINAL_URL, SEARCH_TYPE_CRIMINAL, body, 'CRIMINAL');
+  return rows.slice(0, 5).map((c: any) => {
+    const offense = pick(c, 'offense', 'charge', 'description', 'offenseDescription', 'crime') ?? 'Record on file';
+    const disposition = pick(c, 'disposition', 'caseStatus', 'status');
+    const year = yearOf(pick(c, 'offenseDate', 'arrestDate', 'filingDate', 'date', 'dispositionDate'));
+    const where = pick(c, 'state', 'jurisdiction', 'county', 'court');
+    return [offense, disposition, year, where].filter(Boolean).join(' · ');
+  }).filter(Boolean);
+}
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      console.log('ENFORMION_DETAIL_ERROR:', res.status, errText.slice(0, 600));
-      return null;
-    }
+// OFAC / sanctions and prohibited-parties screening.
+async function lookupOfac(
+  username: string, password: string, fullName?: string,
+): Promise<string[]> {
+  if (!fullName) return [];
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return [];
+  const rows = await proSearch(
+    username, password, OFAC_URL, SEARCH_TYPE_OFAC,
+    { FirstName: parts[0], LastName: parts.slice(1).join(' '), ResultsPerPage: 3 },
+    'OFAC',
+  );
+  return rows.slice(0, 3).map((o: any) => {
+    const list = pick(o, 'listName', 'list', 'program', 'sanctionsProgram', 'source') ?? 'Sanctions list';
+    const name = pick(o, 'fullName', 'name', 'entityName');
+    return [list, name].filter(Boolean).join(' · ');
+  }).filter(Boolean);
+}
 
-    const data = await res.json();
-    const row = (data.results ?? data.Results ?? [])[0] ?? null;
-    console.log('ENFORMION_DETAIL_OK:', !!row);
-    return row;
-  } catch (e: any) {
-    console.log('ENFORMION_DETAIL_EXCEPTION:', String(e));
-    return null;
+// Workplace Search. Person Search reports hasWorkplaceRecords but does not
+// return the WorkPlace array unless that include is entitled, so employment
+// comes from the dedicated endpoint instead.
+async function lookupWorkplace(
+  username: string, password: string, tahoeId?: string, fullName?: string,
+): Promise<{ title?: string; company?: string } | null> {
+  const body = identityBody(tahoeId, fullName, 3);
+  if (!body) return null;
+  const rows = await proSearch(username, password, WORKPLACE_URL, SEARCH_TYPE_WORKPLACE, body, 'WORKPLACE');
+  const current = rows.find((w: any) => w.isCurrent === true || w.current === true) ?? rows[0];
+  if (!current) return null;
+  return {
+    title: pick(current, 'title', 'jobTitle', 'position', 'occupation'),
+    company: pick(current, 'company', 'companyName', 'employer', 'employerName', 'organization'),
+  };
+}
+
+// Detail endpoints accept either the person's TahoeId or a name.
+function identityBody(tahoeId?: string, fullName?: string, perPage = 5): Record<string, unknown> | null {
+  if (tahoeId) return { TahoeId: tahoeId, ResultsPerPage: perPage };
+  if (fullName) {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length < 2) return null;
+    return { FirstName: parts[0], LastName: parts.slice(1).join(' '), ResultsPerPage: perPage };
   }
+  return null;
 }
 
 async function lookupLinkedIn(
