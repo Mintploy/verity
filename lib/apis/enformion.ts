@@ -83,10 +83,27 @@ export interface EnformionPerson {
   linkedInUrl?: string;
   linkedInHeadline?: string;
   censusNeighborhood?: string;
-  criminalRecords?: string[];
   marriageRecords?: string[];
   divorceRecords?: string[];
   vehicles?: string[];
+  /** Record counts from Enformion's `indicators` object (they are counts, not flags). */
+  counts?: EnformionCounts;
+}
+
+export interface EnformionCounts {
+  bankruptcy: number;
+  evictions: number;
+  foreclosures: number;
+  judgments: number;
+  liens: number;
+  business: number;
+  divorce: number;
+  marriage: number;
+  property: number;
+  vehicles: number;
+  licenses: number;
+  debt: number;
+  workplace: number;
 }
 
 export interface EnformionResult {
@@ -112,6 +129,39 @@ function birthYearToApproxAge(dobStr: string): number | null {
   const year = parseInt(parts[parts.length - 1]);
   if (!year || year < 1900) return null;
   return new Date().getFullYear() - year;
+}
+
+const byPhoneOrder = (a: any, b: any) => (a.phoneOrder ?? 999) - (b.phoneOrder ?? 999);
+
+function findPhone(person: any, digits: string): any | undefined {
+  return (person?.phoneNumbers ?? []).find(
+    (p: any) => (p.phoneNumber ?? '').replace(/\D/g, '') === digits
+  );
+}
+
+// A number can appear on several people's records. phoneOrder ranks a number
+// within one person's own list, so the record where the searched number ranks
+// best is the one that actually owns it.
+function pickBestMatch(results: any[], digits: string): any {
+  let best = results[0];
+  let bestOrder = Infinity;
+  for (const r of results) {
+    const hit = findPhone(r, digits);
+    if (!hit) continue;
+    const order = hit.phoneOrder ?? 999;
+    if (order < bestOrder) {
+      bestOrder = order;
+      best = r;
+    }
+  }
+  return best;
+}
+
+// Reads a detail array only if the response actually carries one. Returns []
+// rather than inventing a placeholder when the include is absent or unentitled.
+function readDetailList(raw: any, format: (row: any) => string, limit: number): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, limit).map(format).filter(Boolean);
 }
 
 function makeHeaders(username: string, password: string, searchType?: string) {
@@ -215,7 +265,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       }
 
       const data = await res.json();
-      const got: any[] = data.results ?? data.Results ?? [];
+      const got: any[] = Array.isArray(data) ? data : (data.results ?? data.Results ?? []);
       console.log(`ENFORMION_RESULTS[${variant.label}]:`, got.length);
       if (got.length) {
         results = got;
@@ -230,7 +280,11 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       return { phone: emptyPhone(), person: {} };
     }
 
-    const best = results[0];
+    // A number can sit on several people's records (a shared office line, a
+    // household). phoneOrder ranks a number within one person's own list, so
+    // the record where the searched number ranks best is its real owner.
+    const best = pickBestMatch(results, cleaned);
+    console.log('ENFORMION_MATCH:', best?.fullName, 'of', results.length, 'results');
 
     // --- Drill-down: heavy includes require the TahoeId from the search above ---
     if (best.tahoeId) {
@@ -254,27 +308,27 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
             ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
             : undefined,
           origin: 'United States',
-          active: !(best.deathRecords?.isDeceased ?? false),
+          active: pr.isConnected !== false,
         };
       }
     }
-    // Fallback: phone data from PhoneNumbers include in person result
+    // Fallback: phone data from the PhoneNumbers include on the person record
     if (phoneResult.lineType === 'mobile' && !phoneResult.carrier) {
-      const phoneNumbers: any[] = best.phoneNumbers ?? [];
-      const matchedPhone = phoneNumbers.find(
-        (p: any) => (p.phoneNumber ?? '').replace(/\D/g, '') === cleaned
-      ) ?? phoneNumbers.sort((a: any, b: any) => (a.phoneOrder ?? 999) - (b.phoneOrder ?? 999))[0];
+      const matchedPhone = findPhone(best, cleaned)
+        ?? [...(best.phoneNumbers ?? [])].sort(byPhoneOrder)[0];
       if (matchedPhone) {
-        const rawLineType = matchedPhone?.phoneType ?? '';
-        const lineType = classifyLineType(rawLineType);
+        const lineType = classifyLineType(matchedPhone.phoneType ?? '');
         phoneResult = {
           lineType,
-          carrier: matchedPhone?.company ?? undefined,
+          carrier: matchedPhone.company ?? undefined,
           voipFlag: lineType === 'voip'
             ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
             : undefined,
           origin: 'United States',
-          active: !(best.deathRecords?.isDeceased ?? false),
+          // isConnected is the line's own status. The top-level person record
+          // carries no deathRecords object (only nested associates do), so the
+          // subject's status comes from datesOfDeath instead.
+          active: matchedPhone.isConnected !== false,
         };
       }
     }
@@ -342,8 +396,9 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     // --- Relatives + spouse detection ---
     const relativesSummary: any[] = best.relativesSummary ?? [];
 
+    const isSpouse = (r: any) => r.relativeType === 'Spouse' || r.spouse === 1;
     const currentSpouse = relativesSummary.find(
-      (r: any) => r.spouse === 1 && !r.oldSpouse && !r.isDeceased
+      (r: any) => isSpouse(r) && !r.oldSpouse && !r.isDeceased
     );
     const spouseName: string | undefined = currentSpouse ? buildName(currentSpouse) : undefined;
 
@@ -359,7 +414,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         : undefined;
 
     const relatives: string[] = relativesSummary
-      .filter((r: any) => r.spouse !== 1)
+      .filter((r: any) => !isSpouse(r))
       .slice(0, 10)
       .map((r: any) => {
         const rName = buildName(r);
@@ -389,62 +444,58 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       .slice(0, 3);
 
     // --- Indicators ---
-    const indicators = best.indicators ?? {};
-    const hasBankruptcy = (indicators.hasBankruptcyRecords ?? 0) > 0;
-    const hasEvictions = (indicators.hasEvictionsRecords ?? 0) > 0;
-    const hasForeclosures = (indicators.hasForeclosuresRecords ?? 0) > 0;
-    const hasJudgments = (indicators.hasJudgmentRecords ?? 0) > 0;
-    const hasLiens = (indicators.hasLienRecords ?? 0) > 0;
-    const hasBusinessRecords = (indicators.hasBusinessRecords ?? 0) > 0;
-    const hasDivorceRecords = (indicators.hasDivorceRecords ?? 0) > 0;
-    const hasPropertyRecords = (indicators.hasPropertyV2Records ?? indicators.hasPropertyRecords ?? 0) > 0;
+    // These are record COUNTS, not booleans (e.g. hasBusinessRecords: 17), so
+    // the counts are kept and surfaced rather than flattened to yes/no.
+    const ind = best.indicators ?? {};
+    const n = (k: string): number => Number(ind[k] ?? 0) || 0;
 
-    // --- Criminal records ---
-    const criminalRecords: string[] = (best.criminal ?? best.Criminal ?? [])
-      .slice(0, 5)
-      .map((c: any) => {
-        const offense = c.offense ?? c.Offense ?? c.charge ?? c.Charge ?? c.description ?? c.Description ?? 'Record on file';
-        const year = c.date ?? c.Date ?? c.filingDate ?? c.FilingDate ?? c.arrestDate ?? c.ArrestDate;
-        const state = c.state ?? c.State ?? c.jurisdiction ?? c.Jurisdiction ?? '';
-        const parts = [offense, year ? new Date(year).getFullYear() : null, state].filter(Boolean);
-        return parts.join(' · ');
-      })
-      .filter(Boolean);
+    const counts = {
+      bankruptcy: n('hasBankruptcyRecords'),
+      evictions: n('hasEvictionsRecords'),
+      foreclosures: n('hasForeclosuresRecords') + n('hasForeclosuresV2Records'),
+      judgments: n('hasJudgmentRecords'),
+      liens: n('hasLienRecords'),
+      business: n('hasBusinessRecords'),
+      divorce: n('hasDivorceRecords'),
+      marriage: n('hasMarriageRecords'),
+      property: n('hasPropertyV2Records') || n('hasPropertyRecords'),
+      vehicles: n('hasVehicleRegistrationsRecords'),
+      licenses: n('hasProfessionalLicenseRecords'),
+      debt: n('hasDebtRecords'),
+      workplace: n('hasWorkplaceRecords'),
+    };
 
-    // --- Marriage records ---
-    const marriageRecords: string[] = (best.marriage ?? best.Marriage ?? [])
-      .slice(0, 3)
-      .map((m: any) => {
-        const spouse = buildName(m.spouse ?? m.Spouse ?? m);
-        const year = m.marriageDate ?? m.MarriageDate ?? m.date ?? m.Date;
-        const county = m.county ?? m.County ?? m.state ?? m.State ?? '';
-        const parts = [spouse || 'Marriage on record', year ? new Date(year).getFullYear() : null, county].filter(Boolean);
-        return parts.join(' · ');
-      })
-      .filter(Boolean);
+    const hasBankruptcy = counts.bankruptcy > 0;
+    const hasEvictions = counts.evictions > 0;
+    const hasForeclosures = counts.foreclosures > 0;
+    const hasJudgments = counts.judgments > 0;
+    const hasLiens = counts.liens > 0;
+    const hasBusinessRecords = counts.business > 0;
+    const hasDivorceRecords = counts.divorce > 0;
+    const hasPropertyRecords = counts.property > 0;
 
-    // --- Divorce (inline from include, fallback to dedicated lookup) ---
-    const inlineDivorce: string[] = (best.divorce ?? best.Divorce ?? [])
-      .slice(0, 3)
-      .map((d: any) => {
-        const year = d.divorceDate ?? d.DivorceDate ?? d.date ?? d.Date;
-        const county = d.county ?? d.County ?? d.state ?? d.State ?? '';
-        const parts = [year ? new Date(year).getFullYear() : 'Divorce on record', county].filter(Boolean);
-        return parts.join(' · ');
-      })
-      .filter(Boolean);
+    // A verified production response carries no criminal / marriage /
+    // vehicleRegistrations arrays even when the corresponding Includes are
+    // requested, and `indicators` has no criminal counter at all — criminal
+    // appears to be a separate product. Detail arrays are read only if a
+    // response ever does carry them; otherwise the counts above are all we
+    // legitimately know, and nothing is invented to fill the gap.
+    const marriageRecords: string[] = readDetailList(best.marriage, (m: any) => {
+      const spouse = buildName(m.spouse ?? m);
+      const year = m.marriageDate ?? m.date;
+      return [spouse || 'Marriage on record', year ? new Date(year).getFullYear() : null, m.county ?? m.state]
+        .filter(Boolean).join(' · ');
+    }, 3);
 
-    // --- Vehicles ---
-    const vehicles: string[] = (best.vehicleRegistrations ?? best.VehicleRegistrations ?? [])
-      .slice(0, 4)
-      .map((v: any) => {
-        const year = v.modelYear ?? v.ModelYear ?? v.year ?? v.Year ?? '';
-        const make = v.make ?? v.Make ?? '';
-        const model = v.model ?? v.Model ?? '';
-        const color = v.color ?? v.Color ?? '';
-        return [year, make, model, color ? `(${color})` : ''].filter(Boolean).join(' ');
-      })
-      .filter(Boolean);
+    const inlineDivorce: string[] = readDetailList(best.divorce, (d: any) => {
+      const year = d.divorceDate ?? d.date;
+      return [year ? new Date(year).getFullYear() : 'Divorce on record', d.county ?? d.state]
+        .filter(Boolean).join(' · ');
+    }, 3);
+
+    const vehicles: string[] = readDetailList(best.vehicleRegistrations, (v: any) =>
+      [v.modelYear ?? v.year, v.make, v.model, v.color ? `(${v.color})` : '']
+        .filter(Boolean).join(' '), 4);
 
     // --- Secondary lookups (parallel) ---
     const [propertyIntelligence, divorceDetail, linkedInResult, censusResult] = await Promise.all([
@@ -490,7 +541,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         linkedInUrl: linkedInResult?.url,
         linkedInHeadline: linkedInResult?.headline,
         censusNeighborhood: censusResult?.neighborhood,
-        criminalRecords: criminalRecords.length ? criminalRecords : undefined,
+        counts,
         marriageRecords: marriageRecords.length ? marriageRecords : undefined,
         divorceRecords: inlineDivorce.length ? inlineDivorce : divorceDetail ? [divorceDetail] : undefined,
         vehicles: vehicles.length ? vehicles : undefined,

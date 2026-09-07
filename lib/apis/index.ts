@@ -25,7 +25,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (person.hasBankruptcy) flags.push('bankruptcy');
   if (person.hasEvictions) flags.push('evictions');
   if (person.hasJudgments || person.hasLiens || person.hasForeclosures) flags.push('financial');
-  if (person.criminalRecords?.length) flags.push('criminal');
 
   const score: ScoreState = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
     ? 'red'
@@ -44,8 +43,9 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const resolvedDob = person.dob ?? '—';
   const resolvedAliases = person.aliases?.length ? person.aliases : undefined;
 
-  const businessEntities = person.hasBusinessRecords
-    ? 'Business affiliations on record — details require further lookup.'
+  const bizCount = person.counts?.business ?? 0;
+  const businessEntities = bizCount > 0
+    ? `${bizCount} business affiliation${bizCount === 1 ? '' : 's'} on record — details require further lookup.`
     : 'None found.';
 
   const publicRecords = buildPublicRecords(pub, fecResult, person, so);
@@ -102,11 +102,17 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
           : [],
     },
     professional: {
-      title: person.jobTitle !== undefined ? person.jobTitle : '—',
-      company: person.company !== undefined ? person.company : '—',
+      // Enformion reports a workplace count but does not return the WorkPlace
+      // array unless that include is entitled on the account. Say so rather
+      // than showing a bare dash, which reads as "no employment on record".
+      title: person.jobTitle ?? '—',
+      company: person.company
+        ?? ((person.counts?.workplace ?? 0) > 0 ? 'Employment on record — details not available' : '—'),
       tenure: '—',
       llcs: 'None found.',
-      licenses: '—',
+      licenses: (person.counts?.licenses ?? 0) > 0
+        ? `${person.counts!.licenses} professional license${person.counts!.licenses === 1 ? '' : 's'} on record`
+        : '—',
       businessEntities,
     },
     publicRecords,
@@ -133,6 +139,13 @@ function getSummary(score: ScoreState): string {
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
+// Enformion's indicators are record counts, so report the count when we have
+// one. "On file" without a number reads as vaguer than the data actually is.
+function plural(count: number | undefined, noun: string): string {
+  if (!count || count < 1) return 'None on file';
+  return `${count} ${noun}${count === 1 ? '' : 's'} on file — details require further review`;
+}
+
 function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<any> {
   const records = [
     // A failed check must never render as "Not listed" — that is a false
@@ -141,11 +154,10 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
       ? { label: 'Sex offender registry', value: so.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed', good: !so.onRegistry, flag: !!so.onRegistry }
       : { label: 'Sex offender registry', value: 'Not verified — search nsopw.gov directly', neutral: true },
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
-    { label: 'Bankruptcy filings', value: person?.hasBankruptcy ? 'On file — details require further review' : 'None on file', good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
-    { label: 'Eviction records', value: person?.hasEvictions ? 'On file — details require further review' : 'None on file', good: !person?.hasEvictions, flag: !!person?.hasEvictions },
-    { label: 'Judgments / liens', value: (person?.hasJudgments || person?.hasLiens) ? 'On file — details require further review' : 'None on file', good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
-    { label: 'Criminal records', value: person?.criminalRecords?.length ? person.criminalRecords.join(' | ') : 'None found', good: !person?.criminalRecords?.length, flag: !!(person?.criminalRecords?.length) },
-    { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : 'None on file', neutral: true },
+    { label: 'Bankruptcy filings', value: plural(person?.counts?.bankruptcy, 'filing'), good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
+    { label: 'Eviction records', value: plural(person?.counts?.evictions, 'record'), good: !person?.hasEvictions, flag: !!person?.hasEvictions },
+    { label: 'Judgments / liens', value: plural((person?.counts?.judgments ?? 0) + (person?.counts?.liens ?? 0), 'record'), good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
+    { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : plural(person?.counts?.vehicles, 'registration'), neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
   ];
   return records;
