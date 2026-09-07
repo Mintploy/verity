@@ -3,8 +3,11 @@
 // Env vars: ENFORMION_USERNAME (galaxy-ap-name), ENFORMION_PASSWORD (galaxy-ap-password)
 // Base endpoint: POST https://devapi.enformion.com/PersonSearch
 
-// devapi.* is Enformion's sandbox and returns canned data only. Point
-// ENFORMION_HOST at the production host to get real records.
+// devapi.enformion.com is the correct API host and serves LIVE data despite the
+// name — confirmed against a real production response. Do not point
+// ENFORMION_HOST at enformion.com or api.enformion.com: those serve the web
+// portal and return an HTML login page, not JSON. The override exists only in
+// case Enformion issues a different API host.
 const HOST = (process.env.ENFORMION_HOST ?? 'https://devapi.enformion.com').replace(/\/+$/, '');
 
 const BASE_URL = `${HOST}/PersonSearch`;
@@ -143,6 +146,17 @@ function birthYearToApproxAge(dobStr: string): number | null {
   return new Date().getFullYear() - year;
 }
 
+// An HTML body means the request reached a web server rather than the API —
+// almost always a misconfigured ENFORMION_HOST. Say that plainly instead of
+// dumping a login page into the logs.
+function failureSummary(status: number, body: string): string {
+  const trimmed = body.trimStart();
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+    return `${status} — received an HTML page, not JSON. ENFORMION_HOST (${HOST}) is not an API host; unset it to use the default.`;
+  }
+  return `${status} ${body.slice(0, 800)}`;
+}
+
 const byPhoneOrder = (a: any, b: any) => (a.phoneOrder ?? 999) - (b.phoneOrder ?? 999);
 
 function findPhone(person: any, digits: string): any | undefined {
@@ -198,7 +212,7 @@ async function proSearch(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      console.log(`ENFORMION_${label}_ERROR:`, res.status, errText.slice(0, 500));
+      console.log(`ENFORMION_${label}_ERROR:`, failureSummary(res.status, errText));
       return [];
     }
 
@@ -328,7 +342,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        console.log(`ENFORMION_ERROR[${variant.label}]:`, res.status, errText.slice(0, 1000));
+        console.log(`ENFORMION_ERROR[${variant.label}]:`, failureSummary(res.status, errText));
         continue;
       }
 
