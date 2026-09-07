@@ -319,10 +319,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     // provided phone number"). Person Search's `Person` type answers 200 with
     // zero rows for a Phone criterion even where data demonstrably exists, so
     // the phone lookup belongs here, not there.
-    const rpRows = await proSearch(
-      username, password, PHONE_URL, SEARCH_TYPE_PHONE,
-      { Phone: cleaned, ResultsPerPage: 5 }, 'REVERSEPHONE',
-    );
+    const rpRows = await reversePhone(username, password, cleaned);
     let results: any[] = rpRows.filter((r: any) => r && (r.tahoeId || r.name || r.fullName));
 
     // Step 2 — Re-fetch the match by TahoeId. Includes require a unique
@@ -716,6 +713,33 @@ async function lookupPropertyV2(
       yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
     };
   }).filter((p: any) => p.address);
+}
+
+// Reverse Phone Search. galaxy-search-type is ReversePhone and the body is
+// { Phone, Page, ResultsPerPage }, per the published spec.
+//
+// The spec's example passes a dashed number ("123-456-7890") and Enformion
+// echoes numbers back formatted, so if bare digits return nothing the
+// documented format is tried before giving up. The log line names which format
+// produced rows.
+async function reversePhone(
+  username: string, password: string, digits: string,
+): Promise<any[]> {
+  const formats = [digits];
+  if (digits.length === 10) {
+    formats.push(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
+    formats.push(`(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`);
+  }
+
+  for (const phone of formats) {
+    const rows = await proSearch(
+      username, password, PHONE_URL, SEARCH_TYPE_PHONE,
+      { Phone: phone, Page: 1, ResultsPerPage: 10 },
+      `REVERSEPHONE:${phone}`,
+    );
+    if (rows.length) return rows;
+  }
+  return [];
 }
 
 // Fetches the full person record by TahoeId. Includes are only honoured when
