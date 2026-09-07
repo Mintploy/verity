@@ -219,7 +219,13 @@ async function proSearch(
     const data = await res.json();
     const rows: any[] = Array.isArray(data) ? data : (data.results ?? data.Results ?? []);
     console.log(`ENFORMION_${label}_RESULTS:`, rows.length);
-    if (rows[0]) console.log(`ENFORMION_SHAPE[${label}]:`, Object.keys(rows[0]).join(','));
+    if (rows[0]) {
+      console.log(`ENFORMION_SHAPE[${label}]:`, Object.keys(rows[0]).join(','));
+    } else if (!Array.isArray(data)) {
+      // A 200 with no rows may still carry a message, a counts block, or a
+      // pagination total explaining why. Surface it instead of discarding it.
+      console.log(`ENFORMION_EMPTY[${label}]:`, JSON.stringify(data).slice(0, 800));
+    }
     return rows;
   } catch (e: any) {
     console.log(`ENFORMION_${label}_EXCEPTION:`, String(e), e?.cause ? `| ${String(e.cause)}` : '');
@@ -246,10 +252,12 @@ function yearOf(raw?: string): string | null {
   return Number.isFinite(y) && y > 1900 ? String(y) : null;
 }
 
+// Only the documented galaxy-* headers. An Authorization: Basic header was
+// also being sent; Enformion's spec never asks for one, and an unexpected
+// credential can resolve to a different (unentitled) identity that answers 200
+// with an empty result set — which is exactly the symptom seen.
 function makeHeaders(username: string, password: string, searchType?: string) {
-  const credentials = Buffer.from(`${username}:${password}`).toString('base64');
   return {
-    'Authorization': `Basic ${credentials}`,
     'galaxy-ap-name': username,
     'galaxy-ap-password': password,
     ...(searchType ? { 'galaxy-search-type': searchType } : {}),
