@@ -314,16 +314,28 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
   }
 
   try {
-    // ReversePhoneSearch runs independently for carrier / line-type intelligence
-    const phoneResPromise = fetch(PHONE_URL, {
-      method: 'POST',
-      headers: makeHeaders(username, password, SEARCH_TYPE_PHONE),
-      body: JSON.stringify({ Phone: cleaned, ResultsPerPage: 1 }),
-      signal: AbortSignal.timeout(15000),
-    }).catch(() => null);
+    // Step 1 — Reverse Phone Search is the documented product for turning a
+    // number into the people on it ("returns all individuals associated with a
+    // provided phone number"). Person Search's `Person` type answers 200 with
+    // zero rows for a Phone criterion even where data demonstrably exists, so
+    // the phone lookup belongs here, not there.
+    const rpRows = await proSearch(
+      username, password, PHONE_URL, SEARCH_TYPE_PHONE,
+      { Phone: cleaned, ResultsPerPage: 5 }, 'REVERSEPHONE',
+    );
+    let results: any[] = rpRows.filter((r: any) => r && (r.tahoeId || r.name || r.fullName));
 
-    let results: any[] = [];
-    for (const variant of variants) {
+    // Step 2 — Re-fetch the match by TahoeId. Includes require a unique
+    // identifier, and a TahoeId is one, so this is where the full record
+    // (addresses, relatives, indicators) legitimately comes from.
+    const seed = results.length ? pickBestMatch(results, cleaned) : null;
+    if (seed?.tahoeId) {
+      const full = await personSearchById(username, password, seed.tahoeId, CORE_INCLUDES);
+      if (full) results = [full];
+    }
+
+    // Step 3 — Fall back to Person Search only if the phone path found nobody.
+    for (const variant of results.length ? [] : variants) {
       const inc = variant.includes ?? CORE_INCLUDES;
       const body: Record<string, unknown> = {
         ...variant.body,
@@ -355,10 +367,8 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       }
     }
 
-    const phoneRes = await phoneResPromise;
-
     if (!results.length) {
-      console.log('ENFORMION_NO_RESULTS: all variants exhausted for', cleaned);
+      console.log('ENFORMION_NO_RESULTS: reverse-phone and all Person Search variants empty for', cleaned);
       return { phone: emptyPhone(), person: {} };
     }
 
@@ -368,25 +378,23 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     const best = pickBestMatch(results, cleaned);
     console.log('ENFORMION_MATCH:', best?.fullName, 'of', results.length, 'results');
 
-    // --- Phone intelligence (from ReversePhoneSearch; fallback to PhoneNumbers in person result) ---
+    // --- Phone intelligence ---
+    // Prefer carrier/line-type off the reverse-phone row for the searched
+    // number; fall back to the PhoneNumbers include on the person record.
     let phoneResult: EnformionPhone = emptyPhone();
-    if (phoneRes?.ok) {
-      const phoneData = await phoneRes.json().catch(() => null);
-      const pr = (phoneData?.results ?? [])[0];
-      console.log('ENFORMION_PHONE_STATUS:', phoneRes.status, 'results:', phoneData?.results?.length ?? 0);
-      if (pr) {
-        const rawLineType = pr.phoneType ?? pr.lineType ?? pr.type ?? '';
-        const lineType = classifyLineType(rawLineType);
-        phoneResult = {
-          lineType,
-          carrier: pr.carrier ?? pr.company ?? pr.Company ?? undefined,
-          voipFlag: lineType === 'voip'
-            ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
-            : undefined,
-          origin: 'United States',
-          active: pr.isConnected !== false,
-        };
-      }
+    const rpMatch = rpRows.map((r: any) => findPhone(r, cleaned)).find(Boolean)
+      ?? rpRows.find((r: any) => (r?.phoneNumber ?? '').replace(/\D/g, '') === cleaned);
+    if (rpMatch) {
+      const lineType = classifyLineType(rpMatch.phoneType ?? rpMatch.lineType ?? '');
+      phoneResult = {
+        lineType,
+        carrier: rpMatch.company ?? rpMatch.carrier ?? undefined,
+        voipFlag: lineType === 'voip'
+          ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
+          : undefined,
+        origin: 'United States',
+        active: rpMatch.isConnected !== false,
+      };
     }
     // Fallback: phone data from the PhoneNumbers include on the person record
     if (phoneResult.lineType === 'mobile' && !phoneResult.carrier) {
@@ -708,6 +716,20 @@ async function lookupPropertyV2(
       yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
     };
   }).filter((p: any) => p.address);
+}
+
+// Fetches the full person record by TahoeId. Includes are only honoured when
+// the request carries a unique identifier, which a TahoeId is — a name is not,
+// and asking for Includes alongside one returns 400.
+async function personSearchById(
+  username: string, password: string, tahoeId: string, includes: string[],
+): Promise<any | null> {
+  const rows = await proSearch(
+    username, password, BASE_URL, SEARCH_TYPE_PERSON,
+    { TahoeId: tahoeId, Includes: includes, FilterOptions: ['IncludeLowQualityAddresses'], ResultsPerPage: 1 },
+    'BYID',
+  );
+  return rows[0] ?? null;
 }
 
 // Criminal Search V2. There is no criminal counter in `indicators`, so this is
