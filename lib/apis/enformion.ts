@@ -20,7 +20,7 @@ const CENSUS_URL = `${HOST}/CensusSearch`;
 // Detail products. Person Search's `indicators` say what exists; these
 // endpoints return the records themselves. Criminal and OFAC have no indicator
 // and are queried directly.
-const CRIMINAL_URL = `${HOST}/CriminalSearchV2`;
+const CRIMINAL_URL = `${HOST}/CriminalSearch/V2`;
 const OFAC_URL = `${HOST}/OfacSearch`;
 const WORKPLACE_URL = `${HOST}/WorkplaceSearch`;
 
@@ -96,7 +96,7 @@ export interface EnformionPerson {
   linkedInUrl?: string;
   linkedInHeadline?: string;
   censusNeighborhood?: string;
-  criminalRecords?: string[];
+  criminal?: CriminalResult;
   ofacHits?: string[];
   marriageRecords?: string[];
   divorceRecords?: string[];
@@ -201,6 +201,7 @@ async function proSearch(
   searchType: string,
   body: Record<string, unknown>,
   label: string,
+  extractRows?: (data: any) => any[],
 ): Promise<any[]> {
   try {
     const res = await fetch(url, {
@@ -217,7 +218,9 @@ async function proSearch(
     }
 
     const data = await res.json();
-    const rows: any[] = Array.isArray(data) ? data : (data.results ?? data.Results ?? []);
+    const rows: any[] = extractRows
+      ? (extractRows(data) ?? [])
+      : (Array.isArray(data) ? data : (data.results ?? data.Results ?? []));
     console.log(`ENFORMION_${label}_RESULTS:`, rows.length);
     if (rows[0]) {
       console.log(`ENFORMION_SHAPE[${label}]:`, Object.keys(rows[0]).join(','));
@@ -266,7 +269,17 @@ function makeHeaders(username: string, password: string, searchType?: string) {
   };
 }
 
-export async function lookupEnformion(phone: string, name?: string): Promise<EnformionResult> {
+export interface EnformionQuery {
+  phone?: string;
+  name?: string;
+  email?: string;
+  address?: string;
+  /** City, State or ZIP — narrows a name or address search. */
+  location?: string;
+}
+
+export async function lookupEnformion(query: EnformionQuery): Promise<EnformionResult> {
+  const { name, email, address, location } = query;
   const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const username = process.env.ENFORMION_USERNAME;
   const password = process.env.ENFORMION_PASSWORD;
@@ -275,7 +288,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     return { phone: emptyPhone(), person: {} };
   }
 
-  const raw = phone.replace(/\D/g, '');
+  const raw = (query.phone ?? '').replace(/\D/g, '');
   const cleaned = raw.length === 11 && raw.startsWith('1') ? raw.slice(1) : raw;
 
   // Includes available on an initial (identifier-less) search.
@@ -303,20 +316,42 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
   const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
 
   // Search variants, tried in order until one returns rows.
-  // Phone-only first: combining phone AND name ANDs the conditions, so a name
-  // that doesn't match Enformion's record for that phone yields zero rows.
-  // The bare variant isolates whether heavy includes are suppressing results.
-  // Phone is the primary key for this product and is the only search parameter
-  // Enformion treats as a unique identifier, so it is the only one that may
-  // carry Includes. Name searches must go bare or Enformion returns 400
-  // "Unique identifiers must be provided for the requested includes."
-  const variants: Array<{ label: string; body: Record<string, unknown>; includes?: string[] }> = [
-    { label: 'phone', body: { Phone: cleaned } },
-  ];
+  //
+  // A phone or an email is a unique identifier and may carry Includes. A name
+  // is not: pairing one with Includes returns 400 "Unique identifiers must be
+  // provided for the requested includes", so name and address variants go bare
+  // and the full record is fetched afterwards by TahoeId.
+  //
+  // Combining criteria ANDs them, so each is tried alone before any pairing.
+  const variants: Array<{ label: string; body: Record<string, unknown>; includes?: string[] }> = [];
+
+  if (cleaned) variants.push({ label: 'phone', body: { Phone: cleaned } });
+  if (email) variants.push({ label: 'email', body: { Email: email } });
+
+  if (address) {
+    // Person Search takes addresses as an array of objects; AddressLine2 is the
+    // "City, State" (or ZIP) half.
+    variants.push({
+      label: 'address',
+      body: { Addresses: [{ AddressLine1: address, ...(location ? { AddressLine2: location } : {}) }] },
+      includes: [],
+    });
+  }
+
   if (firstName && lastName) {
-    // Name only narrows; it never replaces the phone as the lookup key.
-    variants.push({ label: 'phone+name', body: { Phone: cleaned, FirstName: firstName, LastName: lastName } });
-    variants.push({ label: 'name', body: { FirstName: firstName, LastName: lastName }, includes: [] });
+    variants.push({
+      label: 'name',
+      body: {
+        FirstName: firstName,
+        LastName: lastName,
+        ...(location ? { Addresses: [{ AddressLine2: location }] } : {}),
+      },
+      includes: [],
+    });
+    // Pairing is a last resort — it only helps when a lone criterion is too broad.
+    if (cleaned) {
+      variants.push({ label: 'phone+name', body: { Phone: cleaned, FirstName: firstName, LastName: lastName } });
+    }
   } else if (firstName) {
     variants.push({ label: 'firstname', body: { FirstName: firstName }, includes: [] });
   }
@@ -327,7 +362,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
     // provided phone number"). Person Search's `Person` type answers 200 with
     // zero rows for a Phone criterion even where data demonstrably exists, so
     // the phone lookup belongs here, not there.
-    const rpRows = await reversePhone(username, password, cleaned);
+    const rpRows = cleaned ? await reversePhone(username, password, cleaned) : [];
     let results: any[] = rpRows.filter((r: any) => r && (r.tahoeId || r.name || r.fullName));
 
     // Step 2 — Re-fetch the match by TahoeId. Includes require a unique
@@ -606,7 +641,10 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
       addresses[0]?.addr
         ? lookupCensus(username, password, addresses[0].addr).catch(() => null)
         : Promise.resolve(null),
-      lookupCriminal(username, password, best.tahoeId, fullName).catch(() => []),
+      lookupCriminal(username, password, fullName, {
+        age,
+        states: (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
+      }).catch(() => ({ findings: [], onSexOffenderRegistry: false, nameOnlyMatches: false })),
       lookupOfac(username, password, fullName).catch(() => []),
       counts.workplace > 0
         ? lookupWorkplace(username, password, best.tahoeId, fullName).catch(() => null)
@@ -644,7 +682,7 @@ export async function lookupEnformion(phone: string, name?: string): Promise<Enf
         linkedInHeadline: linkedInResult?.headline,
         censusNeighborhood: censusResult?.neighborhood,
         counts,
-        criminalRecords: criminalRecords.length ? criminalRecords : undefined,
+        criminal: criminalRecords,
         ofacHits: ofacHits.length ? ofacHits : undefined,
         marriageRecords: marriageRecords.length ? marriageRecords : undefined,
         divorceRecords: inlineDivorce.length ? inlineDivorce : divorceDetail ? [divorceDetail] : undefined,
@@ -764,21 +802,120 @@ async function personSearchById(
   return rows[0] ?? null;
 }
 
-// Criminal Search V2. There is no criminal counter in `indicators`, so this is
-// queried directly rather than gated on one.
+export interface CriminalFinding {
+  /** Human-readable summary of the offence. Never contains SSN. */
+  summary: string;
+  /** True when the record comes from a sex offender registry. */
+  sexOffender: boolean;
+  /** True when the record was corroborated against the subject's own age/state. */
+  corroborated: boolean;
+}
+
+export interface CriminalResult {
+  findings: CriminalFinding[];
+  /** True if any corroborated record is a sex offender registry listing. */
+  onSexOffenderRegistry: boolean;
+  /** True if we searched but could only match on name, with no corroboration. */
+  nameOnlyMatches: boolean;
+}
+
+// Criminal Search V2 — POST /CriminalSearch/V2, body { FirstName, LastName,
+// Dob?, Page, ResultsPerPage }. Unlike Person Search this responds in
+// PascalCase under a CriminalRecords key.
+//
+// This endpoint matches on NAME, and Enformion does not return a usable DOB for
+// the subject, so a raw hit means "someone with this name has a record" — not
+// "this man has a record". Attributing a stranger's conviction to the person
+// being searched would be both defamatory and, for a product women use to
+// decide whether to meet someone, actively misleading. Every record is
+// therefore corroborated against the subject's own age and known states before
+// it is presented as theirs.
 async function lookupCriminal(
-  username: string, password: string, tahoeId?: string, fullName?: string,
-): Promise<string[]> {
-  const body = identityBody(tahoeId, fullName, 5);
-  if (!body) return [];
-  const rows = await proSearch(username, password, CRIMINAL_URL, SEARCH_TYPE_CRIMINAL, body, 'CRIMINAL');
-  return rows.slice(0, 5).map((c: any) => {
-    const offense = pick(c, 'offense', 'charge', 'description', 'offenseDescription', 'crime') ?? 'Record on file';
-    const disposition = pick(c, 'disposition', 'caseStatus', 'status');
-    const year = yearOf(pick(c, 'offenseDate', 'arrestDate', 'filingDate', 'date', 'dispositionDate'));
-    const where = pick(c, 'state', 'jurisdiction', 'county', 'court');
-    return [offense, disposition, year, where].filter(Boolean).join(' · ');
-  }).filter(Boolean);
+  username: string,
+  password: string,
+  fullName?: string,
+  subject?: { age?: number; states?: string[] },
+): Promise<CriminalResult> {
+  const empty: CriminalResult = { findings: [], onSexOffenderRegistry: false, nameOnlyMatches: false };
+  if (!fullName) return empty;
+
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return empty;
+
+  const rows = await proSearch(
+    username, password, CRIMINAL_URL, SEARCH_TYPE_CRIMINAL,
+    { FirstName: parts[0], LastName: parts[parts.length - 1], Page: 1, ResultsPerPage: 10 },
+    'CRIMINAL',
+    (d: any) => d.CriminalRecords ?? d.criminalRecords ?? [],
+  );
+
+  const subjectStates = new Set((subject?.states ?? []).map(s => s.toUpperCase()));
+  const findings: CriminalFinding[] = [];
+
+  for (const rec of rows.slice(0, 10)) {
+    const offenses: any[] = rec.Offenses ?? [];
+    const cases: any[] = rec.CaseDetails ?? [];
+    const attrs: any[] = rec.OffenderAttributes ?? [];
+    const addrs: any[] = rec.Addresses ?? [];
+
+    // --- Corroboration: does this record plausibly belong to our subject? ---
+    let ageMatch: boolean | null = null;
+    if (subject?.age) {
+      for (const a of attrs) {
+        const recAge = a.Age ?? (a.Dob ? new Date().getFullYear() - new Date(a.Dob).getFullYear() : null);
+        if (typeof recAge === 'number' && Number.isFinite(recAge)) {
+          // Allow two years' drift for partial dates and reporting lag.
+          ageMatch = Math.abs(recAge - subject.age) <= 2;
+          if (ageMatch) break;
+        }
+      }
+    }
+
+    let stateMatch: boolean | null = null;
+    if (subjectStates.size) {
+      const recStates = [
+        ...addrs.map((a: any) => a.State),
+        ...offenses.map((o: any) => o.SourceState),
+        ...cases.map((c: any) => c.CourtCounty),
+      ].filter(Boolean).map((s: string) => String(s).toUpperCase());
+      if (recStates.length) stateMatch = recStates.some(s => subjectStates.has(s));
+    }
+
+    // Corroborated only when a check actually ran and passed, and nothing
+    // positively contradicts it. Unknown is never treated as agreement.
+    const checksRun = ageMatch !== null || stateMatch !== null;
+    const contradicted = ageMatch === false || stateMatch === false;
+    const corroborated = checksRun && !contradicted;
+
+    const isSexOffence = String(rec.ShortCat ?? '').toUpperCase().includes('SEX')
+      || cases.some((c: any) => /sex offender/i.test(String(c.MappedCategory ?? c.RawCategory ?? c.Source ?? '')));
+
+    for (const off of offenses.length ? offenses : [null]) {
+      const desc = off
+        ? (Array.isArray(off.OffenseDescription) ? off.OffenseDescription.join('; ') : off.OffenseDescription)
+        : null;
+      const category = cases[0]?.MappedCategory ?? cases[0]?.RawCategory ?? rec.ShortCat;
+      const year = yearOf(off?.ConvictionDate ?? off?.OffenseDate ?? off?.DispositionDate ?? cases[0]?.CaseDate);
+      const where = off?.SourceState ?? addrs[0]?.State;
+      const disposition = off?.Disposition;
+
+      // Deliberately excludes Names[].Ssn and every identifying attribute
+      // (Race, Sex, Height, ScarsMarks) — none of it belongs in this report.
+      const summary = [desc || category || 'Record on file', disposition, year, where]
+        .filter(Boolean).join(' · ');
+
+      if (summary) findings.push({ summary, sexOffender: isSexOffence, corroborated });
+    }
+  }
+
+  const corroboratedFindings = findings.filter(f => f.corroborated);
+  console.log('ENFORMION_CRIMINAL_MATCH:', findings.length, 'records,', corroboratedFindings.length, 'corroborated');
+
+  return {
+    findings: findings.slice(0, 8),
+    onSexOffenderRegistry: corroboratedFindings.some(f => f.sexOffender),
+    nameOnlyMatches: findings.length > 0 && corroboratedFindings.length === 0,
+  };
 }
 
 // OFAC / sanctions and prohibited-parties screening.

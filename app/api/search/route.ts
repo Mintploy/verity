@@ -16,10 +16,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { phone, name } = body;
+    const { phone, name, email, address, location } = body;
 
-    if (!phone) {
-      return Response.json({ error: 'Phone number is required' }, { status: 400 });
+    // Phone is the primary lookup, but a search by name, email or address is
+    // equally valid — require only that at least one of them is present.
+    if (!phone && !name && !email && !address) {
+      return Response.json(
+        { error: 'Enter a phone number, name, email or address to search' },
+        { status: 400 },
+      );
     }
 
     const quota = await consumeSearch(session.email);
@@ -28,7 +33,11 @@ export async function POST(req: NextRequest) {
     }
 
     const enrichHistorical = quota.plan === 'founding' || quota.plan === 'annual';
-    const report = await generateReport({ phone, name, userId: session.email, enrichHistorical });
+    const report = await generateReport({
+      phone, name, email, address, location,
+      userId: session.email,
+      enrichHistorical,
+    });
 
     return Response.json({ report, searchId: report.searchId, demoMode: process.env.ALLOW_LIVE_LOOKUPS !== 'true' });
   } catch (err: any) {

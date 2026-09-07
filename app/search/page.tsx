@@ -13,6 +13,40 @@ interface SavedReport {
   searchId: string;
 }
 
+type Mode = 'phone' | 'name' | 'email' | 'address';
+
+// Phone stays first and is the default: it is the strongest identifier
+// Enformion accepts and the one this product is built around. The others widen
+// the entry points without displacing it.
+const MODES: Array<{
+  id: Mode;
+  label: string;
+  label2: string;
+  placeholder: string;
+  inputType: string;
+  secondary?: { label: string; hint: string; placeholder: string };
+}> = [
+  {
+    id: 'phone', label: 'Phone', label2: 'His phone number',
+    placeholder: '(•••) ••• ••••', inputType: 'tel',
+    secondary: { label: 'His name', hint: '(optional — sharpens results)', placeholder: 'First and last name' },
+  },
+  {
+    id: 'name', label: 'Name', label2: 'His full name',
+    placeholder: 'First and last name', inputType: 'text',
+    secondary: { label: 'Where he lives', hint: '(optional — narrows a common name)', placeholder: 'City, State or ZIP' },
+  },
+  {
+    id: 'email', label: 'Email', label2: 'His email address',
+    placeholder: 'name@example.com', inputType: 'email',
+  },
+  {
+    id: 'address', label: 'Address', label2: 'His street address',
+    placeholder: '123 Park Ave', inputType: 'text',
+    secondary: { label: 'City, State or ZIP', hint: '(recommended)', placeholder: 'Los Angeles, CA' },
+  },
+];
+
 function getScoreColor(score: string) {
   if (score === 'green') return { bg: 'var(--sage-pale)', text: 'var(--sage-deep)' };
   if (score === 'red') return { bg: 'var(--deeprose-pale)', text: 'var(--deeprose-deep)' };
@@ -21,8 +55,9 @@ function getScoreColor(score: string) {
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const [phone, setPhone] = useState(searchParams.get('phone') ?? '');
-  const [name, setName] = useState('');
+  const [mode, setMode] = useState<Mode>('phone');
+  const [primary, setPrimary] = useState(searchParams.get('phone') ?? '');
+  const [secondary, setSecondary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
@@ -73,8 +108,24 @@ function SearchContent() {
     loadPastSearches();
   };
 
+  const activeMode = MODES.find(m => m.id === mode)!;
+  const canSearch = primary.trim().length > 0;
+
+  // Which field the typed value maps to depends on the active tab; the
+  // secondary box is the name on a phone search and the location otherwise.
+  const buildQuery = () => {
+    const value = primary.trim();
+    const extra = secondary.trim() || undefined;
+    switch (mode) {
+      case 'phone': return { phone: value, name: extra };
+      case 'name': return { name: value, location: extra };
+      case 'email': return { email: value };
+      case 'address': return { address: value, location: extra };
+    }
+  };
+
   const handleSearch = async () => {
-    if (!phone.trim()) return;
+    if (!canSearch) return;
     setLoading(true);
     setError(null);
 
@@ -82,7 +133,7 @@ function SearchContent() {
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), name: name.trim() || undefined }),
+        body: JSON.stringify(buildQuery()),
       });
 
       const data = await res.json();
@@ -141,32 +192,59 @@ function SearchContent() {
           <em style={{ color: 'var(--rose)', fontWeight: 300 }}>researching?</em>
         </h1>
 
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => { setMode(m.id); setError(null); }}
+              style={{
+                flex: '1 1 0', minWidth: 80, padding: '10px 12px',
+                borderRadius: 'var(--r-md)', cursor: 'pointer',
+                border: mode === m.id ? '1px solid var(--primary)' : '1px solid transparent',
+                background: mode === m.id ? 'var(--pearl)' : 'transparent',
+                color: mode === m.id ? 'var(--primary)' : 'var(--mauve-deep)',
+                fontFamily: 'var(--sans)', fontSize: 13,
+                fontWeight: mode === m.id ? 600 : 400,
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ padding: '20px 28px', background: 'var(--pearl)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-md)' }}>
             <label style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--mauve-deep)', display: 'block', marginBottom: 8 }}>
-              His phone number <span style={{ color: 'var(--rose)' }}>*</span>
+              {activeMode.label2} <span style={{ color: 'var(--rose)' }}>*</span>
             </label>
             <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(•••) ••• ••••"
-              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--serif)', fontSize: 32, color: 'var(--dark)', fontVariantNumeric: 'tabular-nums' }}
+              type={activeMode.inputType}
+              value={primary}
+              onChange={(e) => setPrimary(e.target.value)}
+              placeholder={activeMode.placeholder}
+              style={{
+                width: '100%', border: 'none', background: 'transparent', outline: 'none',
+                fontFamily: 'var(--serif)', color: 'var(--dark)',
+                fontSize: mode === 'phone' ? 32 : 24,
+                ...(mode === 'phone' ? { fontVariantNumeric: 'tabular-nums' as const } : {}),
+              }}
             />
           </div>
 
-          <div style={{ padding: '20px 28px', background: 'var(--pearl)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)' }}>
-            <label style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--mauve-deep)', display: 'block', marginBottom: 8 }}>
-              His name <em style={{ color: 'var(--mauve)', fontStyle: 'normal', fontSize: 12 }}>(optional — sharpens results)</em>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="First and last name"
-              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)' }}
-            />
-          </div>
+          {activeMode.secondary && (
+            <div style={{ padding: '20px 28px', background: 'var(--pearl)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)' }}>
+              <label style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--mauve-deep)', display: 'block', marginBottom: 8 }}>
+                {activeMode.secondary.label} <em style={{ color: 'var(--mauve)', fontStyle: 'normal', fontSize: 12 }}>{activeMode.secondary.hint}</em>
+              </label>
+              <input
+                type="text"
+                value={secondary}
+                onChange={(e) => setSecondary(e.target.value)}
+                placeholder={activeMode.secondary.placeholder}
+                style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--dark)' }}
+              />
+            </div>
+          )}
 
           {error && (
             <div style={{ padding: '14px 18px', background: 'var(--deeprose-pale)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--deeprose-deep)' }}>
@@ -176,14 +254,14 @@ function SearchContent() {
 
           <button
             onClick={handleSearch}
-            disabled={!phone.trim()}
+            disabled={!canSearch}
             style={{
               padding: '20px 32px', borderRadius: 'var(--r-pill)',
-              background: phone.trim() ? 'var(--primary)' : 'var(--mauve)',
+              background: canSearch ? 'var(--primary)' : 'var(--mauve)',
               color: 'var(--ivory)', border: 'none',
-              cursor: phone.trim() ? 'pointer' : 'not-allowed',
+              cursor: canSearch ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 500,
-              boxShadow: phone.trim() ? 'var(--shadow-pop)' : 'none',
+              boxShadow: canSearch ? 'var(--shadow-pop)' : 'none',
               width: '100%',
             }}
           >

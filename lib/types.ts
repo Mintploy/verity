@@ -1,8 +1,15 @@
 export type ScoreState = 'green' | 'yellow' | 'red';
 
+export type SearchMode = 'phone' | 'name' | 'email' | 'address';
+
 export interface SearchRequest {
-  phone: string;
+  /** Phone remains the primary lookup key; the others are alternates. */
+  phone?: string;
   name?: string;
+  email?: string;
+  address?: string;
+  /** City, State or ZIP — narrows a name or address search. */
+  location?: string;
   userId?: string;
   enrichHistorical?: boolean;
 }

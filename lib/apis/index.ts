@@ -9,7 +9,13 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   const [enResult, publicRecs, soRegistry] = await Promise.allSettled([
-    lookupEnformion(req.phone, req.name),
+    lookupEnformion({
+      phone: req.phone,
+      name: req.name,
+      email: req.email,
+      address: req.address,
+      location: req.location,
+    }),
     lookupPublicRecords(req.name, req.phone),
     checkSexOffenderRegistry(req.name),
   ]);
@@ -25,13 +31,16 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (person.hasBankruptcy) flags.push('bankruptcy');
   if (person.hasEvictions) flags.push('evictions');
   if (person.hasJudgments || person.hasLiens || person.hasForeclosures) flags.push('financial');
-  if (person.criminalRecords?.length) flags.push('criminal');
+  const criminal = person.criminal;
+  const confirmedCriminal = criminal?.findings.filter(f => f.corroborated) ?? [];
+  if (confirmedCriminal.length) flags.push('criminal');
   if (person.ofacHits?.length) flags.push('sanctions');
 
   // A registry listing, a criminal record, or a sanctions hit each stand on
   // their own — they are not one flag among several to be averaged away.
   const gravest = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
-    || !!person.criminalRecords?.length
+    || criminal?.onSexOffenderRegistry
+    || confirmedCriminal.length > 0
     || !!person.ofacHits?.length;
 
   const score: ScoreState = gravest
@@ -74,7 +83,9 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     subject: {
       name: resolvedName,
       age: resolvedAge,
-      phone: req.phone,
+      // On a non-phone search the subject's own primary number is the result,
+      // not the query.
+      phone: req.phone ?? person.additionalPhones?.[0] ?? '—',
       dob: resolvedDob,
     },
     phone: {
@@ -154,18 +165,71 @@ function plural(count: number | undefined, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'} on file — details require further review`;
 }
 
+// A registry listing is the single most consequential thing this report can
+// say, so it is never claimed clear on a check that did not run. Criminal
+// Search V2 carries state sex offender registry records, which can confirm a
+// listing even when NSOPW itself is unavailable — but it cannot prove absence,
+// so a clean Criminal result still leaves the registry "not verified".
+function buildRegistryRow(so: any, criminal: any): any {
+  if (criminal?.onSexOffenderRegistry) {
+    const hits = criminal.findings.filter((f: any) => f.sexOffender && f.corroborated);
+    return {
+      label: 'Sex offender registry',
+      value: `Listed — ${hits[0]?.summary ?? 'registry record found'}`,
+      good: false,
+      flag: true,
+    };
+  }
+  if (so?.checked) {
+    return {
+      label: 'Sex offender registry',
+      value: so.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed',
+      good: !so.onRegistry,
+      flag: !!so.onRegistry,
+    };
+  }
+  return {
+    label: 'Sex offender registry',
+    value: 'Not verified — search nsopw.gov directly',
+    neutral: true,
+  };
+}
+
+// Criminal Search V2 matches on name alone, so an uncorroborated hit means
+// "someone with this name has a record" — not "he does". Presenting the two as
+// the same thing would risk pinning a stranger's conviction on the person being
+// searched. Corroborated records are stated plainly; name-only matches are
+// shown as needing verification and are never counted as a confirmed finding.
+function buildCriminalRow(criminal: any): any {
+  const confirmed = criminal?.findings?.filter((f: any) => f.corroborated) ?? [];
+  if (confirmed.length) {
+    return {
+      label: 'Criminal records',
+      value: confirmed.map((f: any) => f.summary).join(' | '),
+      good: false,
+      flag: true,
+    };
+  }
+  if (criminal?.nameOnlyMatches) {
+    return {
+      label: 'Criminal records',
+      value: `${criminal.findings.length} record${criminal.findings.length === 1 ? '' : 's'} match the name but could not be confirmed as this person — verify before relying on this`,
+      neutral: true,
+    };
+  }
+  return { label: 'Criminal records', value: 'None found', good: true };
+}
+
 function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<any> {
   const records = [
     // A failed check must never render as "Not listed" — that is a false
     // assurance. Only claim the registry is clear when it was actually searched.
-    so?.checked
-      ? { label: 'Sex offender registry', value: so.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed', good: !so.onRegistry, flag: !!so.onRegistry }
-      : { label: 'Sex offender registry', value: 'Not verified — search nsopw.gov directly', neutral: true },
+    buildRegistryRow(so, person?.criminal),
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
     { label: 'Bankruptcy filings', value: plural(person?.counts?.bankruptcy, 'filing'), good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
     { label: 'Eviction records', value: plural(person?.counts?.evictions, 'record'), good: !person?.hasEvictions, flag: !!person?.hasEvictions },
     { label: 'Judgments / liens', value: plural((person?.counts?.judgments ?? 0) + (person?.counts?.liens ?? 0), 'record'), good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
-    { label: 'Criminal records', value: person?.criminalRecords?.length ? person.criminalRecords.join(' | ') : 'None found', good: !person?.criminalRecords?.length, flag: !!person?.criminalRecords?.length },
+    buildCriminalRow(person?.criminal),
     { label: 'Sanctions / watchlists', value: person?.ofacHits?.length ? person.ofacHits.join(' | ') : 'Not listed', good: !person?.ofacHits?.length, flag: !!person?.ofacHits?.length },
     { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : plural(person?.counts?.vehicles, 'registration'), neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
