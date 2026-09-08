@@ -205,6 +205,22 @@ function readDetailList(raw: any, format: (row: any) => string, limit: number): 
 // The docs host is unreachable from the build environment, so the shapes below
 // are inferred from the confirmed Person Search pattern; ENFORMION_SHAPE lines
 // in production report the real keys so the parsers can be pinned to them.
+// Enformion is not consistent about the collection key. Person Search answers
+// under `persons`; other endpoints use `results`; ReversePhoneSearch and
+// CriminalSearch use their own names and pass explicit extractors.
+//
+// Reading only `results` silently discarded fully populated responses. That is
+// the same fault that produced ENFORMION_EMPTY[BYID] while the body plainly
+// carried the person's age, DOB dates and AKAs, and it is why the report could
+// show a name and nothing else.
+//
+// This is a superset, so a `results`-shaped body still resolves exactly as
+// before — no endpoint loses behaviour by adopting it.
+function extractRowsDefault(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  return data?.persons ?? data?.Persons ?? data?.results ?? data?.Results ?? [];
+}
+
 async function proSearch(
   username: string,
   password: string,
@@ -231,7 +247,7 @@ async function proSearch(
     const data = await res.json();
     const rows: any[] = extractRows
       ? (extractRows(data) ?? [])
-      : (Array.isArray(data) ? data : (data.results ?? data.Results ?? []));
+      : extractRowsDefault(data);
     console.log(`ENFORMION_${label}_RESULTS:`, rows.length);
     if (rows[0]) {
       console.log(`ENFORMION_SHAPE[${label}]:`, Object.keys(rows[0]).join(','));
@@ -410,7 +426,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       }
 
       const data = await res.json();
-      const got: any[] = Array.isArray(data) ? data : (data.results ?? data.Results ?? []);
+      const got: any[] = extractRowsDefault(data);
       console.log(`ENFORMION_RESULTS[${variant.label}]:`, got.length);
       if (got.length) {
         results = got;
@@ -740,7 +756,7 @@ async function lookupPropertyV2(
   if (!res.ok) return [];
 
   const data = await res.json();
-  const results: any[] = data.results ?? data.Results ?? [];
+  const results: any[] = extractRowsDefault(data);
   console.log('ENFORMION_PROPERTY_RESULTS:', results.length);
 
   return results.slice(0, 4).map((p: any) => {
@@ -977,7 +993,11 @@ async function lookupOfac(
   if (parts.length < 2) return [];
   const rows = await proSearch(
     username, password, OFAC_URL, SEARCH_TYPE_OFAC,
-    { FirstName: parts[0], LastName: parts.slice(1).join(' '), ResultsPerPage: 3 },
+    // OfacSearch does not take FirstName/LastName. Its own 400 names the
+    // accepted fields: "At least one must be provided. (EntityName or
+    // PersonName)". Sent as a single string; if it wants a structured value
+    // the next 400 will name the sub-fields.
+    { PersonName: parts.join(' '), ResultsPerPage: 3 },
     'OFAC',
   );
   return rows.slice(0, 3).map((o: any) => {
@@ -1031,7 +1051,7 @@ async function lookupLinkedIn(
   if (!res.ok) return null;
 
   const data = await res.json();
-  const results: any[] = data.results ?? data.Results ?? [];
+  const results: any[] = extractRowsDefault(data);
   if (!results.length) return null;
 
   const r = results[0];
@@ -1065,7 +1085,7 @@ async function lookupCensus(
   if (!res.ok) return null;
 
   const data = await res.json();
-  const results: any[] = data.results ?? data.Results ?? [];
+  const results: any[] = extractRowsDefault(data);
   if (!results.length) return null;
 
   const r = results[0];
@@ -1103,7 +1123,7 @@ async function lookupDivorce(
   if (!res.ok) return null;
 
   const data = await res.json();
-  const results: any[] = data.results ?? data.Results ?? [];
+  const results: any[] = extractRowsDefault(data);
   console.log('ENFORMION_DIVORCE_RESULTS:', results.length);
   if (!results.length) return null;
 
