@@ -782,10 +782,48 @@ async function reversePhone(
       username, password, PHONE_URL, SEARCH_TYPE_PHONE,
       { Phone: phone, Page: 1, ResultsPerPage: 10 },
       `REVERSEPHONE:${phone}`,
+      // This endpoint returns `reversePhoneRecords`, not `results`. Without
+      // this the default extractor found nothing and a populated response was
+      // logged as EMPTY.
+      (data) => data?.reversePhoneRecords ?? data?.ReversePhoneRecords ?? [],
     );
-    if (rows.length) return rows;
+    if (rows.length) return rows.map(normalizeReversePhoneRow);
   }
   return [];
+}
+
+// A ReversePhoneSearch row is shaped differently from a Person Search row: the
+// identity sits under `tahoePerson`, the name is a `names` array, and the
+// carrier and line type describe the searched number at the top level instead
+// of in a `phoneNumbers` list. Normalise once here so pickBestMatch, findPhone
+// and the TahoeId drill-down downstream can all stay written against a single
+// shape — and so the `r.tahoeId || r.name || r.fullName` filter in Step 1 stops
+// discarding every row it is handed.
+function normalizeReversePhoneRow(r: any): any {
+  const person = r?.tahoePerson ?? {};
+  const name = r?.names?.[0] ?? person?.name ?? {};
+  const fullName = [name.firstName, name.middleName, name.lastName]
+    .filter(Boolean).join(' ').trim() || undefined;
+
+  const existing = Array.isArray(r?.phoneNumbers) ? r.phoneNumbers : [];
+
+  return {
+    ...r,
+    // recordId carries the same identifier as tahoeId on this endpoint, so it
+    // is a safe last resort for the drill-down.
+    tahoeId: person.tahoeId ?? r?.tahoeId ?? r?.recordId,
+    fullName,
+    firstName: name.firstName,
+    lastName: name.lastName,
+    phoneNumbers: existing.length ? existing : (r?.phoneNumber ? [{
+      phoneNumber: r.phoneNumber,
+      phoneType: r.phoneType,
+      carrier: r.carrier,
+      company: r.carrier,
+      isConnected: r.isConnected,
+      phoneOrder: 1,
+    }] : []),
+  };
 }
 
 // Fetches the full person record by TahoeId. Includes are only honoured when
