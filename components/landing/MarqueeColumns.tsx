@@ -36,7 +36,7 @@ const col3: Card[] = [
   { type: 'score', score: 'yellow', label: 'Soft yellow', sub: 'Proceed with care.' },
   { type: 'quote', text: 'I use it before every first date. Non-negotiable.', attr: 'Aisha T. · 26 · NYC' },
   { type: 'data', label: 'Public records', val: '1 civil suit open · 2023 · Los Angeles' },
-  { type: 'tag', text: '47,232 women already verified', tone: 'clear' },
+  { type: 'tag', text: 'Every member ID-verified before access', tone: 'clear' },
   { type: 'data', label: 'Social footprint', val: 'Age discrepancy found on X / Instagram' },
   { type: 'score', score: 'red', label: 'Deep rose', sub: "We'd sit this one out." },
   { type: 'tag', text: 'Report generated in 14 seconds', tone: 'clear' },

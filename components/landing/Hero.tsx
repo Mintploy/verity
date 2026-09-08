@@ -47,6 +47,7 @@ export function Hero() {
             color: 'var(--dark-soft)', margin: '36px 0 0', maxWidth: 480, fontWeight: 300,
           }}>
             Verity is private intelligence for the woman who's done taking unnecessary risks.
+            A first date, a marketplace pickup, anyone you're about to meet alone.
             Drop in a phone number. Get back the full picture — quietly, in seconds.
           </p>
 
@@ -89,18 +90,6 @@ export function Hero() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginTop: 36 }}>
-            <div className="v-hide-mobile" style={{ display: 'flex' }}>
-              {['var(--blush-deep)', 'var(--champagne)', 'var(--mauve)', 'var(--sage)', 'var(--rose)'].map((c, i) => (
-                <div key={i} style={{
-                  width: 32, height: 32, borderRadius: '50%', background: c,
-                  border: '2.5px solid var(--ivory)', marginLeft: i ? -10 : 0,
-                }} />
-              ))}
-            </div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.4 }}>
-              <strong style={{ fontWeight: 600, color: 'var(--dark)' }}>47,232 women</strong> already verified ·{' '}
-              <em style={{ fontFamily: 'var(--serif)', fontSize: 15 }}>her circle</em>
-            </div>
           </div>
         </div>
 
