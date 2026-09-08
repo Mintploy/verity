@@ -674,8 +674,8 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       hasDivorceRecords && inlineDivorce.length === 0
         ? lookupDivorce(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
-      best.tahoeId
-        ? lookupLinkedIn(username, password, best.tahoeId).catch(() => null)
+      fullName
+        ? lookupLinkedIn(username, password, fullName).catch(() => null)
         : Promise.resolve(null),
       addresses[0]?.addr
         ? lookupCensus(username, password, addresses[0].addr).catch(() => null)
@@ -1047,15 +1047,21 @@ function identityBody(tahoeId?: string, fullName?: string, perPage = 5): Record<
   return null;
 }
 
+// Takes a name, not a TahoeId. The documented request properties are
+// FirstName, LastName and ProfileUrl only — TahoeId is not among them, so the
+// previous { TahoeId } body would have failed even once the header was right.
 async function lookupLinkedIn(
   username: string,
   password: string,
-  tahoeId: string,
+  fullName: string,
 ): Promise<{ url?: string; headline?: string } | null> {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return null;
+
   const res = await fetch(LINKEDIN_URL, {
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_LINKEDIN),
-    body: JSON.stringify({ TahoeId: tahoeId }),
+    body: JSON.stringify({ FirstName: parts[0], LastName: parts[parts.length - 1] }),
     signal: AbortSignal.timeout(10000),
   });
 
