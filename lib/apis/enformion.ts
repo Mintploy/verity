@@ -218,9 +218,27 @@ function readDetailList(raw: any, format: (row: any) => string, limit: number): 
 //
 // This is a superset, so a `results`-shaped body still resolves exactly as
 // before — no endpoint loses behaviour by adopting it.
+// Every collection key below is confirmed from enformiongo.readme.io, not
+// inferred. Each endpoint names its own, and reading the wrong one is
+// indistinguishable from an empty result set in the logs — the fault that
+// silently emptied Person Search, Reverse Phone, Divorce, OFAC, Workplace,
+// Census and LinkedIn in turn:
+//
+//   /PersonSearch        persons              /OfacSearch        OfacRecords
+//   /ReversePhoneSearch  reversePhoneRecords  /WorkplaceSearch   workplaceRecords
+//   /DivorceSearch       records              /CensusSearch      censusRecords
+//   /MarriageSearch      records              /CriminalSearch/V2 CriminalRecords
+//   /LinkedIn/Id         person  (a single object, not an array)
 function extractRowsDefault(data: any): any[] {
   if (Array.isArray(data)) return data;
+  // LinkedIn returns one person object rather than a collection.
+  if (data?.person && !Array.isArray(data.person)) return [data.person];
   return data?.persons ?? data?.Persons
+    ?? data?.reversePhoneRecords ?? data?.ReversePhoneRecords
+    ?? data?.OfacRecords ?? data?.ofacRecords
+    ?? data?.workplaceRecords ?? data?.WorkplaceRecords
+    ?? data?.censusRecords ?? data?.CensusRecords
+    ?? data?.CriminalRecords ?? data?.criminalRecords
     ?? data?.records ?? data?.Records
     ?? data?.results ?? data?.Results
     ?? [];
@@ -1016,8 +1034,9 @@ async function lookupOfac(
     'OFAC',
   );
   return rows.slice(0, 3).map((o: any) => {
-    const list = pick(o, 'listName', 'list', 'program', 'sanctionsProgram', 'source') ?? 'Sanctions list';
-    const name = pick(o, 'fullName', 'name', 'entityName');
+    // Documented: SourceName is the sanctions list, Name the matched party.
+    const list = pick(o, 'SourceName', 'listName', 'program', 'source') ?? 'Sanctions list';
+    const name = pick(o, 'Name', 'fullName', 'entityName');
     return [list, name].filter(Boolean).join(' · ');
   }).filter(Boolean);
 }
@@ -1033,9 +1052,12 @@ async function lookupWorkplace(
   const rows = await proSearch(username, password, WORKPLACE_URL, SEARCH_TYPE_WORKPLACE, body, 'WORKPLACE');
   const current = rows.find((w: any) => w.isCurrent === true || w.current === true) ?? rows[0];
   if (!current) return null;
+  // Documented field names: currentEmployment carries jobTitle/employer,
+  // workExperience carries expJobTitle/expCompany. The looser candidates are
+  // kept as a tail in case a row is flattened differently.
   return {
-    title: pick(current, 'title', 'jobTitle', 'position', 'occupation'),
-    company: pick(current, 'company', 'companyName', 'employer', 'employerName', 'organization'),
+    title: pick(current, 'jobTitle', 'expJobTitle', 'title', 'position', 'occupation'),
+    company: pick(current, 'employer', 'expCompany', 'company', 'companyName', 'organization'),
   };
 }
 
