@@ -46,6 +46,61 @@ export async function createCheckoutSession({
   return session;
 }
 
+// Whether this person has actually completed Stripe Identity.
+//
+// Stripe is the source of truth; there is no local record to fall out of sync.
+// Fast path is customer metadata. When that is missing — the customer is created
+// at checkout, which happens *after* verification, so the first login always
+// misses — we fall back to matching a verified session by the email stashed in
+// its metadata, then back-fill the customer so later logins hit the fast path.
+//
+// The fallback scans a page of recent sessions. That is fine at current volume;
+// once verification volume outgrows one page, move the write to the
+// checkout.session.completed webhook so the fast path is always populated.
+export async function hasVerifiedIdentity(
+  email: string,
+  customerId: string
+): Promise<boolean> {
+  const customer = await stripe.customers.retrieve(customerId);
+  if (!customer.deleted && customer.metadata?.identity_verified === 'true') {
+    return true;
+  }
+
+  const sessions = await stripe.identity.verificationSessions.list({ limit: 100 });
+  const match = sessions.data.find(
+    (s) => s.status === 'verified' && s.metadata?.email === email
+  );
+  if (!match) return false;
+
+  await stripe.customers.update(customerId, {
+    metadata: {
+      identity_verified: 'true',
+      identity_session_id: match.id,
+    },
+  });
+  return true;
+}
+
+// Record a completed verification against the customer, if one exists yet.
+// Returns false when there is no customer to write to — not an error: the
+// customer is created later at checkout, and the login fallback covers it.
+export async function recordVerifiedIdentity(
+  email: string,
+  verificationSessionId: string
+): Promise<boolean> {
+  const customers = await stripe.customers.list({ email, limit: 1 });
+  const customer = customers.data[0];
+  if (!customer) return false;
+
+  await stripe.customers.update(customer.id, {
+    metadata: {
+      identity_verified: 'true',
+      identity_session_id: verificationSessionId,
+    },
+  });
+  return true;
+}
+
 export async function createIdentityVerificationSession({
   returnUrl,
   metadata,

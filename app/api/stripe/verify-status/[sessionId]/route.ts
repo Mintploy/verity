@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { stripe, recordVerifiedIdentity } from '@/lib/stripe';
 
 export async function GET(
   req: NextRequest,
@@ -12,6 +12,19 @@ export async function GET(
       sessionId,
       { expand: ['verified_outputs'] }
     );
+
+    // Persist the result so login has something real to check. The customer
+    // usually does not exist yet (checkout comes after verification), in which
+    // case this is a no-op and the login fallback back-fills it instead.
+    const email = session.metadata?.email;
+    if (session.status === 'verified' && email) {
+      try {
+        await recordVerifiedIdentity(email, session.id);
+      } catch (err) {
+        // Never fail her verification because the bookkeeping write failed.
+        console.error('Could not record verified identity:', err);
+      }
+    }
 
     return Response.json({
       status: session.status,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMagicLinkToken, createSessionToken, SESSION_COOKIE } from '@/lib/auth';
-import { stripe } from '@/lib/stripe';
+import { stripe, hasVerifiedIdentity } from '@/lib/stripe';
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
@@ -23,10 +23,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/checkout?reason=no-subscription', req.url));
     }
 
+    // "Verified women only" is the product promise — enforce it rather than
+    // asserting it. Fails closed: any doubt sends her back through ID check.
+    const identityVerified = await hasVerifiedIdentity(email, stripeCustomerId);
+    if (!identityVerified) {
+      return NextResponse.redirect(new URL('/verify?reason=identity-required', req.url));
+    }
+
     const sessionToken = await createSessionToken({
       email,
       stripeCustomerId,
-      identityVerified: true,
+      identityVerified,
     });
 
     const res = NextResponse.redirect(new URL('/search', req.url));
