@@ -220,7 +220,10 @@ function readDetailList(raw: any, format: (row: any) => string, limit: number): 
 // before — no endpoint loses behaviour by adopting it.
 function extractRowsDefault(data: any): any[] {
   if (Array.isArray(data)) return data;
-  return data?.persons ?? data?.Persons ?? data?.results ?? data?.Results ?? [];
+  return data?.persons ?? data?.Persons
+    ?? data?.records ?? data?.Records
+    ?? data?.results ?? data?.Results
+    ?? [];
 }
 
 async function proSearch(
