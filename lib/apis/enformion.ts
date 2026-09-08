@@ -24,9 +24,20 @@ const CRIMINAL_URL = `${HOST}/CriminalSearch/V2`;
 const OFAC_URL = `${HOST}/OfacSearch`;
 const WORKPLACE_URL = `${HOST}/WorkplaceSearch`;
 
-// galaxy-search-type values
+// galaxy-search-type values.
+//
+// Person Search has four tiers, and they are an access level, not a category:
+//   Person                    — full detail, for logged-in / paying users
+//   Teaser                    — masked and quantity-limited, for logged-out
+//   ReversePhonePerson        — full detail, phone entry point
+//   ReversePhonePersonTeaser  — masked, phone entry point
+//
+// Verity only ever queries after she has verified and paid, so both entry
+// points use the paid tier. The phone lookup previously sent "ReversePhone",
+// which is not one of the four — responses came back with addresses,
+// dataSource and fullRecord all null, i.e. masked teaser-grade data.
 const SEARCH_TYPE_PERSON = 'Person';
-const SEARCH_TYPE_PHONE = 'ReversePhone';
+const SEARCH_TYPE_PHONE = 'ReversePhonePerson';
 const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
 const SEARCH_TYPE_LINKEDIN = 'LinkedIn';
@@ -761,8 +772,9 @@ async function lookupPropertyV2(
   }).filter((p: any) => p.address);
 }
 
-// Reverse Phone Search. galaxy-search-type is ReversePhone and the body is
-// { Phone, Page, ResultsPerPage }, per the published spec.
+// Reverse Phone Search. galaxy-search-type is ReversePhonePerson — the paid
+// tier — and the body is { Phone, Page, ResultsPerPage }, per the published
+// spec.
 //
 // The spec's example passes a dashed number ("123-456-7890") and Enformion
 // echoes numbers back formatted, so if bare digits return nothing the
