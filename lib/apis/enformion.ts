@@ -40,7 +40,9 @@ const SEARCH_TYPE_PERSON = 'Person';
 const SEARCH_TYPE_PHONE = 'ReversePhone';
 const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
-const SEARCH_TYPE_LINKEDIN = 'LinkedIn';
+// Documented as "LinkedinID" (enformiongo.readme.io/reference/linkedin-id).
+// The code sent "LinkedIn", which is why this endpoint answered 400.
+const SEARCH_TYPE_LINKEDIN = 'LinkedinID';
 const SEARCH_TYPE_CENSUS = 'Census';
 const SEARCH_TYPE_CRIMINAL = 'CriminalV2';
 const SEARCH_TYPE_OFAC = 'Ofac';
@@ -251,10 +253,20 @@ async function proSearch(
     console.log(`ENFORMION_${label}_RESULTS:`, rows.length);
     if (rows[0]) {
       console.log(`ENFORMION_SHAPE[${label}]:`, Object.keys(rows[0]).join(','));
+      // Key names alone do not say whether a section will populate: an empty
+      // addresses[] and a missing one look identical in SHAPE. Report each
+      // array's length and whether each scalar is set, so a genuinely thin
+      // record is distinguishable from a parse failure. Counts and presence
+      // only — no values, so this logs no personal data.
+      console.log(`ENFORMION_CENSUS[${label}]:`, Object.entries(rows[0])
+        .map(([k, v]) => Array.isArray(v)
+          ? `${k}:${v.length}`
+          : (v === null || v === '' || v === undefined ? `${k}:-` : `${k}:set`))
+        .join(' '));
     } else if (!Array.isArray(data)) {
       // A 200 with no rows may still carry a message, a counts block, or a
       // pagination total explaining why. Surface it instead of discarding it.
-      console.log(`ENFORMION_EMPTY[${label}]:`, JSON.stringify(data).slice(0, 800));
+      console.log(`ENFORMION_EMPTY[${label}]:`, JSON.stringify(data).slice(0, 2000));
     }
     return rows;
   } catch (e: any) {
