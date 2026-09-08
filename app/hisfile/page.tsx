@@ -215,8 +215,18 @@ export default function HisFilePage() {
                       {file.full_name && (
                         <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.7 }}>({file.full_name})</span>
                       )}
-                      {file.star_sign && (
+                      {file.file_type !== 'safety' && file.star_sign && (
                         <span style={{ fontSize: 14 }} title={file.star_sign}>{starSignEmoji(file.star_sign)}</span>
+                      )}
+                      {file.file_type === 'safety' && (
+                        <span style={{
+                          padding: '3px 9px', borderRadius: 'var(--r-pill)',
+                          background: 'var(--gold-pale)', color: 'var(--gold-deep)',
+                          fontFamily: 'var(--sans)', fontSize: 10, fontWeight: 500,
+                          letterSpacing: 0.3, textTransform: 'uppercase',
+                        }}>
+                          Safety check
+                        </span>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>

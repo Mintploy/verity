@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   try {
     const body = await req.json();
-    const file = await saveHisFile(session.email, { ...body, id });
+    const { file } = await saveHisFile(session.email, { ...body, id });
     return Response.json({ file });
   } catch (e: any) {
     return Response.json({ error: e.message ?? 'Failed' }, { status: 500 });

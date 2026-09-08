@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
-    const file = await saveHisFile(session.email, body);
-    return Response.json({ file });
+    const { file, merged } = await saveHisFile(session.email, body);
+    // `merged` tells the client it landed on an entry that already existed,
+    // so it can say so instead of implying a second file was created.
+    return Response.json({ file, merged });
   } catch (e: any) {
     return Response.json({ error: e.message ?? 'Failed' }, { status: 500 });
   }

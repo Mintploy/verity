@@ -7,6 +7,7 @@ import { Wordmark } from '@/components/ui/Wordmark';
 import { Floret } from '@/components/ui/Floret';
 import { Report, ScoreState } from '@/lib/types';
 import { getStarSign, getCompatibility, SIGN_EMOJI, StarSign } from '@/lib/starsigns';
+import type { FileType } from '@/lib/hisfile';
 
 export default function ReportPage() {
   return (
@@ -417,8 +418,11 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
 
-  const saveToHisFile = async () => {
+  // Not every search is a date. Asking up front is what decides which
+  // questionnaire the entry opens with, so it has to happen before the save.
+  const saveToHisFile = async (fileType: FileType) => {
     setSaving(true);
     setSaveError(null);
     try {
@@ -426,6 +430,7 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          file_type: fileType,
           nickname: report.subject.name,
           full_name: report.subject.name,
           phone: report.subject.phone,
@@ -435,7 +440,13 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
       });
       if (res.status === 401) { router.push('/login'); return; }
       if (!res.ok) { setSaveError('Could not save. Are you signed in?'); return; }
-      router.push('/hisfile');
+      const { file } = await res.json();
+      setChoosing(false);
+      // Straight to the entry itself, so she can fill in the questionnaire
+      // she just picked. A re-save lands on the file that already exists.
+      router.push(file?.id ? `/hisfile/${file.id}` : '/hisfile');
+    } catch {
+      setSaveError('Could not save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -465,8 +476,16 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
       </div>
 
       <div style={{ padding: 18, borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <ActionButton icon="save" label={saving ? 'Saving...' : 'Save to His File'} onClick={saveToHisFile} />
+        <ActionButton icon="save" label={saving ? 'Saving...' : 'Save to His File'} onClick={() => setChoosing(true)} />
         {saveError && <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--deeprose-deep)', padding: '6px 12px' }}>{saveError}</div>}
+        {choosing && (
+          <SaveTypeDialog
+            name={report.subject.name}
+            saving={saving}
+            onChoose={saveToHisFile}
+            onCancel={() => setChoosing(false)}
+          />
+        )}
         <ActionButton icon="compare" label="Compare with others" onClick={onCompare} />
         <ActionButton icon="dl" label="Download PDF" onClick={() => window.print()} />
         <ActionButton icon="share" label="Share with your circle" />
@@ -478,6 +497,103 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
         <div style={{ fontFamily: 'var(--sans)', fontStyle: 'normal', fontSize: 10, color: 'var(--wine)', opacity: 0.7, marginTop: 8, letterSpacing: 0.3 }}>VERITY'S CARDINAL RULE</div>
       </div>
     </aside>
+  );
+}
+
+function SaveTypeDialog({ name, saving, onChoose, onCancel }: {
+  name: string;
+  saving: boolean;
+  onChoose: (t: FileType) => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  const options: { type: FileType; title: string; body: string }[] = [
+    {
+      type: 'dating',
+      title: 'A love interest',
+      body: 'Someone you’re dating or talking to. Tracks how you met, first dates, icks and star sign compatibility.',
+    },
+    {
+      type: 'safety',
+      title: 'A safety check',
+      body: 'A marketplace seller, a rideshare, a contractor — anyone you’re meeting once. Just where you met, where you’re meeting, and your notes.',
+    },
+  ];
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(31,10,21,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Why are you saving this file?"
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--pearl)', borderRadius: 'var(--r-xl)',
+          boxShadow: 'var(--shadow-lg)', maxWidth: 460, width: '100%',
+          padding: 'clamp(24px, 4vw, 32px)',
+        }}
+      >
+        <div className="v-eyebrow" style={{ marginBottom: 8 }}>Before we save</div>
+        <h3 style={{ fontFamily: 'var(--serif)', fontSize: 24, fontWeight: 400, lineHeight: 1.15, color: 'var(--dark)', margin: '0 0 6px' }}>
+          Who is <em style={{ color: 'var(--primary)' }}>{name}</em> to you?
+        </h3>
+        <p style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', lineHeight: 1.5, margin: '0 0 20px', opacity: 0.8 }}>
+          We&rsquo;ll only ask you the questions that apply.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {options.map(o => (
+            <button
+              key={o.type}
+              onClick={() => onChoose(o.type)}
+              disabled={saving}
+              style={{
+                textAlign: 'left', padding: '16px 18px', borderRadius: 'var(--r-lg)',
+                border: '1.5px solid var(--gold-pale)', background: 'var(--ivory)',
+                cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.6 : 1,
+                transition: 'border-color 0.15s, background 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (saving) return;
+                e.currentTarget.style.borderColor = 'var(--primary)';
+                e.currentTarget.style.background = 'var(--primary-mist)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--gold-pale)';
+                e.currentTarget.style.background = 'var(--ivory)';
+              }}
+            >
+              <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', marginBottom: 4 }}>{o.title}</div>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', lineHeight: 1.5, opacity: 0.85 }}>{o.body}</div>
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          style={{
+            marginTop: 16, background: 'none', border: 'none',
+            fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--mauve-deep)',
+            cursor: 'pointer', padding: 0,
+          }}
+        >
+          {saving ? 'Saving…' : 'Cancel'}
+        </button>
+      </div>
+    </div>
   );
 }
 

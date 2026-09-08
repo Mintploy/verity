@@ -3,10 +3,14 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
-import type { HisFile } from '@/lib/hisfile';
+import type { HisFile, FileType } from '@/lib/hisfile';
 
 const APPS = ['Hinge', 'Tinder', 'Bumble', 'Coffee Meets Bagel', 'The League', 'Feeld', 'IRL', 'Instagram', 'Other'];
+const WHERE_MET_SAFETY = ['Facebook Marketplace', 'Craigslist', 'OfferUp', 'eBay', 'Nextdoor', 'Depop', 'Rideshare', 'Referral', 'Other'];
+// Drawn from the same vocabulary as the dating statuses so the filter tabs on
+// the His File list keep working for both kinds of entry.
 const STATUSES = ['talking', 'dating', 'met', 'ghosted', 'blocked', 'archived'];
+const STATUSES_SAFETY = ['met', 'ghosted', 'blocked', 'archived'];
 const GENEROSITY = ['cheap', 'average', 'generous', 'spoils me'];
 const COMMON_ICKS = ['bad hygiene', 'late texter', 'love bombing', 'too intense', 'cheap on dates', 'talks over me', 'dismissive', 'no depth', 'all about looks', 'mommy issues', 'oversharing', 'flaky'];
 
@@ -42,7 +46,7 @@ export default function HisFileDetail() {
   const id = params.id as string;
   const isNew = id === 'new';
 
-  const [file, setFile] = useState<HisFile>({ nickname: '' });
+  const [file, setFile] = useState<HisFile>({ nickname: '', file_type: 'dating' });
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -88,6 +92,11 @@ export default function HisFileDetail() {
     router.push('/hisfile');
   };
 
+  // Entries created before the split, and any row missing the column, read as
+  // dating — that is what the old questionnaire assumed of everyone.
+  const fileType: FileType = file.file_type ?? 'dating';
+  const isSafety = fileType === 'safety';
+
   const addIck = (ick: string) => {
     const trimmed = ick.trim();
     if (!trimmed) return;
@@ -131,7 +140,7 @@ export default function HisFileDetail() {
             <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(28px,5vw,42px)', fontWeight: 400, lineHeight: 1.05, color: 'var(--dark)', margin: 0, letterSpacing: -0.4 }}>
               {file.nickname || <em style={{ color: 'var(--mauve)' }}>Unnamed</em>}
             </h1>
-            {file.star_sign && (
+            {!isSafety && file.star_sign && (
               <div style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--gold-deep)', marginTop: 6 }}>
                 {starSignEmoji(file.star_sign)} {file.star_sign}
               </div>
@@ -149,8 +158,35 @@ export default function HisFileDetail() {
           )}
         </div>
 
-        {/* Compatibility — or prompt if user hasn't set their DOB yet */}
-        {hasDob === false ? (
+        {/* What kind of file this is — decides everything below it. */}
+        <div style={{ marginBottom: 20 }}>
+          <div className="v-eyebrow" style={{ marginBottom: 10 }}>Why you opened this file</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {([
+              { type: 'dating' as FileType, label: 'Love interest' },
+              { type: 'safety' as FileType, label: 'Safety check' },
+            ]).map(o => (
+              <button key={o.type} onClick={() => setFile(f => ({ ...f, file_type: o.type }))} style={{
+                padding: '9px 20px', borderRadius: 'var(--r-pill)',
+                border: fileType === o.type ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)',
+                background: fileType === o.type ? 'var(--primary-mist)' : 'var(--pearl)',
+                color: fileType === o.type ? 'var(--primary-deep)' : 'var(--dark-soft)',
+                fontFamily: 'var(--sans)', fontSize: 13,
+                fontWeight: fileType === o.type ? 500 : 400, cursor: 'pointer',
+              }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)', marginTop: 8, opacity: 0.8 }}>
+            {isSafety
+              ? 'Just the essentials — where you met, where you’re meeting, and your notes.'
+              : 'The full questionnaire — how you met, first dates, icks and compatibility.'}
+          </div>
+        </div>
+
+        {/* Compatibility — dating only, or a prompt if she hasn't set her DOB yet */}
+        {isSafety ? null : hasDob === false ? (
           <Link href="/settings" style={{ textDecoration: 'none', display: 'block', marginBottom: 20 }}>
             <div style={{
               padding: '16px 20px', borderRadius: 'var(--r-lg)',
@@ -189,13 +225,13 @@ export default function HisFileDetail() {
             <input
               value={file.nickname}
               onChange={e => setFile(f => ({ ...f, nickname: e.target.value }))}
-              placeholder="How you know him"
+              placeholder={isSafety ? 'How you refer to him' : 'How you know him'}
               style={inputStyle}
             />
           </Field>
           <Field label="Status">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {STATUSES.map(s => (
+              {(isSafety ? STATUSES_SAFETY : STATUSES).map(s => (
                 <button key={s} onClick={() => setFile(f => ({ ...f, status: s }))} style={{
                   padding: '7px 16px', borderRadius: 'var(--r-pill)',
                   border: file.status === s ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)',
@@ -212,30 +248,76 @@ export default function HisFileDetail() {
             <Field label="Full name">
               <input value={file.full_name ?? ''} onChange={e => setFile(f => ({ ...f, full_name: e.target.value }))} placeholder="As on his ID" style={inputStyle} />
             </Field>
-            <Field label="Date of birth">
-              <input type="date" value={file.date_of_birth ?? ''} onChange={e => setFile(f => ({ ...f, date_of_birth: e.target.value }))} style={inputStyle} />
-            </Field>
+            {isSafety ? (
+              <Field label="Phone">
+                <input value={file.phone ?? ''} onChange={e => setFile(f => ({ ...f, phone: e.target.value }))} placeholder="+1 (555) 000-0000" style={inputStyle} />
+              </Field>
+            ) : (
+              <Field label="Date of birth">
+                <input type="date" value={file.date_of_birth ?? ''} onChange={e => setFile(f => ({ ...f, date_of_birth: e.target.value }))} style={inputStyle} />
+              </Field>
+            )}
           </TwoCol>
-          <TwoCol>
-            <Field label="Phone">
-              <input value={file.phone ?? ''} onChange={e => setFile(f => ({ ...f, phone: e.target.value }))} placeholder="+1 (555) 000-0000" style={inputStyle} />
-            </Field>
-            <Field label="His finsta / alt account">
-              <input value={file.his_finsta ?? ''} onChange={e => setFile(f => ({ ...f, his_finsta: e.target.value }))} placeholder="@handle" style={inputStyle} />
-            </Field>
-          </TwoCol>
+          {!isSafety && (
+            <TwoCol>
+              <Field label="Phone">
+                <input value={file.phone ?? ''} onChange={e => setFile(f => ({ ...f, phone: e.target.value }))} placeholder="+1 (555) 000-0000" style={inputStyle} />
+              </Field>
+              <Field label="His finsta / alt account">
+                <input value={file.his_finsta ?? ''} onChange={e => setFile(f => ({ ...f, his_finsta: e.target.value }))} placeholder="@handle" style={inputStyle} />
+              </Field>
+            </TwoCol>
+          )}
           <Field label="Notes">
             <textarea
               value={file.notes ?? ''}
               onChange={e => setFile(f => ({ ...f, notes: e.target.value }))}
-              placeholder="Anything important to remember..."
-              rows={4}
+              placeholder={isSafety
+                ? 'What he’s selling, what he told you, anything that felt off...'
+                : 'Anything important to remember...'}
+              rows={isSafety ? 6 : 4}
               style={{ ...inputStyle, resize: 'vertical' as const }}
             />
           </Field>
         </Section>
 
+        {/* Meeting up — safety files only. No first date, no who-paid: this is
+            a one-off handoff, and the only thing that matters is where. */}
+        {isSafety && (
+          <Section eyebrow="02" title="Meeting up">
+            <Field label="Where you found him">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {WHERE_MET_SAFETY.map(w => (
+                  <button key={w} onClick={() => setFile(f => ({ ...f, where_we_met: w }))} style={{
+                    padding: '7px 16px', borderRadius: 'var(--r-pill)',
+                    border: file.where_we_met === w ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)',
+                    background: file.where_we_met === w ? 'var(--primary-mist)' : 'var(--pearl)',
+                    color: file.where_we_met === w ? 'var(--primary-deep)' : 'var(--dark-soft)',
+                    fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer',
+                  }}>
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <TwoCol>
+              <Field label="Meet-up location">
+                <input
+                  value={file.meetup_location ?? ''}
+                  onChange={e => setFile(f => ({ ...f, meetup_location: e.target.value }))}
+                  placeholder="Address or place you agreed on"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="Date">
+                <input type="date" value={file.met_date ?? ''} onChange={e => setFile(f => ({ ...f, met_date: e.target.value }))} style={inputStyle} />
+              </Field>
+            </TwoCol>
+          </Section>
+        )}
+
         {/* How we met */}
+        {!isSafety && (
         <Section eyebrow="02" title="How we met">
           <Field label="App / platform">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -261,8 +343,10 @@ export default function HisFileDetail() {
             </Field>
           </TwoCol>
         </Section>
+        )}
 
         {/* First date */}
+        {!isSafety && (
         <Section eyebrow="03" title="First date">
           <TwoCol>
             <Field label="Location">
@@ -286,8 +370,10 @@ export default function HisFileDetail() {
             ))}
           </Field>
         </Section>
+        )}
 
         {/* Financial signals */}
+        {!isSafety && (
         <Section eyebrow="04" title="Financial signals">
           <Field label="Generosity rating">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -308,8 +394,10 @@ export default function HisFileDetail() {
             <input value={file.accurate_salary ?? ''} onChange={e => setFile(f => ({ ...f, accurate_salary: e.target.value }))} placeholder="e.g. $120k/yr" style={inputStyle} />
           </Field>
         </Section>
+        )}
 
         {/* The Ick */}
+        {!isSafety && (
         <Section eyebrow="05" title="The Ick">
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
             {(file.icks ?? []).map(ick => (
@@ -360,6 +448,7 @@ export default function HisFileDetail() {
             ))}
           </div>
         </Section>
+        )}
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 8 }}>
