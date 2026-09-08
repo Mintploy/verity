@@ -78,6 +78,14 @@ export interface EnformionProperty {
   baths?: number;
   sqft?: number;
   yearBuilt?: number;
+  lotSqft?: number;
+  occupancy?: string;
+  ownershipType?: string;
+  landUse?: string;
+  propertyClass?: string;
+  subdivision?: string;
+  apn?: string;
+  schoolDistrict?: string;
 }
 
 export interface EnformionPerson {
@@ -238,6 +246,7 @@ function extractRowsDefault(data: any): any[] {
     ?? data?.OfacRecords ?? data?.ofacRecords
     ?? data?.workplaceRecords ?? data?.WorkplaceRecords
     ?? data?.censusRecords ?? data?.CensusRecords
+    ?? data?.PropertyV2Records ?? data?.propertyV2Records
     ?? data?.CriminalRecords ?? data?.criminalRecords
     ?? data?.records ?? data?.Records
     ?? data?.results ?? data?.Results
@@ -792,31 +801,80 @@ async function lookupPropertyV2(
   const results: any[] = extractRowsDefault(data);
   console.log('ENFORMION_PROPERTY_RESULTS:', results.length);
 
+  // Property V2 does not return flat fields. Everything lives under
+  // AssessorRecords[] in typed sub-objects, so the previous flat reads
+  // (p.estimatedValue, p.saleAmount, p.bedrooms …) could never match and every
+  // attribute came back undefined even on a successful response.
+  const num = (v: any): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const money = (v: any): string | undefined => {
+    const n = num(v);
+    return n ? `$${n.toLocaleString()}` : undefined;
+  };
+
   return results.slice(0, 4).map((p: any) => {
-    const addr = p.fullAddress ?? p.FullAddress
-      ?? [p.addressLine1 ?? p.AddressLine1, p.addressLine2 ?? p.AddressLine2].filter(Boolean).join(', ');
-    const purchaseDateRaw = p.saleDate ?? p.SaleDate ?? p.purchaseDate ?? p.PurchaseDate;
-    const purchaseDate = purchaseDateRaw
-      ? new Date(purchaseDateRaw).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const a = (p.AssessorRecords ?? p.assessorRecords ?? [])[0] ?? {};
+    const structure = a.Structure ?? {};
+    const size = a.PropertySize ?? {};
+    const tax = a.Tax ?? {};
+    const purchase = a.PurchaseTransaction ?? {};
+    const ownerMeta = a.OwnerMetaData ?? {};
+    const ident = a.PropertyIdentification ?? {};
+    const legal = a.PropertyLegal ?? {};
+    const location = a.Location ?? {};
+    const owner = (a.Owners ?? [])[0] ?? {};
+
+    // The address key is the one field the response schema does not name.
+    // ENFORMION_CENSUS[PROPERTY] will reveal it; until then try the plausible
+    // shapes rather than dropping the record.
+    const addr: string = p.fullAddress ?? p.FullAddress ?? a.PropertyAddress
+      ?? [p.addressLine1 ?? p.AddressLine1, p.addressLine2 ?? p.AddressLine2]
+        .filter(Boolean).join(', ');
+
+    const saleDateRaw = purchase.SaleDate ?? purchase.SaleRecordingDate;
+    const purchaseDate = saleDateRaw
+      ? new Date(saleDateRaw).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       : undefined;
-    const saleAmt = p.saleAmount ?? p.SaleAmount ?? p.purchasePrice ?? p.PurchasePrice;
-    const avm = p.estimatedValue ?? p.EstimatedValue ?? p.avm ?? p.AVM;
-    const rent = p.estimatedRent ?? p.EstimatedRent;
-    const ownerName = p.ownerName ?? p.OwnerName ?? p.owner ?? p.Owner;
-    const rawType = p.propertyType ?? p.PropertyType ?? p.landUse ?? p.LandUse ?? '';
+
+    // Market value is the closer analogue to an "estimated value"; assessed and
+    // calculated totals are the fallbacks, and they read lower.
+    const value = tax.MarketTotalValue ?? tax.TotalValueCalculated ?? tax.AssessedTotalValue;
+
+    const ownershipType = ownerMeta.EtalCodeDescription
+      ?? ownerMeta.RelationshipTypeCodeDescription
+      ?? (owner.IsCorporationOrBusiness === true ? 'Corporation or business'
+        : owner.IsCorporationOrBusiness === false ? 'Individual' : undefined);
+
     return {
       address: addr,
-      ownerName,
-      purchasePrice: saleAmt ? `$${Number(saleAmt).toLocaleString()}` : undefined,
+      ownerName: owner.OwnerName ?? p.ownerName ?? p.OwnerName,
+      ownerType: owner.IsCorporationOrBusiness === true ? 'business' : undefined,
+      purchasePrice: money(purchase.SaleAmount),
       purchaseDate,
       yearsOwned: purchaseDate ? `Since ${purchaseDate}` : undefined,
-      currentValue: avm ? `$${Number(avm).toLocaleString()}` : undefined,
-      estimatedRent: rent ? `$${Number(rent).toLocaleString()}/mo` : undefined,
-      propertyType: rawType || undefined,
-      beds: p.bedrooms ?? p.Bedrooms ?? p.beds ?? undefined,
-      baths: p.bathrooms ?? p.Bathrooms ?? p.baths ?? undefined,
-      sqft: p.squareFeet ?? p.SquareFeet ?? p.sqft ?? undefined,
-      yearBuilt: p.yearBuilt ?? p.YearBuilt ?? undefined,
+      currentValue: money(value),
+      // No estimated-rent field exists in the documented schema.
+      estimatedRent: undefined,
+      propertyType: ident.PropertyIndicatorCodeDescription ?? ident.CountyUseDescr ?? undefined,
+      beds: num(structure.Bedrooms),
+      baths: num(structure.TotalBathrooms ?? structure.NumberOfBathrooms ?? structure.TotalBaths),
+      // Building/living square footage is NOT in the documented schema:
+      // PropertySize carries only LandSquareFootage, which is the lot. Mapping
+      // the lot here would print 22,444 where 4,066 is expected, so it is left
+      // unset rather than made up.
+      sqft: undefined,
+      lotSqft: num(size.LandSquareFootage),
+      yearBuilt: num(structure.YearBuilt ?? structure.EffectiveYearBuilt),
+      occupancy: ownerMeta.OwnerOccupancyCodeDescription ?? ownerMeta.OwnerOccupancyCode ?? undefined,
+      ownershipType,
+      landUse: ident.CountyUseDescr ?? ident.LandUseCodeDescription ?? undefined,
+      propertyClass: ident.PropertyIndicatorCodeDescription ?? undefined,
+      subdivision: legal.SubdivisionName ?? undefined,
+      apn: ident.ApnUnformatted ?? ident.OriginalApn ?? undefined,
+      schoolDistrict: location.SchoolDistrict
+        ?? location.HighSchoolDistrictCountyDescription ?? undefined,
     };
   }).filter((p: any) => p.address);
 }
