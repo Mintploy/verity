@@ -3,37 +3,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
+import { FileFolder } from '@/components/hisfile/FileFolder';
 import type { HisFile } from '@/lib/hisfile';
 
 const STATUSES = ['all', 'talking', 'dating', 'met', 'ghosted', 'blocked', 'archived'];
-
-function scoreColor(s?: string) {
-  if (s === 'green') return { bg: 'var(--sage-pale)', dot: 'var(--sage)', text: 'var(--sage-deep)' };
-  if (s === 'red') return { bg: 'var(--deeprose-pale)', dot: 'var(--deeprose)', text: 'var(--deeprose-deep)' };
-  if (s === 'yellow') return { bg: 'var(--honey-pale)', dot: 'var(--honey)', text: 'var(--honey-deep)' };
-  return { bg: 'var(--ivory-warm)', dot: 'var(--mauve)', text: 'var(--mauve-deep)' };
-}
-
-function statusColor(s?: string) {
-  const map: Record<string, { bg: string; text: string }> = {
-    talking: { bg: 'var(--primary-mist)', text: 'var(--primary-deep)' },
-    dating: { bg: 'var(--blush-pale)', text: 'var(--wine)' },
-    met: { bg: 'var(--gold-pale)', text: 'var(--gold-deep)' },
-    ghosted: { bg: 'var(--ivory-warm)', text: 'var(--dark-soft)' },
-    blocked: { bg: 'var(--deeprose-pale)', text: 'var(--deeprose-deep)' },
-    archived: { bg: 'var(--ivory-deep)', text: 'var(--mauve-deep)' },
-  };
-  return s ? (map[s] ?? { bg: 'var(--ivory-warm)', text: 'var(--dark-soft)' }) : { bg: 'var(--ivory-warm)', text: 'var(--dark-soft)' };
-}
-
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function formatDate(iso?: string) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 export default function HisFilePage() {
   const router = useRouter();
@@ -173,96 +146,27 @@ export default function HisFilePage() {
         )}
 
         {!loading && !error && filtered.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filtered.map(file => {
-              const sc = scoreColor(file.safety_score);
-              const st = statusColor(file.status);
-              const nick = file.nickname || 'Unnamed';
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {filtered.map((file, i) => {
               const isConfirming = confirmDeleteId === file.id;
               const isDeleting = deletingId === file.id;
+              const onDark = i % 2 === 0;
               return (
-                <div
+                <FileFolder
                   key={file.id}
-                  onClick={() => router.push(`/hisfile/${file.id}`)}
-                  style={{
-                    padding: '18px 22px', borderRadius: 'var(--r-lg)',
-                    background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)',
-                    display: 'flex', alignItems: 'center', gap: 16,
-                    transition: 'box-shadow 0.15s, transform 0.15s',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'; (e.currentTarget as HTMLElement).style.transform = ''; }}
+                  file={file}
+                  index={i}
+                  onOpen={() => router.push(`/hisfile/${file.id}`)}
                 >
-                  {/* Safety score dot */}
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: sc.dot, flexShrink: 0, boxShadow: `0 0 0 3px ${sc.bg}` }} />
-
-                  {/* Avatar */}
-                  <div style={{
-                    width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                    background: 'linear-gradient(135deg, var(--ivory-warm), var(--champagne))',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18,
-                    color: 'var(--dark-soft)', border: '2px solid var(--gold-pale)',
-                  }}>
-                    {initials(nick)}
-                  </div>
-
-                  {/* Main info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--dark)', fontWeight: 400 }}>{nick}</span>
-                      {file.full_name && (
-                        <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.7 }}>({file.full_name})</span>
-                      )}
-                      {file.file_type !== 'safety' && file.star_sign && (
-                        <span style={{ fontSize: 14 }} title={file.star_sign}>{starSignEmoji(file.star_sign)}</span>
-                      )}
-                      {file.file_type === 'safety' && (
-                        <span style={{
-                          padding: '3px 9px', borderRadius: 'var(--r-pill)',
-                          background: 'var(--gold-pale)', color: 'var(--gold-deep)',
-                          fontFamily: 'var(--sans)', fontSize: 10, fontWeight: 500,
-                          letterSpacing: 0.3, textTransform: 'uppercase',
-                        }}>
-                          Safety check
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
-                      {file.phone && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', opacity: 0.65 }}>{file.phone}</span>}
-                      {file.researched_at && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)' }}>{formatDate(file.researched_at)}</span>}
-                      {file.compatibility_score !== undefined && file.compatibility_score !== null && (
-                        <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)' }}>
-                          ♡ {file.compatibility_score}/10
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status pill */}
-                  {file.status && (
-                    <div style={{
-                      padding: '5px 12px', borderRadius: 'var(--r-pill)',
-                      background: st.bg, color: st.text,
-                      fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500,
-                      letterSpacing: 0.2, textTransform: 'capitalize',
-                      whiteSpace: 'nowrap', flexShrink: 0,
-                    }}>
-                      {file.status}
-                    </div>
-                  )}
-
-                  {/* Delete button */}
                   {isConfirming ? (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    <span style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                       <button
                         onClick={e => deleteFile(file.id!, e)}
                         disabled={isDeleting}
                         style={{
                           padding: '5px 12px', borderRadius: 'var(--r-pill)',
                           background: 'var(--deeprose)', border: 'none',
-                          color: 'var(--ivory)', fontFamily: 'var(--sans)', fontSize: 11,
+                          color: 'var(--pearl)', fontFamily: 'var(--sans)', fontSize: 11,
                           cursor: 'pointer', whiteSpace: 'nowrap',
                         }}
                       >
@@ -272,31 +176,32 @@ export default function HisFilePage() {
                         onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}
                         style={{
                           padding: '5px 10px', borderRadius: 'var(--r-pill)',
-                          background: 'var(--pearl)', border: '1px solid var(--gold-pale)',
-                          color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 11,
-                          cursor: 'pointer',
+                          background: onDark ? 'rgba(240,176,187,0.18)' : 'var(--ivory-warm)',
+                          border: 'none', color: 'inherit',
+                          fontFamily: 'var(--sans)', fontSize: 11, cursor: 'pointer',
                         }}
                       >
                         Cancel
                       </button>
-                    </div>
+                    </span>
                   ) : (
                     <button
                       onClick={e => deleteFile(file.id!, e)}
                       title="Delete file"
+                      aria-label={`Delete ${file.nickname || 'file'}`}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--mauve)', fontSize: 15, padding: '4px 6px',
+                        color: 'inherit', fontSize: 15, padding: '4px 6px',
                         borderRadius: 'var(--r-sm)', flexShrink: 0,
-                        opacity: 0.5, transition: 'opacity 0.15s, color 0.15s',
+                        opacity: 0.45, transition: 'opacity 0.15s',
                       }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--deeprose)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.5'; (e.currentTarget as HTMLElement).style.color = 'var(--mauve)'; }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.45'; }}
                     >
                       ✕
                     </button>
                   )}
-                </div>
+                </FileFolder>
               );
             })}
           </div>
@@ -334,10 +239,3 @@ export default function HisFilePage() {
   );
 }
 
-function starSignEmoji(sign: string): string {
-  const map: Record<string, string> = {
-    Aries: '♈', Taurus: '♉', Gemini: '♊', Cancer: '♋', Leo: '♌', Virgo: '♍',
-    Libra: '♎', Scorpio: '♏', Sagittarius: '♐', Capricorn: '♑', Aquarius: '♒', Pisces: '♓',
-  };
-  return map[sign] ?? '✦';
-}

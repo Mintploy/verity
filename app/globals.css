@@ -212,3 +212,88 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--primary); outline-
 /* Nothing in a report may push the page sideways. */
 .v-grid-score, .v-grid-r2, .v-grid-r3 { min-width: 0; }
 .v-grid-score > *, .v-grid-r2 > *, .v-grid-r3 > * { min-width: 0; }
+
+/* ── His File: the drawer ─────────────────────────────────────────────────
+   A saved man is a folder, not a row. The tab carries his name and sits
+   proud of the body; the stack alternates Chianti and cream and staggers
+   its tabs so a full drawer reads as depth rather than as a list.          */
+.v-folder {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  /* Folders overlap slightly, the way they do in a drawer. */
+  margin-bottom: -6px;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), filter 0.18s;
+}
+.v-folder:last-child { margin-bottom: 0; }
+.v-folder:hover      { transform: translateY(-4px); }
+.v-folder:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 16px; }
+
+.v-folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 150px;
+  max-width: min(72%, 340px);
+  padding: 9px 22px 13px;
+  border-radius: 14px 14px 0 0;
+  /* Tucks behind the body so the two read as one cut piece of card. */
+  margin-bottom: -6px;
+  position: relative;
+  z-index: 0;
+}
+.v-folder-body {
+  position: relative;
+  z-index: 1;
+  border-radius: 16px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+}
+/* A flex item defaults to min-content, so without this the name column
+   refuses to shrink and breaks one word per line in a narrow folder. */
+.v-folder-body > * { min-width: 0; }
+.v-folder:hover .v-folder-body { box-shadow: var(--shadow-md); }
+
+/* Pressed board, not flat fill: a faint fibre so the colour reads as stock. */
+.v-folder-tab, .v-folder-body {
+  background-image:
+    repeating-linear-gradient(94deg, rgba(255,255,255,0.035) 0 2px, rgba(0,0,0,0.012) 2px 4px),
+    repeating-linear-gradient(6deg,  rgba(255,255,255,0.025) 0 3px, rgba(0,0,0,0.010) 3px 6px);
+}
+
+.v-folder[data-tone='dark']  .v-folder-tab,
+.v-folder[data-tone='dark']  .v-folder-body  { background-color: var(--primary); color: var(--pearl); }
+.v-folder[data-tone='light'] .v-folder-tab,
+.v-folder[data-tone='light'] .v-folder-body  { background-color: var(--pearl);  color: var(--dark); }
+
+.v-folder-label {
+  font-family: var(--script);
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v-folder[data-tone='dark']  .v-folder-label { color: var(--blush); }
+.v-folder[data-tone='light'] .v-folder-label { color: var(--primary); }
+
+@media (max-width: 768px) {
+  /* The tab already carries his name in full, so the initials monogram is
+     repeating it — and at this width it is taking room the name needs. */
+  /* !important because the monogram carries an inline display:flex. */
+  .v-folder-avatar { display: none !important; }
+  .v-folder-tab  { max-width: 78%; padding: 8px 18px 12px; }
+  .v-folder-body { padding: 16px 18px; gap: 12px; }
+  .v-folder-label { font-size: 19px; }
+  /* Least load-bearing of the three meta items; it yields so the date,
+     which was losing its last character, keeps its full width. */
+  .v-folder-compat { display: none; }
+}
