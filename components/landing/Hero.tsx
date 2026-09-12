@@ -1,20 +1,33 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { setPendingPhone } from '@/lib/pending';
 import { Sparkle } from '@/components/ui/Sparkle';
 
 export function Hero() {
   const [phone, setPhone] = useState('');
   const router = useRouter();
 
-  const handleSearch = () => {
-    if (phone.trim()) {
-      // The picker, not the search page: she sees who is on the number before
-      // being asked to verify or pay, and /search is behind the session gate.
-      router.push(`/matches?phone=${encodeURIComponent(phone)}`);
-    } else {
+  const handleSearch = async () => {
+    if (!phone.trim()) {
       router.push('/verify');
+      return;
     }
+
+    // His number is held before she goes anywhere, so it survives ID
+    // verification, Stripe and the welcome email and is waiting for her on the
+    // other side. Nothing is looked up until she is a member.
+    setPendingPhone(phone);
+
+    const me = await fetch('/api/auth/me')
+      .then((r) => r.json())
+      .catch(() => ({ authenticated: false }));
+
+    router.push(
+      me.authenticated
+        ? `/matches?phone=${encodeURIComponent(phone.replace(/\D/g, ''))}`
+        : '/verify',
+    );
   };
 
   return (

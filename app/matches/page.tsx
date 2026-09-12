@@ -1,8 +1,8 @@
 'use client';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
+import { clearPendingPhone, setPendingPhone } from '@/lib/pending';
 
 interface Candidate {
   token: string;
@@ -29,7 +29,6 @@ function MatchesInner() {
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chosen, setChosen] = useState<Candidate | null>(null);
-  const [authed, setAuthed] = useState<boolean | null>(null);
   const [building, setBuilding] = useState(false);
 
   useEffect(() => {
@@ -38,18 +37,35 @@ function MatchesInner() {
       setCandidates([]);
       return;
     }
-    fetch('/api/matches', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
-    })
+    // Members only. A woman who has not verified and paid is sent into the
+    // funnel with his number kept, rather than being shown a locked door.
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((me) => {
+        if (!me.authenticated) {
+          setPendingPhone(phone);
+          router.replace('/verify');
+          return Promise.reject(new Error('redirecting'));
+        }
+        return fetch('/api/matches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+        });
+      })
       .then(async (r) => {
+        if (!r) return;
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Search failed');
+        clearPendingPhone();
         setCandidates(d.candidates ?? []);
       })
-      .catch((e) => { setError(e.message); setCandidates([]); });
-  }, [phone]);
+      .catch((e) => {
+        if (e?.message === 'redirecting') return;
+        setError(e.message);
+        setCandidates([]);
+      });
+  }, [phone, router]);
 
   // Runs the paid half of the pipeline for the man she picked.
   const buildReport = useCallback(async (token: string) => {
@@ -74,17 +90,14 @@ function MatchesInner() {
     }
   }, [router]);
 
-  const select = async (c: Candidate) => {
+  const select = (c: Candidate) => {
     setChosen(c);
     setError(null);
-    // Held now, not at the gate: she may leave for Stripe or the login link and
-    // come back in a new tab, and re-picking a man she already chose is the
-    // kind of small insult that loses her.
+    // Held anyway: a session can lapse between landing here and choosing, and
+    // re-picking a man she already chose is the kind of small insult that
+    // loses her. /search resumes it on the way back.
     sessionStorage.setItem(PENDING_KEY, JSON.stringify({ token: c.token, name: c.name }));
-
-    const me = await fetch('/api/auth/me').then((r) => r.json()).catch(() => ({ authenticated: false }));
-    setAuthed(!!me.authenticated);
-    if (me.authenticated) buildReport(c.token);
+    buildReport(c.token);
   };
 
   if (building) {
@@ -160,8 +173,6 @@ function MatchesInner() {
                   See his file →
                 </span>
               </button>
-
-              {isChosen && authed === false && <Gate name={c.name} />}
             </div>
           );
         })}
@@ -175,41 +186,6 @@ function MatchesInner() {
             </p>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-/** Shown once she has picked a man but has no session. */
-function Gate({ name }: { name: string }) {
-  const first = name.split(' ')[0];
-  return (
-    <div style={{
-      margin: '0 0 20px', padding: '22px 24px', borderRadius: 'var(--r-lg)',
-      background: 'var(--blush-pale)', border: '1px solid var(--primary-pale)',
-    }}>
-      <div style={{ fontFamily: 'var(--serif)', fontSize: 19, color: 'var(--dark)', marginBottom: 6 }}>
-        {first}&rsquo;s full file is ready.
-      </div>
-      <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '0 0 18px', fontWeight: 300 }}>
-        Verity is for verified women only, so we need to know who you are before we open it.
-        Your choice is saved — you will come back to {first}.
-      </p>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <Link href="/verify" style={{
-          padding: '13px 26px', borderRadius: 'var(--r-pill)', background: 'var(--primary)',
-          color: 'var(--ivory)', fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 500,
-          textDecoration: 'none', boxShadow: 'var(--shadow-pop)',
-        }}>
-          Verify &amp; join →
-        </Link>
-        <Link href="/login" style={{
-          padding: '13px 26px', borderRadius: 'var(--r-pill)', background: 'var(--pearl)',
-          border: '1px solid var(--gold-pale)', color: 'var(--dark-soft)',
-          fontFamily: 'var(--sans)', fontSize: 14, textDecoration: 'none',
-        }}>
-          I&rsquo;m already a member — log in
-        </Link>
       </div>
     </div>
   );

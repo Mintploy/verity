@@ -1,8 +1,16 @@
+'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getPendingPhone } from '@/lib/pending';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Floret } from '@/components/ui/Floret';
 
 export default function CheckoutSuccessPage() {
+  // She typed his number before she paid. Send her straight back to it rather
+  // than to an empty search box she has already filled in once.
+  const [pending, setPending] = useState<string | null>(null);
+  useEffect(() => { setPending(getPendingPhone()); }, []);
+
   return (
     <div style={{
       minHeight: '100vh', background: 'var(--ivory)',
@@ -40,10 +48,12 @@ export default function CheckoutSuccessPage() {
             lineHeight: 1.6, margin: '0 0 40px', fontWeight: 300,
           }}>
             Your membership is active, with 15 safety lookups a month.
-            Drop in a phone number and get the full picture — quietly, in seconds.
+            {pending
+              ? ' We kept the number you started with — it is ready when you are.'
+              : ' Drop in a phone number and get the full picture — quietly, in seconds.'}
           </p>
 
-          <Link href="/search" style={{
+          <Link href={pending ? `/matches?phone=${pending}` : '/search'} style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,
             padding: '18px 36px', borderRadius: 'var(--r-pill)',
             background: 'var(--primary)', color: 'var(--ivory)',
@@ -51,7 +61,7 @@ export default function CheckoutSuccessPage() {
             fontFamily: 'var(--serif)', fontSize: 19, fontWeight: 500,
             boxShadow: 'var(--shadow-pop)',
           }}>
-            Run your first search →
+            {pending ? 'See who he is →' : 'Run your first search →'}
           </Link>
 
           <div style={{ marginTop: 20, fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>

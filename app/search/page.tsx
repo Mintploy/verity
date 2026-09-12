@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
+import { clearPendingPhone, getPendingPhone } from '@/lib/pending';
 import { Sparkle } from '@/components/ui/Sparkle';
 
 interface SavedReport {
@@ -91,10 +92,20 @@ function SearchContent() {
     setDemoMode(sessionStorage.getItem('verity-demo') === '1');
     loadPastSearches();
 
+    // She typed his number before she had an account and has now arrived with
+    // one — most often from the welcome email. Take her to the picker for that
+    // number instead of a search box she has already filled in.
+    const pendingPhone = getPendingPhone();
+    const pending = sessionStorage.getItem('verity-pending-candidate');
+    if (!pending && pendingPhone) {
+      clearPendingPhone();
+      router.replace(`/matches?phone=${pendingPhone}`);
+      return;
+    }
+
     // She picked a man on /matches, then went away to log in or to verify.
     // Landing her on an empty search box would make her choose him twice, so
     // resume where she left off and build the file she already asked for.
-    const pending = sessionStorage.getItem('verity-pending-candidate');
     if (!pending) return;
     sessionStorage.removeItem('verity-pending-candidate');
     try {

@@ -92,9 +92,11 @@ export function Nav({ showCompare, onCompare }: NavProps) {
             </>
           ) : (
             <>
-              <Link href="/login" className="v-hide-mobile" style={{
+              {/* Never hidden on mobile: a member who lands on the marketing
+                  page needs the way back in to be visible, not inside a menu. */}
+              <Link href="/login" style={{
                 fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
-                textDecoration: 'none',
+                textDecoration: 'none', whiteSpace: 'nowrap',
               }}>
                 Sign in
               </Link>

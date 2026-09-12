@@ -1,22 +1,24 @@
 import type { NextRequest } from 'next/server';
 import { lookupCandidates } from '@/lib/apis/enformion';
+import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { toPublicCandidates } from '@/lib/candidates';
 
 /**
  * Who is on this number — the picker's data source.
  *
- * This route is deliberately reachable without a session: she has to see that
- * we found her man before she has any reason to verify or pay. That makes it
- * the only unauthenticated path to a metered third-party database, so it is
- * kept to the cheap half of the pipeline and answers with the least it can —
- * a name, an approximate age and a city. No aliases, no relatives, no address
- * history, no prior cities. Those are the report, and the report is paid.
+ * Members only. She types his number on the landing page, but nothing is
+ * looked up until she has verified and paid, so by the time this runs she is
+ * already a member. That keeps the one metered third-party database we pay
+ * per call for off the open internet entirely.
+ *
+ * It still answers with the least that lets her recognise him — a name, an
+ * approximate age, a city. The aliases, relatives and address history are the
+ * report, and the report is a separate, quota-counted call.
  */
 
-// Per-IP throttle. In-memory means per-instance, so it is a speed bump against
-// casual scripting rather than a guarantee; a determined caller spread across
-// enough cold starts will get more than this. Move to a Supabase-backed
-// counter if the Enformion bill ever shows it being worked around.
+// Per-member throttle. In-memory means per-instance, so it is a backstop
+// against a runaway client rather than a quota — the real spend limit is
+// consumeSearch on the report itself.
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 5;
 const hits = new Map<string, number[]>();
@@ -38,7 +40,17 @@ function rateLimited(ip: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+    const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
+    const session = sessionToken
+      ? await verifySessionToken(sessionToken).catch(() => null)
+      : null;
+    if (!session) {
+      return Response.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Throttled per member now rather than per IP, but kept: a picker refresh
+    // loop would otherwise bill us once per render.
+    const ip = session.email;
     if (rateLimited(ip)) {
       return Response.json(
         { error: 'Too many searches. Wait a moment and try again.' },
