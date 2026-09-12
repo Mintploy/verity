@@ -29,12 +29,22 @@ export function Nav({ showCompare, onCompare }: NavProps) {
 
   const close = () => setMenuOpen(false);
 
-  const navLinks = [
-    { label: 'How it works', href: '/#how-it-works' },
-    { label: 'Stories', href: '/stories' },
-    { label: 'Help', href: '/help' },
-    ...(isLoggedIn ? [{ label: 'His File', href: '/hisfile' }, { label: 'Settings', href: '/settings' }] : []),
-  ];
+  // Order follows who is reading. Signed out, the marketing pages lead because
+  // she is still deciding. Signed in, she came back for her own things — her
+  // drawer and her account — so those lead and the marketing pages fall behind.
+  const navLinks = isLoggedIn
+    ? [
+        { label: 'His File', href: '/hisfile' },
+        { label: 'Settings', href: '/settings' },
+        { label: 'How it works', href: '/#how-it-works' },
+        { label: 'Stories', href: '/stories' },
+        { label: 'Help', href: '/help' },
+      ]
+    : [
+        { label: 'How it works', href: '/#how-it-works' },
+        { label: 'Stories', href: '/stories' },
+        { label: 'Help', href: '/help' },
+      ];
 
   return (
     <>

@@ -164,6 +164,24 @@ function SearchContent() {
 
   const handleSearch = async () => {
     if (!canSearch) return;
+
+    // A phone search goes through the picker, because a number can sit on
+    // several people and only she knows which one she means. The picker was
+    // wired to the landing hero, which a signed-in member never sees — so
+    // every search from this page was still being auto-resolved by
+    // pickBestMatch, which is the guess the picker exists to replace.
+    //
+    // The other three modes have no candidate step: the reverse-phone lookup
+    // that produces candidates is phone-only, so they keep the direct path.
+    if (mode === 'phone') {
+      const digits = primary.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+      if (digits.length === 10) {
+        setLoading(true);
+        router.push(`/matches?phone=${digits}`);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 

@@ -164,6 +164,28 @@ export interface SaveResult {
   merged: boolean;
 }
 
+/**
+ * The saved report behind a His File entry.
+ *
+ * A report used to live only in the tab that generated it, in sessionStorage,
+ * so "View report" from His File worked until the tab closed and then said
+ * "Report not found" forever. The row already had a report_data column; it
+ * simply was never written or read.
+ */
+export async function getReportByReportId(
+  userId: string,
+  reportId: string,
+): Promise<Record<string, unknown> | null> {
+  const sb = getServiceSupabase();
+  const { data } = await sb
+    .from('his_files')
+    .select('report_data')
+    .eq('user_id', userId)
+    .eq('report_id', reportId)
+    .maybeSingle();
+  return (data?.report_data as Record<string, unknown> | undefined) ?? null;
+}
+
 export async function saveHisFile(userId: string, file: HisFile): Promise<SaveResult> {
   const sb = getServiceSupabase();
 

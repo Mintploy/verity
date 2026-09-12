@@ -39,7 +39,19 @@ function ReportContent() {
     if (stored) {
       setReport(JSON.parse(stored));
     } else {
-      setNotFound(true);
+      // Not in this tab — she has come back to a man she saved earlier. Ask
+      // the server for the copy stored against his His File entry.
+      fetch(`/api/report/${id}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (d?.report) {
+            sessionStorage.setItem(`report-${id}`, JSON.stringify(d.report));
+            setReport(d.report);
+          } else {
+            setNotFound(true);
+          }
+        })
+        .catch(() => setNotFound(true));
     }
     setDemoMode(sessionStorage.getItem('verity-demo') === '1');
     fetch('/api/profile')
@@ -54,7 +66,14 @@ function ReportContent() {
   if (notFound) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 24 }}>
-        <p style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--dark)' }}>Report not found</p>
+        <p style={{ fontFamily: 'var(--display)', fontSize: 28, color: 'var(--dark)', margin: 0 }}>
+          This report is no longer stored
+        </p>
+        <p style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', lineHeight: 1.6, maxWidth: 420, margin: '12px auto 22px', fontWeight: 300 }}>
+          Reports saved before we began keeping a copy only existed in the tab that
+          created them. His file and your notes are safe — running him again rebuilds
+          the report and re-attaches it.
+        </p>
         <Link href="/search" style={{ padding: '14px 28px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 16 }}>
           Run a new search
         </Link>
@@ -436,6 +455,9 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
           phone: report.subject.phone,
           safety_score: report.score,
           report_id: report.searchId,
+          // Without the body itself, "View report" from His File has nothing to
+          // open once this tab's sessionStorage is gone.
+          report_data: report,
         }),
       });
       if (res.status === 401) { router.push('/login'); return; }
