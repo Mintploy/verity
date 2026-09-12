@@ -322,70 +322,84 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       {report.propertyIntelligence && report.propertyIntelligence.length > 0 && (
         <Section id="sec-3b" eyebrow="03b" title="Property intelligence">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {report.propertyIntelligence.map((prop, i) => (
-              <div key={i} style={{ padding: '20px 24px', background: i === 0 ? 'var(--blush-pale)' : 'var(--ivory-warm)', borderRadius: 'var(--r-lg)', borderLeft: `3px solid ${i === 0 ? 'var(--rose)' : 'var(--mauve)'}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: i === 0 ? 'var(--rose)' : 'var(--mauve-deep)', letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
+            {report.propertyIntelligence.map((prop, i) => {
+              // Four groups, in the order she reads them: which address this
+              // is, the building itself, what it is worth, and who holds it.
+              const building = [
+                prop.propertyType,
+                prop.beds ? `${prop.beds} bed` : null,
+                prop.baths ? `${prop.baths} bath` : null,
+                prop.sqft ? `${prop.sqft.toLocaleString()} sq ft living` : null,
+                prop.lotSqft ? `${prop.lotSqft.toLocaleString()} sq ft lot` : null,
+                prop.totalRooms ? `${prop.totalRooms} rooms` : null,
+                prop.yearBuilt ? `Built ${prop.yearBuilt}` : null,
+              ].filter(Boolean) as string[];
+
+              const money: Array<[string, string]> = [];
+              if (prop.currentValue) money.push(['Estimated value', prop.currentValue]);
+              if (prop.purchasePrice) money.push(['Last sale', prop.purchasePrice]);
+              if (prop.taxAmount) money.push([prop.taxYear ? `Tax ${prop.taxYear}` : 'Annual tax', prop.taxAmount]);
+
+              const ownership: Array<[string, string]> = [];
+              if (prop.ownerName) ownership.push(['Owner of record', prop.ownerName]);
+              if (prop.purchaseDate) ownership.push(['Owned since', prop.purchaseDate]);
+              if (prop.previousOwnerCount) ownership.push(['Previous owners', String(prop.previousOwnerCount)]);
+              if (prop.occupancy) ownership.push(['Occupancy', prop.occupancy]);
+
+              return (
+              <div key={i} style={{ padding: '20px 24px', background: i === 0 ? 'var(--blush-pale)' : 'var(--ivory-warm)', borderRadius: 'var(--r-lg)', borderLeft: `3px solid ${i === 0 ? 'var(--primary)' : 'var(--mauve)'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: i === 0 ? 'var(--primary)' : 'var(--mauve-deep)', letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
                     {i === 0 ? 'Current address' : `Previous address ${i}`}
                   </span>
-                  {prop.ownerType && (
-                    <span style={{ padding: '2px 8px', borderRadius: 'var(--r-pill)', background: prop.ownerType === 'Individual' ? 'var(--sage-pale)' : 'var(--gold-pale)', color: prop.ownerType === 'Individual' ? 'var(--sage-deep)' : 'var(--gold-deep)', fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4 }}>
-                      {prop.ownerType}
+                  {prop.ownerOccupied === true && (
+                    <span style={{ padding: '2px 9px', borderRadius: 'var(--r-pill)', background: 'var(--sage-pale)', color: 'var(--sage-deep)', fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4 }}>
+                      He lives there
+                    </span>
+                  )}
+                  {prop.ownerOccupied === false && (
+                    <span style={{ padding: '2px 9px', borderRadius: 'var(--r-pill)', background: 'var(--honey-pale)', color: 'var(--honey-deep)', fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4 }}>
+                      Not owner-occupied
                     </span>
                   )}
                 </div>
-                
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark-soft)', marginBottom: 16, fontStyle: 'italic' }}>{asText(prop.address)}</div>
-                <div className="v-grid-r3" style={{ gap: 14, marginTop: 12 }}>
-                  {prop.currentValue && (
-                    <div style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 4 }}>Est. value</div>
-                      <div style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--dark)' }}>{prop.currentValue}</div>
-                    </div>
-                  )}
-                  {prop.estimatedRent && (
-                    <div style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 4 }}>Est. rent</div>
-                      <div style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--dark)' }}>{prop.estimatedRent}</div>
-                    </div>
-                  )}
-                  {prop.purchasePrice && (
-                    <div style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 4 }}>Last sale price</div>
-                      <div style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--dark)' }}>{prop.purchasePrice}</div>
-                    </div>
-                  )}
+
+                <div style={{ fontFamily: 'var(--display)', fontSize: 17, color: 'var(--dark)', lineHeight: 1.3, marginBottom: building.length ? 8 : 16 }}>
+                  <a href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(asText(prop.address))} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dark)', textDecoration: 'underline' }}>
+                    {asText(prop.address)}
+                  </a>
                 </div>
-                <div className="v-grid-r3" style={{ gap: 14, marginTop: 14 }}>
-                  {prop.purchaseDate && (
-                    <div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 2 }}>Purchase date</div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)' }}>{prop.purchaseDate}</div>
-                    </div>
-                  )}
-                  {prop.yearsOwned && (
-                    <div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 2 }}>Years at address</div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)' }}>{prop.yearsOwned}</div>
-                    </div>
-                  )}
-                  {prop.ownerName && (
-                    <div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 2 }}>Deed owner</div>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', fontWeight: prop.ownerType !== 'Individual' ? 600 : 400 }}>{prop.ownerName}</div>
-                    </div>
-                  )}
-                </div>
-                {(prop.propertyType || prop.beds || prop.sqft || prop.yearBuilt) && (
-                  <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap' as const }}>
-                    {prop.propertyType && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{prop.propertyType}</span>}
-                    {prop.beds && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{prop.beds} bed · {prop.baths} bath</span>}
-                    {prop.sqft && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{Number(prop.sqft).toLocaleString()} sqft</span>}
-                    {prop.yearBuilt && <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>Built {prop.yearBuilt}</span>}
+
+                {building.length > 0 && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginBottom: 16, lineHeight: 1.6 }}>
+                    {building.join(' · ')}
+                  </div>
+                )}
+
+                {money.length > 0 && (
+                  <div className="v-grid-r3" style={{ gap: 12, marginBottom: ownership.length ? 14 : 0 }}>
+                    {money.map(([label, v]) => (
+                      <div key={label} style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontFamily: 'var(--display)', fontSize: 19, color: 'var(--dark)' }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {ownership.length > 0 && (
+                  <div className="v-grid-r2" style={{ gap: '10px 24px' }}>
+                    {ownership.map(([label, v]) => (
+                      <div key={label}>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 2 }}>{label}</div>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)' }}>{asText(v)}</div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--mauve-deep)', marginTop: 12, fontStyle: 'italic' }}>
             Property data sourced from Enformion. Values are estimates and may not reflect current market conditions.

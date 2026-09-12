@@ -86,6 +86,11 @@ export interface EnformionProperty {
   subdivision?: string;
   apn?: string;
   schoolDistrict?: string;
+  totalRooms?: number;
+  taxAmount?: string;
+  taxYear?: number;
+  previousOwnerCount?: number;
+  ownerOccupied?: boolean;
 }
 
 export interface EnformionPerson {
@@ -874,122 +879,82 @@ async function lookupPropertyV2(
   };
 
   return results.slice(0, 4).map((p: any) => {
-    // The record nests everything under `property`: the census reads
-    // `poseidonId:set property:{summary|assessorRecords|recorderRecords|
-    // openLienRecords}`. Reading AssessorRecords at the top level, as this
-    // did, found nothing on a response that plainly carried the data.
+    // Written against the live schema, confirmed by ENFORMION_PROPERTY_SUMMARY.
+    // assessorRecords comes back empty on every record seen; everything real
+    // sits in `summary`, which is why the earlier mapping still found nothing
+    // even once it was reading the right level of the response.
     const prop = p.property ?? p.Property ?? {};
-    const summary = prop.summary ?? prop.Summary ?? {};
-    const a = (prop.assessorRecords ?? prop.AssessorRecords ?? [])[0] ?? {};
-    const structure = a.Structure ?? a.structure ?? {};
-    const size = a.PropertySize ?? a.propertySize ?? {};
-    const tax = a.Tax ?? a.tax ?? {};
-    const purchase = a.PurchaseTransaction ?? a.purchaseTransaction ?? {};
-    const ownerMeta = a.OwnerMetaData ?? a.ownerMetaData ?? {};
-    const ident = a.PropertyIdentification ?? a.propertyIdentification ?? {};
-    const legal = a.PropertyLegal ?? a.propertyLegal ?? {};
-    const location = a.Location ?? a.location ?? {};
-    const owner = (a.Owners ?? a.owners ?? [])[0] ?? {};
+    const sum = prop.summary ?? prop.Summary ?? {};
 
-    // The address key is the one field the response schema does not name.
-    // ENFORMION_CENSUS[PROPERTY] will reveal it; until then try the plausible
-    // shapes rather than dropping the record.
-    // An address may arrive as a string or as its components. Enformion
-    // returned the latter, and feeding an object into the report crashed the
-    // whole page with "Objects are not valid as a React child" rather than
-    // just leaving one field blank. Never hand a vendor value on untouched.
-    const addressText = (v: any): string | undefined => {
-      if (v == null) return undefined;
-      if (typeof v === 'string') return v.trim() || undefined;
-      if (typeof v === 'number') return String(v);
-      if (typeof v !== 'object') return undefined;
-      const g = (...keys: string[]) => {
-        for (const k of keys) {
-          const hit = v[k] ?? v[k[0].toUpperCase() + k.slice(1)];
-          if (hit != null && hit !== '') return String(hit);
-        }
-        return '';
-      };
-      const street = [
-        g('houseNumber', 'streetNumber'),
-        g('streetPreDirection', 'streetDirection'),
-        g('streetName'),
-        g('streetSuffix', 'streetType'),
-        g('streetPostDirection'),
-        [g('unitType'), g('unitNumber')].filter(Boolean).join(' '),
-      ].filter(Boolean).join(' ').trim();
-      const tail = [g('city'), [g('state'), g('zip', 'zipCode', 'postalCode')].filter(Boolean).join(' ')]
-        .filter(Boolean).join(', ');
-      const full = [street, tail].filter(Boolean).join(', ');
-      return full || undefined;
+    const address = sum.address ?? {};
+    const details = sum.propertyDetails ?? {};
+    const value = sum.propertyValue ?? {};
+    const ident = sum.propertyIdentification ?? {};
+    const ownerMeta = sum.currentOwnerMetaData ?? {};
+
+    const n = (v: any): number | undefined => {
+      const x = Number(v);
+      return Number.isFinite(x) && x > 0 ? x : undefined;
     };
+    const money = (v: any): string | undefined => {
+      const x = n(v);
+      return x ? `$${Math.round(x).toLocaleString()}` : undefined;
+    };
+    const str = (v: any): string | undefined =>
+      typeof v === 'string' && v.trim() ? v.trim() : undefined;
 
-    const addr: string = addressText(summary.propertyAddress ?? summary.PropertyAddress)
-      ?? addressText(summary.fullAddress ?? summary.address)
-      ?? addressText(p.fullAddress ?? p.FullAddress)
-      ?? addressText(a.PropertyAddress ?? a.propertyAddress)
-      ?? [p.addressLine1 ?? p.AddressLine1, p.addressLine2 ?? p.AddressLine2]
-        .filter((x: any) => typeof x === 'string' && x).join(', ');
+    // The record carries a formatted address; parts are only the fallback.
+    const fullAddress = str(address.fullAddress)
+      ?? [str(address.addressLine1), str(address.addressLine2)].filter(Boolean).join(', ');
 
-    const saleDateRaw = purchase.SaleDate ?? purchase.saleDate ?? purchase.SaleRecordingDate ?? purchase.saleRecordingDate;
-    const purchaseDate = saleDateRaw
-      ? new Date(saleDateRaw).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const purchaseRaw = sum.purchasePrice?.date;
+    const purchaseDate = purchaseRaw
+      ? new Date(purchaseRaw).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       : undefined;
 
-    // Market value is the closer analogue to an "estimated value"; assessed and
-    // calculated totals are the fallbacks, and they read lower.
-    const value = tax.MarketTotalValue ?? tax.marketTotalValue
-      ?? tax.TotalValueCalculated ?? tax.totalValueCalculated
-      ?? tax.AssessedTotalValue ?? tax.assessedTotalValue;
+    // Market leads; the totals follow; the assessed figure reads low and is last.
+    const currentValue = money(value.marketValue)
+      ?? money(value.totalValue)
+      ?? money(value.assessedValue)
+      ?? money(sum.assessedValue?.price);
 
-    const ownershipType = ownerMeta.EtalCodeDescription
-      ?? ownerMeta.RelationshipTypeCodeDescription
-      ?? (owner.IsCorporationOrBusiness === true ? 'Corporation or business'
-        : owner.IsCorporationOrBusiness === false ? 'Individual' : undefined);
-
-    // Any field below could be an object on a record shaped differently. One
-    // of them reaching React takes the report down, so they are all coerced.
-    const text = (v: any): string | undefined =>
-      v == null ? undefined
-        : typeof v === 'string' ? (v.trim() || undefined)
-          : typeof v === 'number' ? String(v)
-            : typeof v === 'object' ? addressText(v)
-              : undefined;
+    const owners: string[] = (sum.currentOwners ?? [])
+      .map((o: any) => str(o?.fullName)
+        ?? [str(o?.firstName), str(o?.lastName)].filter(Boolean).join(' '))
+      .filter(Boolean);
 
     return {
-      address: addr,
-      ownerName: text(owner.OwnerName ?? owner.ownerName ?? p.ownerName ?? p.OwnerName),
-      ownerType: owner.IsCorporationOrBusiness === true ? 'business' : undefined,
-      purchasePrice: money(purchase.SaleAmount ?? purchase.saleAmount),
+      address: fullAddress ?? '',
+      ownerName: owners.join(', ') || undefined,
+      ownerType: str(ownerMeta.relationshipTypeCodeDescription),
+      purchasePrice: money(sum.purchasePrice?.price),
       purchaseDate,
-      yearsOwned: purchaseDate ? `Since ${purchaseDate}` : undefined,
-      currentValue: money(value),
-      // No estimated-rent field exists in the documented schema.
+      yearsOwned: purchaseDate ? `Owned since ${purchaseDate}` : undefined,
+      currentValue,
       estimatedRent: undefined,
-      propertyType: text(ident.PropertyIndicatorCodeDescription ?? ident.propertyIndicatorCodeDescription ?? ident.CountyUseDescr ?? ident.countyUseDescr),
-      beds: num(structure.Bedrooms ?? structure.bedrooms),
-      baths: num(structure.TotalBathrooms ?? structure.totalBathrooms ?? structure.NumberOfBathrooms ?? structure.numberOfBathrooms ?? structure.TotalBaths ?? structure.totalBaths),
-      // Living area and lot area are different numbers and must not be
-      // substituted for one another: printing the lot as the house would show
-      // 22,444 where 4,066 is true. Only keys that actually name the building
-      // are accepted here; if none is present the field stays unset, and
-      // ENFORMION_PROPERTY_ASSESSOR names what the record really carries.
-      sqft: num(
-        structure.livingSquareFeet ?? structure.LivingSquareFeet
-        ?? structure.buildingSquareFeet ?? structure.BuildingSquareFeet
-        ?? structure.totalSquareFeet ?? structure.TotalSquareFeet
-        ?? structure.buildingArea ?? structure.BuildingArea,
-      ),
-      lotSqft: num(size.LandSquareFootage ?? size.landSquareFootage),
-      yearBuilt: num(structure.YearBuilt ?? structure.yearBuilt ?? structure.EffectiveYearBuilt ?? structure.effectiveYearBuilt),
-      occupancy: ownerMeta.OwnerOccupancyCodeDescription ?? ownerMeta.OwnerOccupancyCode ?? undefined,
-      ownershipType,
-      landUse: ident.CountyUseDescr ?? ident.LandUseCodeDescription ?? undefined,
-      propertyClass: ident.PropertyIndicatorCodeDescription ?? undefined,
-      subdivision: legal.SubdivisionName ?? undefined,
-      apn: ident.ApnUnformatted ?? ident.OriginalApn ?? undefined,
-      schoolDistrict: location.SchoolDistrict
-        ?? location.HighSchoolDistrictCountyDescription ?? undefined,
+      propertyType: str(details.type)
+        ?? str(ident.landUseCodeDescription)
+        ?? str(ident.propertyIndicatorCodeDescription),
+      beds: n(details.beds),
+      baths: n(details.baths),
+      // livingArea is the building, lotSize is the land. They are different
+      // numbers, and the absence of a key for the first is why square footage
+      // was deliberately left unset rather than filled with the lot.
+      sqft: n(details.livingArea) ?? n(details.squareFootage),
+      lotSqft: n(details.lotSize),
+      yearBuilt: n(details.yearBuilt),
+      totalRooms: n(details.totalRooms),
+      taxAmount: money(value.taxAmount),
+      taxYear: n(value.taxYear) ?? n(value.assessedYear),
+      occupancy: str(ownerMeta.ownerOccupancyCodeDescription),
+      ownerOccupied: typeof sum.isOwnerOccupied === 'boolean' ? sum.isOwnerOccupied : undefined,
+      previousOwnerCount: Array.isArray(sum.previousOwners) ? sum.previousOwners.length : undefined,
+      ownershipType: str(ownerMeta.ownershipeRightsCodeDescription),
+      landUse: str(ident.landUseCodeDescription) ?? str(ident.countyUseDescr),
+      propertyClass: str(ident.propertyIndicatorCodeDescription),
+      subdivision: undefined,
+      apn: str(sum.apn) ?? str(sum.originalApn),
+      schoolDistrict: undefined,
     };
   }).filter((p: any) => p.address);
 }

@@ -56,6 +56,14 @@ export interface PropertyIntelligence {
   baths?: number;
   sqft?: number;
   yearBuilt?: number;
+  /** Land area. Deliberately separate from sqft, which is the building. */
+  lotSqft?: number;
+  totalRooms?: number;
+  taxAmount?: string;
+  taxYear?: number;
+  previousOwnerCount?: number;
+  ownerOccupied?: boolean;
+  occupancy?: string;
 }
 
 export interface Relationships {
