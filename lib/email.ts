@@ -21,6 +21,16 @@ export async function sendMagicLink(email: string, token: string) {
     from: FROM,
     to: email,
     subject: 'Your Verity sign-in link',
+    // An HTML-only body is a long-standing spam heuristic. Every message ships
+    // a plain-text alternative so filters see a normal multipart email.
+    text: [
+      'Your Verity sign-in link.',
+      '',
+      'Click below to sign in. This link expires in 15 minutes.',
+      link,
+      '',
+      "If you didn't request this, ignore it. Your account is safe.",
+    ].join('\n'),
     html: wrap(`
       <h1 style="font-size:36px;font-weight:400;line-height:1.05;margin:0 0 16px;letter-spacing:-0.4px">
         Your sign-in link.
@@ -44,6 +54,16 @@ export async function sendWelcomeEmail(email: string, token: string) {
     from: FROM,
     to: email,
     subject: "You're in. Welcome to Verity.",
+    text: [
+      "You're in. Welcome to Verity.",
+      '',
+      'Your membership is active. Open the link below to run your first search —',
+      'drop in a phone number and get the full picture in seconds.',
+      link,
+      '',
+      'Membership active for 12 months. Renews only if you choose.',
+      'This link expires in 15 minutes — bookmark the site after signing in.',
+    ].join('\n'),
     html: wrap(`
       <h1 style="font-size:48px;font-weight:400;line-height:1;margin:0 0 8px;letter-spacing:-0.6px">
         You're in.
