@@ -121,7 +121,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <span className="v-eyebrow">Verity report · {report.searchId}</span>
-          <h1 style={{ fontFamily: 'var(--serif)', fontSize: 44, lineHeight: 1.05, fontWeight: 400, color: 'var(--dark)', margin: '6px 0 0', letterSpacing: -0.4 }}>
+          <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(30px, 7vw, 44px)', lineHeight: 1.05, fontWeight: 400, color: 'var(--dark)', margin: '6px 0 0', letterSpacing: -0.4 }}>
             <em style={{ color: 'var(--gold)' }}>On</em> {report.subject.name}
           </h1>
         </div>
@@ -130,12 +130,12 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </div>
       </div>
 
-      <div id="sec-0" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', borderRadius: 'var(--r-xl)', overflow: 'hidden', boxShadow: `0 16px 50px ${scoreConfig.glow}, 0 2px 6px rgba(61,36,52,0.06)` }}>
+      <div id="sec-0" className="v-grid-score" style={{ borderRadius: 'var(--r-xl)', overflow: 'hidden', boxShadow: `0 16px 50px ${scoreConfig.glow}, 0 2px 6px rgba(61,36,52,0.06)` }}>
         <div style={{ padding: '36px 36px 32px', background: scoreConfig.bg, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: `radial-gradient(circle, ${scoreConfig.accent} 0%, transparent 65%)`, opacity: 0.55 }} />
           <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div className="v-eyebrow" style={{ color: scoreConfig.deep, marginBottom: 16 }}>Safety score · live</div>
-            <div style={{ fontFamily: 'var(--serif)', fontSize: 72, fontWeight: 400, color: scoreConfig.deep, lineHeight: 0.95, letterSpacing: -1 }}>
+            <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(38px, 10vw, 72px)', fontWeight: 400, color: scoreConfig.deep, lineHeight: 0.95, letterSpacing: -1 }}>
               {scoreConfig.label.split(' ')[0]}<br />
               <em style={{ fontWeight: 300 }}>{scoreConfig.label.split(' ')[1]}</em>
             </div>
@@ -230,7 +230,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </div>
       </div>
 
-      <div id="sec-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div id="sec-1" className="v-grid-r2" style={{ gap: 24 }}>
         <Section eyebrow="01" title="Phone intelligence">
           <KVRow label="Number type" value={report.phone.lineType === 'voip' ? 'VoIP — not a carrier line' : report.phone.lineType === 'mobile' ? 'Mobile (carrier line)' : 'Landline'} />
           {report.phone.origin && report.phone.origin !== '—' && <KVRow label="Origin" value={report.phone.origin} />}
@@ -238,7 +238,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </Section>
 
         <Section id="sec-2" eyebrow="02" title="Identity signals">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className="v-grid-r2" style={{ gap: 14 }}>
             <Stat label="Full name" value={report.identity.fullName} />
             <Stat label="Age" value={String(report.identity.age || '—')} />
             <Stat label="Date of birth" value={report.identity.dob} />
@@ -248,7 +248,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       </div>
 
       <Section id="sec-3" eyebrow="03" title="Address history">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px 32px' }}>
+        <div className="v-grid-r2" style={{ gap: '14px 32px' }}>
           {report.addresses.map((a, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderTop: i >= 2 ? '1px solid var(--gold-pale)' : 'none' }}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', marginTop: 8, flexShrink: 0, background: a.flag ? 'var(--deeprose)' : a.current ? 'var(--rose)' : 'var(--mauve)', boxShadow: a.current ? '0 0 0 3px var(--blush-pale)' : 'none' }} />
@@ -283,7 +283,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                 </div>
                 
                   <div style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark-soft)', marginBottom: 16, fontStyle: 'italic' }}>{prop.address}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 12 }}>
+                <div className="v-grid-r3" style={{ gap: 14, marginTop: 12 }}>
                   {prop.currentValue && (
                     <div style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
                       <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 4 }}>Est. value</div>
@@ -303,7 +303,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 14 }}>
+                <div className="v-grid-r3" style={{ gap: 14, marginTop: 14 }}>
                   {prop.purchaseDate && (
                     <div>
                       <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const, marginBottom: 2 }}>Purchase date</div>
@@ -340,7 +340,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </Section>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="v-grid-r2" style={{ gap: 24 }}>
         <Section id="sec-4" eyebrow="04" title="Relationships">
           <KVRow label="Status" value={report.relationships.status} />
           {report.relationships.spouse && <KVRow label="Spouse" value={report.relationships.spouse} />}
@@ -365,7 +365,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       </div>
 
       <Section id="sec-6" eyebrow="06" title="Public record flags" accent={report.score === 'red' ? 'var(--deeprose-pale)' : 'var(--blush-pale)'}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 32px' }}>
+        <div className="v-grid-r2" style={{ gap: '0 32px' }}>
           {report.publicRecords.map((p, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderTop: i >= 2 ? '1px solid var(--gold-pale)' : 'none' }}>
               <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1, background: p.good ? 'var(--sage-pale)' : p.flag ? 'var(--deeprose-pale)' : 'var(--ivory-warm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

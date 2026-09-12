@@ -181,3 +181,25 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
   .v-display-xl { font-size: 40px; }
   .v-display-lg { font-size: 30px; }
 }
+
+/* ── Report grids ─────────────────────────────────────────────────────────
+   These panels were laid out with inline grid-template-columns, which no
+   media query can reach, so they kept their desktop column counts on a
+   phone. The score panel was the visible failure: its colour block is the
+   narrow column, and at 375px the 72px score text overflowed and clipped.
+   Classes instead, so the breakpoint can do its job.                        */
+.v-grid-score { display: grid; grid-template-columns: 1.2fr 1.8fr; }
+.v-grid-r2    { display: grid; grid-template-columns: 1fr 1fr; }
+.v-grid-r3    { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 768px) {
+  .v-grid-score { grid-template-columns: 1fr; }
+  .v-grid-r2    { grid-template-columns: 1fr; }
+  /* Three stat tiles stay side by side down to a phone — they are short
+     labels, and stacking them turns one glance into three. */
+  .v-grid-r3    { grid-template-columns: repeat(3, 1fr); gap: 10px !important; }
+}
+
+/* Nothing in a report may push the page sideways. */
+.v-grid-score, .v-grid-r2, .v-grid-r3 { min-width: 0; }
+.v-grid-score > *, .v-grid-r2 > *, .v-grid-r3 > * { min-width: 0; }
