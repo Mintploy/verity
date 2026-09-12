@@ -102,6 +102,7 @@ export interface EnformionPerson {
   company?: string;
   additionalPhones?: string[];
   maritalStatus?: string;
+  employmentHistory?: string[];
   spouseName?: string;
   priorMarriages?: string;
   propertyIntelligence?: EnformionProperty[];
@@ -604,13 +605,27 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     // --- Relatives + spouse detection ---
     const relativesSummary: any[] = best.relativesSummary ?? [];
 
-    const isSpouse = (r: any) => r.relativeType === 'Spouse' || r.spouse === 1;
+    if (relativesSummary[0]) {
+      console.log('ENFORMION_RELATIVE_KEYS:', Object.keys(relativesSummary[0]).join('|'));
+    }
+
+    // Spouse detection reads relativeType / spouse / oldSpouse, none of which
+    // have ever been confirmed against a live row, and marital status is blank
+    // on every report. Widened to match case-insensitively and to accept the
+    // plausible spellings; ENFORMION_RELATIVE_KEYS says which one is real.
+    const isSpouse = (r: any) => {
+      const t = String(r.relativeType ?? r.RelativeType ?? r.relationship ?? r.Relationship ?? '').toLowerCase();
+      return t.includes('spouse') || t.includes('husband') || t.includes('wife')
+        || r.spouse === 1 || r.spouse === true || r.isSpouse === true;
+    };
     const currentSpouse = relativesSummary.find(
       (r: any) => isSpouse(r) && !r.oldSpouse && !r.isDeceased
     );
     const spouseName: string | undefined = currentSpouse ? buildName(currentSpouse) : undefined;
 
-    const priorSpouses = relativesSummary.filter((r: any) => r.oldSpouse === true);
+    const priorSpouses = relativesSummary.filter(
+      (r: any) => r.oldSpouse === true || r.OldSpouse === true || r.isFormerSpouse === true,
+    );
     const priorMarriages: string | undefined = priorSpouses.length > 0
       ? `${priorSpouses.length} prior marriage${priorSpouses.length !== 1 ? 's' : ''} on record`
       : undefined;
@@ -754,6 +769,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         emails,
         jobTitle: jobTitle ?? workplace?.title,
         company: company ?? workplace?.company,
+        employmentHistory: workplace?.history,
         additionalPhones,
         maritalStatus,
         spouseName,
@@ -1145,19 +1161,54 @@ async function lookupOfac(
 // comes from the dedicated endpoint instead.
 async function lookupWorkplace(
   username: string, password: string, tahoeId?: string, fullName?: string,
-): Promise<{ title?: string; company?: string } | null> {
+): Promise<{ title?: string; company?: string; history?: string[] } | null> {
   const body = identityBody(tahoeId, fullName, 3);
   if (!body) return null;
   const rows = await proSearch(username, password, WORKPLACE_URL, SEARCH_TYPE_WORKPLACE, body, 'WORKPLACE');
   const current = rows.find((w: any) => w.isCurrent === true || w.current === true) ?? rows[0];
   if (!current) return null;
-  // Documented field names: currentEmployment carries jobTitle/employer,
-  // workExperience carries expJobTitle/expCompany. The looser candidates are
-  // kept as a tail in case a row is flattened differently.
-  return {
-    title: pick(current, 'jobTitle', 'expJobTitle', 'title', 'position', 'occupation'),
-    company: pick(current, 'employer', 'expCompany', 'company', 'companyName', 'organization'),
-  };
+
+  // The job title and employer are NOT top level. The census on a live row
+  // reads "...companies:0 education:0 currentEmployment:1 workExperience:7...",
+  // so they sit one level down, inside those two arrays. Reading them at the
+  // top, as this did, found nothing on every search that has ever run and the
+  // professional section has been empty the whole time.
+  const employment: any[] = current.currentEmployment ?? current.CurrentEmployment ?? [];
+  const experience: any[] = current.workExperience ?? current.WorkExperience ?? [];
+
+  // The keys inside are documented but unconfirmed, and this endpoint has cost
+  // us three wrong guesses already. Log them alongside the mapping.
+  const keysOf = (o: any) => (o && typeof o === 'object' ? Object.keys(o).join('|') : 'none');
+  console.log('ENFORMION_WORKPLACE_NESTED:',
+    'currentEmployment[0]:', keysOf(employment[0]),
+    'workExperience[0]:', keysOf(experience[0]));
+
+  const job = employment[0] ?? {};
+  const firstExp = experience[0] ?? {};
+
+  const title = pick(job, 'jobTitle', 'title', 'position', 'occupation')
+    ?? pick(firstExp, 'expJobTitle', 'jobTitle', 'title');
+  const company = pick(job, 'employer', 'company', 'companyName', 'organization')
+    ?? pick(firstExp, 'expCompany', 'employer', 'company');
+
+  // Everything she can be shown, not just the current role. Deduped, because
+  // work histories repeat the same employer across overlapping date ranges.
+  const seen = new Set<string>();
+  const history: string[] = [];
+  for (const e of [job, ...experience]) {
+    const t = pick(e, 'expJobTitle', 'jobTitle', 'title', 'position');
+    const c = pick(e, 'expCompany', 'employer', 'company', 'companyName');
+    if (!t && !c) continue;
+    const from = pick(e, 'expDateFrom', 'dateFrom', 'startDate', 'fromDate');
+    const to = pick(e, 'expDateTo', 'dateTo', 'endDate', 'toDate');
+    const years = from || to ? ` (${[from, to].filter(Boolean).join(' to ')})` : '';
+    const line = `${[t, c].filter(Boolean).join(' at ')}${years}`;
+    if (seen.has(line)) continue;
+    seen.add(line);
+    history.push(line);
+  }
+
+  return { title, company, history: history.slice(0, 8) };
 }
 
 // Detail endpoints accept either the person's TahoeId or a name.

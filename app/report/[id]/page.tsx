@@ -390,6 +390,19 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           {report.professional.licenses && report.professional.licenses !== '' && (
             <KVRow label="Licenses" value={report.professional.licenses} />
           )}
+          {report.professional.history && report.professional.history.length > 1 && (
+            <>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Work history</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {report.professional.history.map((role, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--blush-deep)', flexShrink: 0, marginTop: 7 }} />
+                    <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.55, fontWeight: 300 }}>{role}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Business entities</div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', lineHeight: 1.7, fontWeight: 300, whiteSpace: 'pre-line' }}>{report.professional.businessEntities ?? report.professional.llcs}</div>
         </Section>

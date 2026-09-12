@@ -71,6 +71,8 @@ export interface Professional {
   company: string;
   tenure: string;
   llcs: string;
+  /** Every role the workplace record carries, current first. */
+  history?: string[];
   licenses?: string;
   businessEntities?: string;
 }

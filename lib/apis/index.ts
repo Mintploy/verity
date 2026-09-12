@@ -126,6 +126,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       // array unless that include is entitled on the account. Say so rather
       // than showing a bare dash, which reads as "no employment on record".
       title: person.jobTitle ?? '',
+      history: person.employmentHistory,
       company: person.company
         ?? ((person.counts?.workplace ?? 0) > 0 ? 'Employment on record, details not available' : ''),
       tenure: '',
