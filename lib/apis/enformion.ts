@@ -62,6 +62,7 @@ export interface EnformionAddress {
   current: boolean;
   detail: string;
   flag?: boolean;
+  owned?: boolean;
 }
 
 export interface EnformionProperty {
@@ -91,6 +92,11 @@ export interface EnformionProperty {
   taxYear?: number;
   previousOwnerCount?: number;
   ownerOccupied?: boolean;
+  /** Names on the deed. Whether the subject is among them is the question. */
+  ownerNames?: string[];
+  county?: string;
+  subjectIsOwner?: boolean;
+  isCurrentResidence?: boolean;
 }
 
 export interface EnformionPerson {
@@ -925,6 +931,8 @@ async function lookupPropertyV2(
 
     return {
       address: fullAddress ?? '',
+      ownerNames: owners,
+      county: str(address.county),
       ownerName: owners.join(', ') || undefined,
       ownerType: str(ownerMeta.relationshipTypeCodeDescription),
       purchasePrice: money(sum.purchasePrice?.price),

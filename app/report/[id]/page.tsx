@@ -309,9 +309,37 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>{a.years}</span>
                   {a.current && <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 13, color: 'var(--gold)' }}>· current</span>}
+                  {a.kind && a.kind !== 'unknown' && (
+                    <span
+                      title={a.kindReason ? `Based on: ${a.kindReason}` : undefined}
+                      style={{
+                        padding: '2px 9px', borderRadius: 'var(--r-pill)',
+                        fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4,
+                        background: a.kind === 'office' ? 'var(--gold-pale)' : 'var(--sage-pale)',
+                        color: a.kind === 'office' ? 'var(--gold-deep)' : 'var(--sage-deep)',
+                      }}
+                    >
+                      {a.kind === 'office' ? 'Likely office' : 'Likely home'}
+                    </span>
+                  )}
                 </div>
                 
                   <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.2 }}><a href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.addr)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dark)', textDecoration: 'underline' }}>{a.addr}</a></div>
+                {(() => {
+                  // Facts about the building, where a property record matched
+                  // this address. She should not have to scroll to a different
+                  // section to learn that the "current address" is an office.
+                  const facts = [
+                    a.sqft ? `${a.sqft.toLocaleString()} sq ft` : null,
+                    a.yearBuilt ? `Built ${a.yearBuilt}` : null,
+                    a.county ? `${a.county} County` : null,
+                  ].filter(Boolean) as string[];
+                  return facts.length > 0 ? (
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 4, opacity: 0.85 }}>
+                      {facts.join(' · ')}
+                    </div>
+                  ) : null;
+                })()}
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: a.flag ? 'var(--deeprose-deep)' : 'var(--dark-soft)', marginTop: 4, fontWeight: a.flag ? 500 : 300 }}>{a.detail}</div>
               </div>
             </div>
@@ -342,24 +370,40 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
 
               const ownership: Array<[string, string]> = [];
               if (prop.ownerName) ownership.push(['Owner of record', prop.ownerName]);
-              if (prop.purchaseDate) ownership.push(['Owned since', prop.purchaseDate]);
+              if (prop.purchaseDate) {
+                // "Owned since 2005" alone leaves her unable to tell a current
+                // holding from one long sold. The deed answers it: if he is on
+                // it, the ownership stands today.
+                ownership.push([
+                  prop.subjectIsOwner === true ? 'Owned since (still current)' : 'Bought',
+                  prop.purchaseDate,
+                ]);
+              }
               if (prop.previousOwnerCount) ownership.push(['Previous owners', String(prop.previousOwnerCount)]);
               if (prop.occupancy) ownership.push(['Occupancy', prop.occupancy]);
 
               return (
               <div key={i} style={{ padding: '20px 24px', background: i === 0 ? 'var(--blush-pale)' : 'var(--ivory-warm)', borderRadius: 'var(--r-lg)', borderLeft: `3px solid ${i === 0 ? 'var(--primary)' : 'var(--mauve)'}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: i === 0 ? 'var(--primary)' : 'var(--mauve-deep)', letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
-                    {i === 0 ? 'Current address' : `Previous address ${i}`}
+                  {/* Labelled by what the record says, never by array
+                      position. Calling the first record "Current address" is
+                      what put a different address here than in his address
+                      history and gave her two answers to one question. */}
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: prop.isCurrentResidence ? 'var(--primary)' : 'var(--mauve-deep)', letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
+                    {prop.isCurrentResidence
+                      ? 'His current address'
+                      : prop.subjectIsOwner === false
+                        ? 'Linked to him, not in his name'
+                        : 'Property on record'}
                   </span>
-                  {prop.ownerOccupied === true && (
+                  {prop.isCurrentResidence && prop.ownerOccupied === true && (
                     <span style={{ padding: '2px 9px', borderRadius: 'var(--r-pill)', background: 'var(--sage-pale)', color: 'var(--sage-deep)', fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4 }}>
                       He lives there
                     </span>
                   )}
-                  {prop.ownerOccupied === false && (
-                    <span style={{ padding: '2px 9px', borderRadius: 'var(--r-pill)', background: 'var(--honey-pale)', color: 'var(--honey-deep)', fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4 }}>
-                      Not owner-occupied
+                  {prop.subjectIsOwner === true && !prop.isCurrentResidence && (
+                    <span style={{ padding: '2px 9px', borderRadius: 'var(--r-pill)', background: 'var(--gold-pale)', color: 'var(--gold-deep)', fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4 }}>
+                      Owned, lives elsewhere
                     </span>
                   )}
                 </div>
@@ -387,6 +431,17 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                   </div>
                 )}
 
+                {prop.subjectIsOwner === false && (
+                  <div style={{
+                    padding: '10px 14px', borderRadius: 'var(--r-md)', marginBottom: 14,
+                    background: 'var(--honey-pale)', color: 'var(--honey-deep)',
+                    fontFamily: 'var(--sans)', fontSize: 12.5, lineHeight: 1.6,
+                  }}>
+                    His name is not on this deed. Records link a person to a property for
+                    several reasons, including selling it or representing it, so treat this
+                    as somewhere he is connected to rather than somewhere he owns.
+                  </div>
+                )}
                 {ownership.length > 0 && (
                   <div className="v-grid-r2" style={{ gap: '10px 24px' }}>
                     {ownership.map(([label, v]) => (

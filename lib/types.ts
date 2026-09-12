@@ -40,6 +40,18 @@ export interface Address {
   detail: string;
   flag?: boolean;
   owned?: boolean;
+  /**
+   * Whether this looks like somewhere he lives or somewhere he works.
+   * A suite number and a commercial land use say office; an apartment number
+   * and a residential class say home. 'unknown' when neither is evident,
+   * which is stated rather than guessed.
+   */
+  kind?: 'home' | 'office' | 'unknown';
+  /** Why we called it that, in her words, so the label is never a bare assertion. */
+  kindReason?: string;
+  sqft?: number;
+  yearBuilt?: number;
+  county?: string;
 }
 
 export interface PropertyIntelligence {
@@ -64,6 +76,12 @@ export interface PropertyIntelligence {
   previousOwnerCount?: number;
   ownerOccupied?: boolean;
   occupancy?: string;
+  ownerNames?: string[];
+  county?: string;
+  /** Is the man she searched actually on this deed? */
+  subjectIsOwner?: boolean;
+  /** Does this property match the current address in his address history? */
+  isCurrentResidence?: boolean;
 }
 
 export interface Relationships {

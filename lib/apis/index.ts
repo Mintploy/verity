@@ -5,6 +5,54 @@ import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { checkSexOffenderRegistry } from './nsopw';
 
+
+/**
+ * Reconciles the two address lists the report shows.
+ *
+ * They come from different products and disagreed on screen: the address
+ * history's first entry is his most recently reported address, while the
+ * property list was labelling its first record "Current address" purely by
+ * array position. A woman reading both saw two different current addresses and
+ * no way to tell which was true.
+ *
+ * Matching them settles it, and answers a second question at the same time.
+ * PropertyV2 returns properties linked to a person, and being linked is not
+ * the same as owning: an estate agent is linked to property he represents. So
+ * the subject is only called an owner when his name is actually on the deed.
+ */
+function normalizeAddr(a: string): string {
+  return (a ?? '')
+    .toUpperCase()
+    .replace(/[.,;#]/g, ' ')
+    .replace(/\b(STREET|ST|AVENUE|AVE|BOULEVARD|BLVD|DRIVE|DR|ROAD|RD|LANE|LN|COURT|CT|PLACE|PL|TERRACE|TER)\b/g, '')
+    .replace(/\b(APARTMENT|APT|UNIT|SUITE|STE|FLOOR|FL)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The house number plus the first word of the street, which is enough to pair. */
+function addrKey(a: string): string {
+  const n = normalizeAddr(a);
+  const parts = n.split(' ').filter(Boolean);
+  return parts.slice(0, 2).join(' ');
+}
+
+const OFFICE_MARKERS = /\b(STE|SUITE|FL|FLOOR|UNIT\s*[A-Z]?\d*\s*(OFFICE)?)\b/i;
+const OFFICE_USE = /(COMMERCIAL|OFFICE|RETAIL|INDUSTRIAL|STORE|WAREHOUSE|PROFESSIONAL)/i;
+const HOME_USE = /(SINGLE FAMILY|RESIDENTIAL|CONDOMINIUM|CONDO|DUPLEX|TOWNHOUSE|APARTMENT|MOBILE HOME)/i;
+
+function classifyAddress(
+  addr: string,
+  prop?: { propertyType?: string; landUse?: string; propertyClass?: string },
+): { kind: 'home' | 'office' | 'unknown'; reason?: string } {
+  const use = [prop?.propertyType, prop?.landUse, prop?.propertyClass].filter(Boolean).join(' ');
+  if (use && OFFICE_USE.test(use)) return { kind: 'office', reason: prop?.propertyType ?? prop?.landUse };
+  if (use && HOME_USE.test(use)) return { kind: 'home', reason: prop?.propertyType ?? prop?.landUse };
+  if (/\bSTE\b|\bSUITE\b|\bFLOOR\b|\bFL\s*\d/i.test(addr)) return { kind: 'office', reason: 'Suite number' };
+  if (/\bAPT\b|\bAPARTMENT\b|\bUNIT\b/i.test(addr)) return { kind: 'home', reason: 'Apartment number' };
+  return { kind: 'unknown' };
+}
+
 export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -75,6 +123,53 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (person.linkedInUrl) profiles.push(`LinkedIn: ${person.linkedInUrl}${person.linkedInHeadline ? ` · ${person.linkedInHeadline}` : ''}`);
   const emailsOnRecord: string[] = person.emails ?? [];
 
+  // --- Reconcile the address history against the property records ---
+  const rawProperties = person.propertyIntelligence ?? [];
+  const rawAddresses = person.addresses ?? [];
+  const currentAddr = rawAddresses.find(a => a.current)?.addr ?? rawAddresses[0]?.addr ?? '';
+  const currentKey = currentAddr ? addrKey(currentAddr) : '';
+
+  const subjectLast = (person.fullName ?? '').trim().split(/\s+/).pop()?.toUpperCase() ?? '';
+  const subjectFirst = (person.fullName ?? '').trim().split(/\s+/)[0]?.toUpperCase() ?? '';
+
+  const propByKey = new Map<string, typeof rawProperties[number]>();
+  for (const pr of rawProperties) {
+    const k = pr.address ? addrKey(pr.address) : '';
+    if (k && !propByKey.has(k)) propByKey.set(k, pr);
+  }
+
+  const enrichedProperties = rawProperties.map(pr => {
+    const owners = (pr.ownerNames ?? []).map(o => o.toUpperCase());
+    // Surname alone is too loose in a county full of relatives; require the
+    // first name too when we have one to check against.
+    const subjectIsOwner = owners.length === 0
+      ? undefined
+      : owners.some(o => (!subjectLast || o.includes(subjectLast))
+        && (!subjectFirst || o.includes(subjectFirst)));
+    return {
+      ...pr,
+      subjectIsOwner,
+      isCurrentResidence: !!(currentKey && pr.address && addrKey(pr.address) === currentKey),
+    };
+  });
+
+  const enrichedAddresses = rawAddresses.map((a, i) => {
+    const match = a.addr ? propByKey.get(addrKey(a.addr)) : undefined;
+    const { kind, reason } = classifyAddress(a.addr, match);
+    return {
+      ...a,
+      ...(i === 0 && person.censusNeighborhood
+        ? { detail: `${a.detail} · ${person.censusNeighborhood}` }
+        : {}),
+      kind,
+      kindReason: reason,
+      sqft: match?.sqft,
+      yearBuilt: match?.yearBuilt,
+      county: match?.county,
+      owned: match?.subjectIsOwner === true ? true : a.owned,
+    };
+  });
+
   const report: Report = {
     id: searchId,
     searchId,
@@ -107,12 +202,8 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       verifiedBy: person.fullName ? 4 : 3,
       aliases: resolvedAliases,
     },
-    addresses: (person.addresses ?? []).map((a, i) =>
-      i === 0 && person.censusNeighborhood
-        ? { ...a, detail: `${a.detail} · ${person.censusNeighborhood}` }
-        : a
-    ),
-    propertyIntelligence: person.propertyIntelligence ?? [],
+    addresses: enrichedAddresses,
+    propertyIntelligence: enrichedProperties,
     relationships: {
       status: person.maritalStatus ?? '',
       spouse: person.spouseName,
