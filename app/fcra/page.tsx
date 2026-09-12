@@ -35,7 +35,7 @@ export default function FcraPage() {
           {[
             {
               title: 'What this means',
-              body: 'You may not use Verity or any information obtained from Verity to determine a person\'s eligibility for credit, insurance, employment, housing, or any other purpose that would constitute a "permissible purpose" under the FCRA. Using public record data for these purposes without proper FCRA compliance — including required disclosures and adverse action notices — is illegal.',
+              body: 'You may not use Verity or any information obtained from Verity to determine a person\'s eligibility for credit, insurance, employment, housing, or any other purpose that would constitute a "permissible purpose" under the FCRA. Using public record data for these purposes without proper FCRA compliance, including required disclosures and adverse action notices, is illegal.',
             },
             {
               title: 'Verity is for personal safety research only',
@@ -47,7 +47,7 @@ export default function FcraPage() {
             },
             {
               title: 'No guarantee of accuracy',
-              body: 'The information available through Verity is aggregated from publicly available sources and third-party data providers. We do not guarantee the accuracy, completeness, or currency of any data. Public records are frequently incomplete or contain errors. Do not make consequential decisions — personal, financial, or legal — based solely on a Verity report.',
+              body: 'The information available through Verity is aggregated from publicly available sources and third-party data providers. We do not guarantee the accuracy, completeness, or currency of any data. Public records are frequently incomplete or contain errors. Do not make consequential decisions, personal, financial, or legal, based solely on a Verity report.',
             },
             {
               title: 'Dispute resolution',
@@ -55,7 +55,7 @@ export default function FcraPage() {
             },
             {
               title: 'Questions',
-              body: 'If you have questions about appropriate use of Verity, contact us at verity@mintploy.com. If you believe you have found a use case that requires FCRA compliance, do not use Verity for that purpose — consult a qualified FCRA-compliant consumer reporting agency instead.',
+              body: 'If you have questions about appropriate use of Verity, contact us at verity@mintploy.com. If you believe you have found a use case that requires FCRA compliance, do not use Verity for that purpose, consult a qualified FCRA-compliant consumer reporting agency instead.',
             },
           ].map((section, i) => (
             <div key={i} style={{ marginBottom: 40 }}>

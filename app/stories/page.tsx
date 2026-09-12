@@ -1,148 +1,88 @@
 import Link from 'next/link';
-import { Wordmark } from '@/components/ui/Wordmark';
 import { Nav } from '@/components/nav/Nav';
 import { Footer } from '@/components/landing/Footer';
+import { Bow } from '@/components/ui/Bow';
 
-const stories = [
-  {
-    initial: 'S.',
-    location: 'Los Angeles, CA',
-    title: 'He had a wife in Dallas.',
-    body: "We'd been dating three months. He was charming, traveled frequently for 'work,' always paid in cash. Something felt off. I ran his number. Verity returned a current marriage — dated 2019 — to a woman in Dallas, Texas. His LinkedIn had him listed as single. I sent her a message. She'd had no idea either.",
-    score: 'red',
-    tag: 'Active marriage undisclosed',
-  },
-  {
-    initial: 'M.',
-    location: 'New York, NY',
-    title: 'The address history told the real story.',
-    body: "He said he owned his apartment. The address history showed four rentals in three years, one eviction filing in 2022, and a small claims judgment. Not disqualifying on their own — but it changed my questions. We had the real conversation on date four instead of date fourteen.",
-    score: 'yellow',
-    tag: 'Financial instability pattern',
-  },
-  {
-    initial: 'P.',
-    location: 'Chicago, IL',
-    title: 'He came up completely clean.',
-    body: "I felt guilty running it. He'd been nothing but thoughtful. The report came back green — stable employment at the same company for nine years, clear public record, address history that matched what he'd told me. The guilt turned into something else. I felt like I could finally exhale.",
-    score: 'green',
-    tag: 'Clean report · peace of mind',
-  },
-  {
-    initial: 'R.',
-    location: 'Miami, FL',
-    title: 'Sex offender registry. My hands were shaking.',
-    body: "He'd found me on Instagram. Wonderful messages, moved quickly to texting, wanted to meet at my apartment. I ran his number before responding. NSOPW returned a match — a conviction from 2017. I blocked him on everything and filed a report with the platform. I don't want to think about if I hadn't looked.",
-    score: 'red',
-    tag: 'Sex offender registry match',
-  },
-  {
-    initial: 'A.',
-    location: 'Seattle, WA',
-    title: 'He was dating four women simultaneously.',
-    body: "My friend used Verity on the same number two weeks after I did. The phone intelligence showed the number had recently been active across four dating apps — a signal the carrier data surfaces. We compared reports. He'd told each of us he was 'taking things slowly' with 'just one person at a time.' We called him together.",
-    score: 'yellow',
-    tag: 'Multiple active relationships',
-  },
-  {
-    initial: 'J.',
-    location: 'Austin, TX',
-    title: 'The VoIP number was the first red flag.',
-    body: "He gave me a phone number but it came back as a VoIP line — not a real carrier, no number age, no geographic origin. The identity section returned nothing verifiable. He had no digital footprint at all. I asked about the number directly. He got defensive. That was the answer.",
-    score: 'red',
-    tag: 'Unverifiable identity',
-  },
+/**
+ * This page used to carry five invented customer accounts, presented under the
+ * line "These are real outcomes from real searches, shared with permission and
+ * anonymized". None of them happened, and one described a capability Verity
+ * does not have (dating-app activity from carrier data). It now carries only
+ * what the report actually produces, which is checkable against the code.
+ */
+
+const SECTIONS: Array<{ title: string; body: string }> = [
+  { title: 'Phone intelligence', body: 'Carrier, line type and how long the number has been in service. A VoIP line registered recently is flagged, because a second, disposable number is worth knowing about.' },
+  { title: 'Identity', body: 'Full name, age, and the aliases and alternate spellings attached to the same record.' },
+  { title: 'Address history', body: 'Where he has lived, when, and which address is current.' },
+  { title: 'Property', body: 'Where a property record exists: owner, purchase price and date, assessed value, and the building itself, beds, baths, square footage and year built.' },
+  { title: 'Relationships', body: 'Marriage and divorce records on file, plus the relatives and associates the record links to him.' },
+  { title: 'Professional', body: 'Employment where it appears in the record, and business entities registered to his name.' },
+  { title: 'Public records', body: 'Civil filings, bankruptcies, evictions, liens and judgments, and a sex offender registry check against NSOPW.' },
+  { title: 'Social footprint', body: 'Confirmed handles, and any inconsistency between what the record says and what the profile claims.' },
 ];
 
-const scoreConfig: Record<string, { label: string; bg: string; color: string }> = {
-  green: { label: 'Clear', bg: 'var(--sage-pale)', color: 'var(--sage-deep)' },
-  yellow: { label: 'Caution', bg: 'var(--honey-pale)', color: 'var(--honey-deep)' },
-  red: { label: 'Flag', bg: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)' },
-};
+const SCORES: Array<{ label: string; meaning: string; bg: string; color: string }> = [
+  { label: 'Green', meaning: 'Nothing adverse surfaced across the sources checked. It is not a character reference, it means the record is clean.', bg: 'var(--sage-pale)', color: 'var(--sage-deep)' },
+  { label: 'Yellow', meaning: 'Something is worth a conversation before you meet. A secondary line, an open civil matter, an address history that does not match what he has told you.', bg: 'var(--honey-pale)', color: 'var(--honey-deep)' },
+  { label: 'Red', meaning: 'A registry match or a corroborated criminal record forces red on its own. It is not averaged away against the things that came back clean.', bg: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)' },
+];
 
-export default function StoriesPage() {
+export default function WhatWeCheckPage() {
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
 
       <div className="v-section v-max">
-        <div style={{ maxWidth: 760, marginBottom: 64 }}>
-          <span className="v-eyebrow" style={{ display: 'block', marginBottom: 16 }}>Story library</span>
-          <h1 className="v-display-lg v-serif" style={{ fontWeight: 400, color: 'var(--dark)', margin: '0 0 24px' }}>
-            Women who looked,{' '}
-            <em style={{ color: 'var(--rose)' }}>and what they found.</em>
+        <div style={{ maxWidth: 760, marginBottom: 56 }}>
+          <span className="v-eyebrow" style={{ display: 'block', marginBottom: 16 }}>What a report covers</span>
+          <h1 className="v-display-lg" style={{ fontFamily: 'var(--display)', fontWeight: 500, color: 'var(--dark)', margin: '0 0 24px' }}>
+            What we check,{' '}
+            <span style={{ fontFamily: 'var(--script)', color: 'var(--primary)', fontSize: '1.25em' }}>and what we don&rsquo;t.</span>
           </h1>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.7, margin: 0, fontWeight: 300 }}>
-            These are real outcomes from real searches, shared with permission and anonymized.
-            Names, locations, and identifying details have been changed. The facts have not.
+            Every report is built from public and licensed records. Verity does not read his messages,
+            track his location, or tell you who he is as a person. It tells you what the record says,
+            and where the record and his story disagree.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 28 }}>
-          {stories.map((s, i) => {
-            const cfg = scoreConfig[s.score];
-            return (
-              <article key={i} style={{
-                background: 'var(--pearl)', borderRadius: 'var(--r-xl)',
-                padding: '36px 32px', boxShadow: 'var(--shadow-sm)',
-                display: 'flex', flexDirection: 'column', gap: 20,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: '50%',
-                      background: 'var(--primary-mist)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18,
-                      color: 'var(--primary-deep)',
-                    }}>{s.initial}</div>
-                    <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{s.location}</span>
-                  </div>
-                  <span style={{
-                    padding: '4px 12px', borderRadius: 'var(--r-pill)',
-                    background: cfg.bg, color: cfg.color,
-                    fontFamily: 'var(--sans)', fontSize: 10.5, fontWeight: 500, letterSpacing: 0.3,
-                  }}>{cfg.label}</span>
-                </div>
-
-                <div>
-                  <h2 style={{
-                    fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 400,
-                    color: 'var(--dark)', margin: '0 0 14px', lineHeight: 1.2,
-                  }}>{s.title}</h2>
-                  <p style={{
-                    fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)',
-                    lineHeight: 1.7, margin: 0, fontWeight: 300,
-                  }}>{s.body}</p>
-                </div>
-
-                <div style={{
-                  marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--gold-pale)',
-                  fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--gold-deep)',
-                  letterSpacing: 0.3, textTransform: 'uppercase',
-                }}>{s.tag}</div>
-              </article>
-            );
-          })}
+        <div className="v-grid-2" style={{ gap: 20, marginBottom: 64 }}>
+          {SECTIONS.map((s) => (
+            <div key={s.title} style={{ padding: '24px 26px', borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 19, color: 'var(--dark)', marginBottom: 8 }}>{s.title}</div>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.65, margin: 0, fontWeight: 300 }}>{s.body}</p>
+            </div>
+          ))}
         </div>
 
-        <div style={{
-          marginTop: 72, padding: '48px 40px', background: 'var(--primary-mist)',
-          borderRadius: 'var(--r-xl)', textAlign: 'center', maxWidth: 640, margin: '72px auto 0',
-        }}>
-          <h2 style={{ fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, color: 'var(--dark)', margin: '0 0 16px' }}>
-            Your story starts with a search.
+        <div style={{ maxWidth: 760, marginBottom: 28 }}>
+          <Bow size={34} color="var(--primary)" center="var(--blush)" />
+          <h2 className="v-display-sm" style={{ fontFamily: 'var(--display)', fontWeight: 500, color: 'var(--dark)', margin: '16px 0 20px' }}>
+            What the score means
           </h2>
-          <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '0 0 32px', fontWeight: 300 }}>
-            Join verified women who trust their instincts — and now have the data to back them up.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 56, maxWidth: 760 }}>
+          {SCORES.map((s) => (
+            <div key={s.label} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: '18px 22px', borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)' }}>
+              <span style={{ padding: '5px 14px', borderRadius: 'var(--r-pill)', background: s.bg, color: s.color, fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>{s.label}</span>
+              <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.65, margin: 0, fontWeight: 300 }}>{s.meaning}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ maxWidth: 760 }}>
+          <p style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--mauve-deep)', lineHeight: 1.7, margin: '0 0 22px' }}>
+            Sources: Enformion, CourtListener, the FEC and NSOPW. Coverage varies by person and by
+            state. A section with nothing in it means the record is empty, not that he is hiding
+            something, and the report says which is which.
           </p>
-          <Link href="/verify" style={{
-            display: 'inline-block', padding: '16px 36px', borderRadius: 'var(--r-pill)',
-            background: 'var(--primary)', color: 'var(--ivory)',
-            textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500,
-            boxShadow: 'var(--shadow-pop)',
+          <Link href="/search" style={{
+            display: 'inline-block', padding: '14px 30px', borderRadius: 'var(--r-pill)',
+            background: 'var(--primary)', color: 'var(--pearl)', textDecoration: 'none',
+            fontFamily: 'var(--display)', fontSize: 16, fontWeight: 500, boxShadow: 'var(--shadow-pop)',
           }}>
-            Start your verification →
+            Run a search
           </Link>
         </div>
       </div>

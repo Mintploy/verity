@@ -1,10 +1,10 @@
-// Enformion — comprehensive people intelligence API
+// Enformion, comprehensive people intelligence API
 // Auth: galaxy-ap-name / galaxy-ap-password headers + galaxy-search-type
 // Env vars: ENFORMION_USERNAME (galaxy-ap-name), ENFORMION_PASSWORD (galaxy-ap-password)
 // Base endpoint: POST https://devapi.enformion.com/PersonSearch
 
 // devapi.enformion.com is the correct API host and serves LIVE data despite the
-// name — confirmed against a real production response. Do not point
+// name, confirmed against a real production response. Do not point
 // ENFORMION_HOST at enformion.com or api.enformion.com: those serve the web
 // portal and return an HTML login page, not JSON. The override exists only in
 // case Enformion issues a different API host.
@@ -27,7 +27,7 @@ const WORKPLACE_URL = `${HOST}/WorkplaceSearch`;
 // galaxy-search-type values.
 //
 // The search type is scoped to the endpoint, not global. /PersonSearch accepts
-// four tiers — Person and ReversePhonePerson (full detail, paying users),
+// four tiers, Person and ReversePhonePerson (full detail, paying users),
 // Teaser and ReversePhonePersonTeaser (masked, logged-out). Those four belong
 // to /PersonSearch ONLY. /ReversePhoneSearch takes "ReversePhone"; sending
 // ReversePhonePerson there returns 400 "Search Type is not valid for requested
@@ -160,20 +160,20 @@ function buildName(obj: { firstName?: string; middleName?: string; lastName?: st
 }
 
 function birthYearToApproxAge(dobStr: string): number | null {
-  // Enformion DOB format: "1/XX/1964" — only year is reliable
+  // Enformion DOB format: "1/XX/1964", only year is reliable
   const parts = dobStr.split('/');
   const year = parseInt(parts[parts.length - 1]);
   if (!year || year < 1900) return null;
   return new Date().getFullYear() - year;
 }
 
-// An HTML body means the request reached a web server rather than the API —
+// An HTML body means the request reached a web server rather than the API 
 // almost always a misconfigured ENFORMION_HOST. Say that plainly instead of
 // dumping a login page into the logs.
 function failureSummary(status: number, body: string): string {
   const trimmed = body.trimStart();
   if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
-    return `${status} — received an HTML page, not JSON. ENFORMION_HOST (${HOST}) is not an API host; unset it to use the default.`;
+    return `${status}, received an HTML page, not JSON. ENFORMION_HOST (${HOST}) is not an API host; unset it to use the default.`;
   }
   return `${status} ${body.slice(0, 800)}`;
 }
@@ -225,10 +225,10 @@ function readDetailList(raw: any, format: (row: any) => string, limit: number): 
 // show a name and nothing else.
 //
 // This is a superset, so a `results`-shaped body still resolves exactly as
-// before — no endpoint loses behaviour by adopting it.
+// before, no endpoint loses behaviour by adopting it.
 // Every collection key below is confirmed from enformiongo.readme.io, not
 // inferred. Each endpoint names its own, and reading the wrong one is
-// indistinguishable from an empty result set in the logs — the fault that
+// indistinguishable from an empty result set in the logs, the fault that
 // silently emptied Person Search, Reverse Phone, Divorce, OFAC, Workplace,
 // Census and LinkedIn in turn:
 //
@@ -287,7 +287,7 @@ async function proSearch(
       // addresses[] and a missing one look identical in SHAPE. Report each
       // array's length and whether each scalar is set, so a genuinely thin
       // record is distinguishable from a parse failure. Counts and presence
-      // only — no values, so this logs no personal data.
+      // only, no values, so this logs no personal data.
       console.log(`ENFORMION_CENSUS[${label}]:`, Object.entries(rows[0])
         .map(([k, v]) => Array.isArray(v)
           ? `${k}:${v.length}`
@@ -327,7 +327,7 @@ function yearOf(raw?: string): string | null {
 // Only the documented galaxy-* headers. An Authorization: Basic header was
 // also being sent; Enformion's spec never asks for one, and an unexpected
 // credential can resolve to a different (unentitled) identity that answers 200
-// with an empty result set — which is exactly the symptom seen.
+// with an empty result set, which is exactly the symptom seen.
 function makeHeaders(username: string, password: string, searchType?: string) {
   return {
     'galaxy-ap-name': username,
@@ -343,7 +343,7 @@ export interface EnformionQuery {
   name?: string;
   email?: string;
   address?: string;
-  /** City, State or ZIP — narrows a name or address search. */
+  /** City, State or ZIP, narrows a name or address search. */
   location?: string;
   /** A man she picked from the candidate list; bypasses pickBestMatch. */
   tahoeId?: string;
@@ -419,7 +419,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       },
       includes: [],
     });
-    // Pairing is a last resort — it only helps when a lone criterion is too broad.
+    // Pairing is a last resort, it only helps when a lone criterion is too broad.
     if (cleaned) {
       variants.push({ label: 'phone+name', body: { Phone: cleaned, FirstName: firstName, LastName: lastName } });
     }
@@ -428,7 +428,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
   }
 
   try {
-    // Step 1 — Reverse Phone Search is the documented product for turning a
+    // Step 1, Reverse Phone Search is the documented product for turning a
     // number into the people on it ("returns all individuals associated with a
     // provided phone number"). Person Search's `Person` type answers 200 with
     // zero rows for a Phone criterion even where data demonstrably exists, so
@@ -436,7 +436,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     const rpRows = cleaned ? await reversePhone(username, password, cleaned) : [];
     let results: any[] = rpRows.filter((r: any) => r && (r.tahoeId || r.name || r.fullName));
 
-    // Step 2 — Re-fetch the match by TahoeId. Includes require a unique
+    // Step 2, Re-fetch the match by TahoeId. Includes require a unique
     // identifier, and a TahoeId is one, so this is where the full record
     // (addresses, relatives, indicators) legitimately comes from.
     //
@@ -452,7 +452,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       if (full) results = [full];
     }
 
-    // Step 3 — Fall back to Person Search only if the phone path found nobody.
+    // Step 3, Fall back to Person Search only if the phone path found nobody.
     for (const variant of results.length ? [] : variants) {
       const inc = variant.includes ?? CORE_INCLUDES;
       const body: Record<string, unknown> = {
@@ -513,7 +513,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         lineType,
         carrier: rpMatch.company ?? rpMatch.carrier ?? undefined,
         voipFlag: lineType === 'voip'
-          ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
+          ? 'This is a VoIP number, not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
           : undefined,
         origin: 'United States',
         active: rpMatch.isConnected !== false,
@@ -529,7 +529,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
           lineType,
           carrier: matchedPhone.company ?? undefined,
           voipFlag: lineType === 'voip'
-            ? 'This is a VoIP number — not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
+            ? 'This is a VoIP number, not tied to a physical carrier. VoIP numbers are easy to create anonymously and are often used as secondary or burner lines.'
             : undefined,
           origin: 'United States',
           // isConnected is the line's own status. The top-level person record
@@ -683,7 +683,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
 
     // A verified production response carries no criminal / marriage /
     // vehicleRegistrations arrays even when the corresponding Includes are
-    // requested, and `indicators` has no criminal counter at all — criminal
+    // requested, and `indicators` has no criminal counter at all, criminal
     // appears to be a separate product. Detail arrays are read only if a
     // response ever does carry them; otherwise the counts above are all we
     // legitimately know, and nothing is invented to fill the gap.
@@ -712,7 +712,12 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       propertyIntelligence, divorceDetail, linkedInResult, censusResult,
       criminalRecords, ofacHits, workplace,
     ] = await Promise.all([
-      counts.property > 0
+      // Ungated. hasPropertyV2Records reads 0 on men whose record plainly
+      // carries isCurrentPropertyOwner, so the gate was suppressing the square
+      // footage, beds and baths rather than saving a wasted call. No
+      // ENFORMION_PROPERTY line has ever appeared in production, which is the
+      // gate never opening, not the endpoint returning nothing.
+      best.tahoeId || addresses[0]?.addr
         ? lookupPropertyV2(username, password, best.tahoeId, addresses[0]?.addr, fullName).catch(() => [])
         : Promise.resolve([] as EnformionProperty[]),
       hasDivorceRecords && inlineDivorce.length === 0
@@ -893,8 +898,8 @@ async function lookupPropertyV2(
   }).filter((p: any) => p.address);
 }
 
-// Reverse Phone Search. galaxy-search-type is ReversePhone — the only type
-// /ReversePhoneSearch accepts — and the body is { Phone, Page, ResultsPerPage },
+// Reverse Phone Search. galaxy-search-type is ReversePhone, the only type
+// /ReversePhoneSearch accepts, and the body is { Phone, Page, ResultsPerPage },
 // per the published spec.
 //
 // The spec's example passes a dashed number ("123-456-7890") and Enformion
@@ -930,7 +935,7 @@ async function reversePhone(
 // carrier and line type describe the searched number at the top level instead
 // of in a `phoneNumbers` list. Normalise once here so pickBestMatch, findPhone
 // and the TahoeId drill-down downstream can all stay written against a single
-// shape — and so the `r.tahoeId || r.name || r.fullName` filter in Step 1 stops
+// shape, and so the `r.tahoeId || r.name || r.fullName` filter in Step 1 stops
 // discarding every row it is handed.
 function normalizeReversePhoneRow(r: any): any {
   const person = r?.tahoePerson ?? {};
@@ -960,7 +965,7 @@ function normalizeReversePhoneRow(r: any): any {
 }
 
 // Fetches the full person record by TahoeId. Includes are only honoured when
-// the request carries a unique identifier, which a TahoeId is — a name is not,
+// the request carries a unique identifier, which a TahoeId is, a name is not,
 // and asking for Includes alongside one returns 400.
 async function personSearchById(
   username: string, password: string, tahoeId: string, includes: string[],
@@ -990,12 +995,12 @@ export interface CriminalResult {
   nameOnlyMatches: boolean;
 }
 
-// Criminal Search V2 — POST /CriminalSearch/V2, body { FirstName, LastName,
+// Criminal Search V2, POST /CriminalSearch/V2, body { FirstName, LastName,
 // Dob?, Page, ResultsPerPage }. Unlike Person Search this responds in
 // PascalCase under a CriminalRecords key.
 //
 // This endpoint matches on NAME, and Enformion does not return a usable DOB for
-// the subject, so a raw hit means "someone with this name has a record" — not
+// the subject, so a raw hit means "someone with this name has a record", not
 // "this man has a record". Attributing a stranger's conviction to the person
 // being searched would be both defamatory and, for a product women use to
 // decide whether to meet someone, actively misleading. Every record is
@@ -1071,7 +1076,7 @@ async function lookupCriminal(
       const disposition = off?.Disposition;
 
       // Deliberately excludes Names[].Ssn and every identifying attribute
-      // (Race, Sex, Height, ScarsMarks) — none of it belongs in this report.
+      // (Race, Sex, Height, ScarsMarks), none of it belongs in this report.
       const summary = [desc || category || 'Record on file', disposition, year, where]
         .filter(Boolean).join(' · ');
 
@@ -1145,7 +1150,7 @@ function identityBody(tahoeId?: string, fullName?: string, perPage = 5): Record<
 }
 
 // Takes a name, not a TahoeId. The documented request properties are
-// FirstName, LastName and ProfileUrl only — TahoeId is not among them, so the
+// FirstName, LastName and ProfileUrl only, TahoeId is not among them, so the
 // previous { TahoeId } body would have failed even once the header was right.
 async function lookupLinkedIn(
   username: string,
@@ -1250,12 +1255,12 @@ async function lookupDivorce(
 }
 
 function emptyPhone(): EnformionPhone {
-  return { lineType: 'mobile', origin: '—', active: true };
+  return { lineType: 'mobile', origin: '', active: true };
 }
 
 // ─── Candidate disambiguation ────────────────────────────────────────────────
 //
-// A number can sit on several people's records — a household line, a recycled
+// A number can sit on several people's records, a household line, a recycled
 // mobile, a shared office. lookupEnformion resolves that ambiguity itself via
 // pickBestMatch, which is right when we must answer with exactly one man, but
 // it means the other candidates are discarded silently and she never learns a
@@ -1267,7 +1272,7 @@ function emptyPhone(): EnformionPhone {
 // ReversePhoneSearch call, no TahoeId drill-down, no detail endpoints, no
 // narrative. The expensive work happens only after she has chosen one.
 export interface PersonCandidate {
-  /** Enformion's identifier. Never sent to the browser — see lib/candidates.ts. */
+  /** Enformion's identifier. Never sent to the browser, see lib/candidates.ts. */
   tahoeId: string;
   name: string;
   age?: number;
@@ -1293,7 +1298,7 @@ export async function lookupCandidates(phone: string): Promise<PersonCandidate[]
     const tahoeId: string | undefined = r?.tahoeId;
     const name: string | undefined = r?.fullName;
     // Without an id there is nothing to drill into later, and without a name
-    // there is nothing for her to recognise — either way the row is not a
+    // there is nothing for her to recognise, either way the row is not a
     // choice she could meaningfully make.
     if (!tahoeId || !name || seen.has(tahoeId)) continue;
     seen.add(tahoeId);

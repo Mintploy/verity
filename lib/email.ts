@@ -56,12 +56,12 @@ export async function sendWelcomeEmail(email: string, token: string) {
     text: [
       "You're in. Welcome to Verity.",
       '',
-      'Your membership is active. Open the link below to run your first search —',
+      'Your membership is active. Open the link below to run your first search ',
       'drop in a phone number and get the full picture in seconds.',
       link,
       '',
       'Membership active for 12 months. Renews only if you choose.',
-      'This link expires in 15 minutes — bookmark the site after signing in.',
+      'This link expires in 15 minutes, bookmark the site after signing in.',
     ].join('\n'),
     html: wrap(`
       <h1 style="font-size:48px;font-weight:400;line-height:1;margin:0 0 8px;letter-spacing:-0.6px">
@@ -71,15 +71,44 @@ export async function sendWelcomeEmail(email: string, token: string) {
         Welcome to Verity.
       </p>
       <p style="font-family:-apple-system,sans-serif;font-size:16px;line-height:1.65;color:#5C2A50;margin:0 0 32px;font-weight:300">
-        Your membership is active. Click below to run your first search — drop in a phone number and get the full picture in seconds.
+        Your membership is active. Click below to run your first search, drop in a phone number and get the full picture in seconds.
       </p>
       <a href="${link}" style="display:inline-block;padding:18px 36px;background:#FF4E8E;color:#FFF4F4;text-decoration:none;border-radius:9999px;font-size:18px;font-weight:500">
         Start searching →
       </a>
       <p style="font-family:-apple-system,sans-serif;font-size:13px;color:#C8A6B4;margin:32px 0 0;line-height:1.65">
         Membership active for 12 months · Renews only if you choose<br>
-        This link expires in 15 minutes — bookmark the site after signing in.
+        This link expires in 15 minutes, bookmark the site after signing in.
       </p>
+    `),
+  });
+}
+
+export async function sendSearchReminder(email: string, subjectName?: string | null) {
+  const who = subjectName ? subjectName.split(' ')[0] : null;
+  const link = `${BASE}/search`;
+  await getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: who ? `Time to re-run ${who}` : 'Time to run that search again',
+    text: [
+      who ? `It has been a month since you looked at ${who}.` : 'It has been a month since your last search.',
+      '',
+      'Records move. New filings, a new address, a new number on his name.',
+      'Running him again takes about fourteen seconds.',
+      link,
+    ].join('\n'),
+    html: wrap(`
+      <h1 style="font-size:34px;font-weight:400;line-height:1.1;margin:0 0 16px;letter-spacing:-0.4px">
+        ${who ? `A month on ${who}.` : 'A month on.'}
+      </h1>
+      <p style="font-family:-apple-system,sans-serif;font-size:15px;line-height:1.65;color:#5E3A40;margin:0 0 28px;font-weight:300">
+        Records move. New filings, a new address, a new number on his name.
+        Running him again takes about fourteen seconds.
+      </p>
+      <a href="${link}" style="display:inline-block;padding:16px 32px;background:#551212;color:#F5EDEC;text-decoration:none;border-radius:9999px;font-size:17px;font-weight:500;letter-spacing:0.2px">
+        Run the search
+      </a>
     `),
   });
 }

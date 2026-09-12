@@ -35,7 +35,7 @@ export function FileFolder({
   file: HisFile;
   index: number;
   onOpen: () => void;
-  /** Row actions — delete and its confirm — rendered into the folder body. */
+  /** Row actions, delete and its confirm, rendered into the folder body. */
   children?: React.ReactNode;
 }) {
   const nick = file.nickname || 'Unnamed';

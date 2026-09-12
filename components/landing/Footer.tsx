@@ -17,7 +17,7 @@ export function Footer() {
     ]],
     ['Help', [
       ['Get in touch', '/help'],
-      ['Story library', '/stories'],
+      ['What we check', '/stories'],
       ['Press', '/help#press'],
     ]],
     ['Legal', [

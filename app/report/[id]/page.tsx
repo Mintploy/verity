@@ -39,7 +39,7 @@ function ReportContent() {
     if (stored) {
       setReport(JSON.parse(stored));
     } else {
-      // Not in this tab — she has come back to a man she saved earlier. Ask
+      // Not in this tab, she has come back to a man she saved earlier. Ask
       // the server for the copy stored against his His File entry.
       fetch(`/api/report/${id}`)
         .then(r => (r.ok ? r.json() : null))
@@ -71,7 +71,7 @@ function ReportContent() {
         </p>
         <p style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', lineHeight: 1.6, maxWidth: 420, margin: '12px auto 22px', fontWeight: 300 }}>
           Reports saved before we began keeping a copy only existed in the tab that
-          created them. His file and your notes are safe — running him again rebuilds
+          created them. His file and your notes are safe, running him again rebuilds
           the report and re-attaches it.
         </p>
         <Link href="/search" style={{ padding: '14px 28px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 16 }}>
@@ -88,7 +88,7 @@ function ReportContent() {
       <Nav />
       {demoMode && (
         <div style={{ textAlign: 'center', padding: '8px 20px', background: 'var(--gold-pale)', fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)', letterSpacing: 0.3 }}>
-          Demo mode — sample data, not real records.
+          Demo mode, sample data, not real records.
         </div>
       )}
       <div className="v-grid-report" style={{ padding: 'clamp(20px, 4vw, 56px)', maxWidth: 1480, margin: '0 auto' }}>
@@ -225,12 +225,12 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                 !subjectSign ? (
                 /* His record carries no date of birth. Enformion returns `age`
                    without a `dob` on plenty of people, and a sign needs the
-                   month and day, so there is nothing to compute. Say so —
+                   month and day, so there is nothing to compute. Say so 
                    before this, the panel simply vanished, which read as the
                    feature being broken rather than the data being absent. */
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', fontWeight: 300, lineHeight: 1.6 }}>
                   No date of birth on his record, so we cannot place his sign.
-                  {report.subject.age ? ` We have his age — ${report.subject.age} — but a sign needs the day.` : ''}
+                  {report.subject.age ? ` We have his age, ${report.subject.age}, but a sign needs the day.` : ''}
                   {' '}Add it in his file if you learn it and the reading appears.
                 </div>
               ) : (
@@ -263,15 +263,15 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
 
       <div id="sec-1" className="v-grid-r2" style={{ gap: 24 }}>
         <Section eyebrow="01" title="Phone intelligence">
-          <KVRow label="Number type" value={report.phone.lineType === 'voip' ? 'VoIP — not a carrier line' : report.phone.lineType === 'mobile' ? 'Mobile (carrier line)' : 'Landline'} />
-          {report.phone.origin && report.phone.origin !== '—' && <KVRow label="Origin" value={report.phone.origin} />}
+          <KVRow label="Number type" value={report.phone.lineType === 'voip' ? 'VoIP, not a carrier line' : report.phone.lineType === 'mobile' ? 'Mobile (carrier line)' : 'Landline'} />
+          {report.phone.origin && report.phone.origin !== '' && <KVRow label="Origin" value={report.phone.origin} />}
           {report.phone.voipFlag && <FlagNote tone={report.score === 'red' ? 'red' : 'yellow'}>{report.phone.voipFlag}</FlagNote>}
         </Section>
 
         <Section id="sec-2" eyebrow="02" title="Identity signals">
           <div className="v-grid-r2" style={{ gap: 14 }}>
             <Stat label="Full name" value={report.identity.fullName} />
-            <Stat label="Age" value={String(report.identity.age || '—')} />
+            <Stat label="Age" value={String(report.identity.age || '')} />
             <Stat label="Date of birth" value={report.identity.dob} />
             <Stat label="Verified by" value={`${report.identity.verifiedBy} sources`} />
           </div>
@@ -387,7 +387,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
             <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--dark)', lineHeight: 1.2 }}>{report.professional.title}</div>
             <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 4 }}>{report.professional.company} · {report.professional.tenure}</div>
           </div>
-          {report.professional.licenses && report.professional.licenses !== '—' && (
+          {report.professional.licenses && report.professional.licenses !== '' && (
             <KVRow label="Licenses" value={report.professional.licenses} />
           )}
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Business entities</div>
@@ -450,6 +450,40 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
+
+  // A reminder to re-run him is only worth offering to someone whose access
+  // would otherwise lapse. An annual member already has the months and the
+  // lookups; nudging her to spend one she has anyway is noise.
+  const [remindable, setRemindable] = useState(false);
+  const [reminderState, setReminderState] = useState<'idle' | 'saving' | 'set'>('idle');
+
+  useEffect(() => {
+    fetch('/api/profile')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const plan = d?.profile?.plan;
+        setRemindable(plan !== 'annual' && plan !== 'founding');
+      })
+      .catch(() => setRemindable(false));
+  }, []);
+
+  const setReminder = async () => {
+    setReminderState('saving');
+    try {
+      const res = await fetch('/api/reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          report_id: report.searchId,
+          subject_name: report.subject.name,
+          phone: report.subject.phone,
+        }),
+      });
+      setReminderState(res.ok ? 'set' : 'idle');
+    } catch {
+      setReminderState('idle');
+    }
+  };
 
   // Not every search is a date. Asking up front is what decides which
   // questionnaire the entry opens with, so it has to happen before the save.
@@ -522,8 +556,13 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
         )}
         <ActionButton icon="compare" label="Compare with others" onClick={onCompare} />
         <ActionButton icon="dl" label="Download PDF" onClick={() => window.print()} />
-        <ActionButton icon="share" label="Share with your circle" />
-        <ActionButton icon="bell" label="Re-run in 30 days" />
+        {remindable && (
+          <ActionButton
+            icon="bell"
+            label={reminderState === 'set' ? 'Reminder set' : reminderState === 'saving' ? 'Setting...' : 'Remind me in 30 days'}
+            onClick={setReminder}
+          />
+        )}
       </div>
 
       <div style={{ padding: 16, borderRadius: 'var(--r-lg)', background: 'var(--blush-pale)', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--wine)', lineHeight: 1.5, textAlign: 'center' as const }}>
@@ -555,7 +594,7 @@ function SaveTypeDialog({ name, saving, onChoose, onCancel }: {
     {
       type: 'safety',
       title: 'A safety check',
-      body: 'A marketplace seller, a rideshare, a contractor — anyone you’re meeting once. Just where you met, where you’re meeting, and your notes.',
+      body: 'A marketplace seller, a rideshare, a contractor, anyone you’re meeting once. Just where you met, where you’re meeting, and your notes.',
     },
   ];
 

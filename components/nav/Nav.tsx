@@ -30,19 +30,19 @@ export function Nav({ showCompare, onCompare }: NavProps) {
   const close = () => setMenuOpen(false);
 
   // Order follows who is reading. Signed out, the marketing pages lead because
-  // she is still deciding. Signed in, she came back for her own things — her
-  // drawer and her account — so those lead and the marketing pages fall behind.
+  // she is still deciding. Signed in, she came back for her own things, her
+  // drawer and her account, so those lead and the marketing pages fall behind.
   const navLinks = isLoggedIn
     ? [
         { label: 'His File', href: '/hisfile' },
         { label: 'Settings', href: '/settings' },
         { label: 'How it works', href: '/#how-it-works' },
-        { label: 'Stories', href: '/stories' },
+        { label: 'What we check', href: '/stories' },
         { label: 'Help', href: '/help' },
       ]
     : [
         { label: 'How it works', href: '/#how-it-works' },
-        { label: 'Stories', href: '/stories' },
+        { label: 'What we check', href: '/stories' },
         { label: 'Help', href: '/help' },
       ];
 
@@ -124,7 +124,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
             </>
           )}
 
-          {/* Hamburger — mobile only */}
+          {/* Hamburger, mobile only */}
           <button
             className="v-mobile-menu-btn"
             onClick={() => setMenuOpen(true)}

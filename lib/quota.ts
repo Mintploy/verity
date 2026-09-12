@@ -48,7 +48,7 @@ export async function consumeSearch(userId: string): Promise<{ allowed: boolean;
   const resetAt = new Date(profile.searches_reset_at);
   let used = profile.searches_this_month ?? 0;
 
-  // Single-report plan: never resets — lifetime cap of 1
+  // Single-report plan: never resets, lifetime cap of 1
   if (plan !== 'single' && !isSameMonth(resetAt, now)) {
     await sb
       .from('user_profiles')

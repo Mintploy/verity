@@ -9,11 +9,11 @@ const faqs = [
     items: [
       {
         q: 'What do I need to run a search?',
-        a: "His phone number is all that's strictly required. Adding his first and last name sharpens the cross-reference and returns more complete results — but a number alone is enough to begin.",
+        a: "His phone number is all that's strictly required. Adding his first and last name sharpens the cross-reference and returns more complete results, but a number alone is enough to begin.",
       },
       {
         q: 'How long does a report take?',
-        a: "Most reports return in 10–20 seconds. We cross-reference seven independent sources in parallel. Complex records — multiple addresses, legal filings, business registrations — can take up to 45 seconds.",
+        a: "Most reports return in 10–20 seconds. We cross-reference seven independent sources in parallel. Complex records, multiple addresses, legal filings, business registrations, can take up to 45 seconds.",
       },
       {
         q: 'Will he know I searched him?',
@@ -21,7 +21,7 @@ const faqs = [
       },
       {
         q: 'What sources do you use?',
-        a: "Enformion (identity, phone, property, employment, criminal, and bankruptcy records), CourtListener (federal court dockets only — not state courts), FEC (political donations), and NSOPW (sex offender registry). Four sources, cross-referenced and scored.",
+        a: "Enformion (identity, phone, property, employment, criminal, and bankruptcy records), CourtListener (federal court dockets only, not state courts), FEC (political donations), and NSOPW (sex offender registry). Four sources, cross-referenced and scored.",
       },
     ],
   },
@@ -31,15 +31,15 @@ const faqs = [
     items: [
       {
         q: 'What does the score mean?',
-        a: "Green means no significant flags across our seven sources — the picture the data paints matches what a person would reasonably represent about themselves. Yellow means inconsistencies or single flags that warrant a conversation. Red means one or more serious flags: active marriages, sex offender registry matches, recent criminal filings, or identity that cannot be verified.",
+        a: "Green means no significant flags across our seven sources, the picture the data paints matches what a person would reasonably represent about themselves. Yellow means inconsistencies or single flags that warrant a conversation. Red means one or more serious flags: active marriages, sex offender registry matches, recent criminal filings, or identity that cannot be verified.",
       },
       {
         q: 'Can a green score be wrong?',
-        a: "Yes. A green score means the data we can access looks clean — it is not a guarantee of character. Public records are a snapshot, not a soul. We are a research tool, not a verdict.",
+        a: "Yes. A green score means the data we can access looks clean, it is not a guarantee of character. Public records are a snapshot, not a soul. We are a research tool, not a verdict.",
       },
       {
         q: 'What is a "recommendation" in the report?',
-        a: "The last section of every report gives you 3–5 plain-English next steps — what to ask about, what to watch for, when to take more time. We write it the way a sharp older sister would: honest, direct, and on your side.",
+        a: "The last section of every report gives you 3–5 plain-English next steps, what to ask about, what to watch for, when to take more time. We write it the way a sharp older sister would: honest, direct, and on your side.",
       },
     ],
   },
@@ -57,7 +57,7 @@ const faqs = [
       },
       {
         q: 'Is my payment information secure?',
-        a: "All payments are processed by Stripe. We never see, store, or handle your card number. Stripe is PCI Level 1 certified — the highest level of payment security certification.",
+        a: "All payments are processed by Stripe. We never see, store, or handle your card number. Stripe is PCI Level 1 certified, the highest level of payment security certification.",
       },
     ],
   },
@@ -67,7 +67,7 @@ const faqs = [
     items: [
       {
         q: 'Why do I need to verify my identity?',
-        a: "Verity is exclusively for women. The identity gate exists so the room stays safe — so that every member knows everyone else has been verified by the same standard. We use Stripe Identity for the check: a government ID and a selfie. The whole process takes about 90 seconds.",
+        a: "Verity is exclusively for women. The identity gate exists so the room stays safe, so that every member knows everyone else has been verified by the same standard. We use Stripe Identity for the check: a government ID and a selfie. The whole process takes about 90 seconds.",
       },
       {
         q: 'What happens to my identity documents?',

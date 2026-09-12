@@ -49,8 +49,8 @@ export default function CheckoutSuccessPage() {
           }}>
             Your membership is active, with 15 safety lookups a month.
             {pending
-              ? ' We kept the number you started with — it is ready when you are.'
-              : ' Drop in a phone number and get the full picture — quietly, in seconds.'}
+              ? ' We kept the number you started with, it is ready when you are.'
+              : ' Drop in a phone number and get the full picture, quietly, in seconds.'}
           </p>
 
           <Link href={pending ? `/matches?phone=${pending}` : '/search'} style={{

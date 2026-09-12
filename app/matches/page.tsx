@@ -129,7 +129,7 @@ function MatchesInner() {
           {candidates === null
             ? `Looking up ${formatPhone(phone)}…`
             : candidates.length > 1
-              ? `${candidates.length} people have been associated with ${formatPhone(phone)}. Numbers get reused and shared, so pick the man you mean — we will only build his file.`
+              ? `${candidates.length} people have been associated with ${formatPhone(phone)}. Numbers get reused and shared, so pick the man you mean, we will only build his file.`
               : candidates.length === 1
                 ? `One person is associated with ${formatPhone(phone)}.`
                 : `We found no one on ${formatPhone(phone)}.`}
@@ -180,7 +180,7 @@ function MatchesInner() {
         {candidates?.length === 0 && !error && (
           <div style={{ padding: '24px', borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)' }}>
             <p style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', lineHeight: 1.6, margin: 0 }}>
-              Nothing is publicly associated with that number. That is not itself a red flag —
+              Nothing is publicly associated with that number. That is not itself a red flag 
               a new line or a privacy-conscious carrier both look like this. Try a different
               number, or search by name instead.
             </p>

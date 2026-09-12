@@ -14,7 +14,7 @@ export function missingEnv(names: string[]): string[] {
 
 /**
  * Logs which vars are missing and returns a 503 the caller can return directly,
- * or null when everything is present. The response body never names the vars —
+ * or null when everything is present. The response body never names the vars 
  * that detail goes to the server log only.
  */
 export function configErrorResponse(names: string[], context: string): Response | null {

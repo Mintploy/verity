@@ -36,9 +36,9 @@ export async function generateNarrative(data: {
   if (data.age) lines.push(`Age: ${data.age}`);
   if (data.jobTitle || data.company) lines.push(`Employment: ${[data.jobTitle, data.company].filter(Boolean).join(' at ')}`);
   if (data.businessEntities && data.businessEntities !== 'None found.') lines.push(`Business entities: ${data.businessEntities}`);
-  if (data.licenses && data.licenses !== '—') lines.push(`Professional licenses: ${data.licenses}`);
-  if (data.maritalStatus && data.maritalStatus !== '—') lines.push(`Marital status: ${data.maritalStatus}`);
-  if (data.priorMarriages && data.priorMarriages !== '—') lines.push(`Prior marriages: ${data.priorMarriages}`);
+  if (data.licenses && data.licenses !== '') lines.push(`Professional licenses: ${data.licenses}`);
+  if (data.maritalStatus && data.maritalStatus !== '') lines.push(`Marital status: ${data.maritalStatus}`);
+  if (data.priorMarriages && data.priorMarriages !== '') lines.push(`Prior marriages: ${data.priorMarriages}`);
   if (data.spouse) lines.push(`Spouse: ${data.spouse}`);
   if (data.phoneLineType === 'voip') lines.push(`Phone: VoIP number (not a carrier line)`);
   if (data.addresses?.length) {
@@ -55,21 +55,21 @@ export async function generateNarrative(data: {
         p.purchasePrice ? `purchased ${p.purchasePrice}` : null,
         p.purchaseDate ? `in ${p.purchaseDate}` : null,
       ].filter(Boolean).join(', ');
-      lines.push(`Property: ${p.address} — ${details}`);
+      lines.push(`Property: ${p.address}, ${details}`);
     });
   }
   if (data.publicRecords?.length) {
     const flags = data.publicRecords.filter(r => r.flag && r.value !== 'None found' && r.value !== 'Not listed');
-    const clean = data.publicRecords.filter(r => r.good && r.value && r.value !== '—');
+    const clean = data.publicRecords.filter(r => r.good && r.value && r.value !== '');
     if (flags.length) lines.push(`Flagged records: ${flags.map(r => `${r.label}: ${r.value}`).join('; ')}`);
     if (clean.length) lines.push(`Clean records: ${clean.map(r => r.label).join(', ')}`);
   }
 
-  const prompt = `You are Verity, a private intelligence service trusted by accomplished, discerning women. Your reader is a high-achieving professional — she is perceptive, values precision, and expects to be treated as an equal. She has run a background profile on a man she is considering spending time with.
+  const prompt = `You are Verity, a private intelligence service trusted by accomplished, discerning women. Your reader is a high-achieving professional, she is perceptive, values precision, and expects to be treated as an equal. She has run a background profile on a man she is considering spending time with.
 
-Write a concise, authoritative 2-3 sentence profile summary based strictly on the data below. Do not speculate beyond the data. If information is limited, say so plainly — she will respect honesty over filler. Tone: measured, factual, quietly direct. Not casual. Not alarmist. Think senior analyst briefing a partner, not a friend texting.
+Write a concise, authoritative 2-3 sentence profile summary based strictly on the data below. Do not speculate beyond the data. If information is limited, say so plainly, she will respect honesty over filler. Tone: measured, factual, quietly direct. Not casual. Not alarmist. Think senior analyst briefing a partner, not a friend texting.
 
-Then produce 3-6 profile highlights — brief labeled facts covering the most material points: employment, property, relationship history, financial standing, and any flags worth noting.
+Then produce 3-6 profile highlights, brief labeled facts covering the most material points: employment, property, relationship history, financial standing, and any flags worth noting.
 
 DATA:
 ${lines.join('\n')}

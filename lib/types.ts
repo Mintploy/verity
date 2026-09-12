@@ -8,7 +8,7 @@ export interface SearchRequest {
   name?: string;
   email?: string;
   address?: string;
-  /** City, State or ZIP — narrows a name or address search. */
+  /** City, State or ZIP, narrows a name or address search. */
   location?: string;
   /** A candidate chosen from the picker. Skips automatic match selection. */
   tahoeId?: string;

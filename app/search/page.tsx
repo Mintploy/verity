@@ -30,12 +30,12 @@ const MODES: Array<{
   {
     id: 'phone', label: 'Phone', label2: 'His phone number',
     placeholder: '(•••) ••• ••••', inputType: 'tel',
-    secondary: { label: 'His name', hint: '(optional — sharpens results)', placeholder: 'First and last name' },
+    secondary: { label: 'His name', hint: '(optional, sharpens results)', placeholder: 'First and last name' },
   },
   {
     id: 'name', label: 'Name', label2: 'His full name',
     placeholder: 'First and last name', inputType: 'text',
-    secondary: { label: 'Where he lives', hint: '(optional — narrows a common name)', placeholder: 'City, State or ZIP' },
+    secondary: { label: 'Where he lives', hint: '(optional, narrows a common name)', placeholder: 'City, State or ZIP' },
   },
   {
     id: 'email', label: 'Email', label2: 'His email address',
@@ -76,7 +76,7 @@ function SearchContent() {
           reports.push({
             key,
             name: data.subject?.name ?? 'Unknown',
-            phone: data.subject?.phone ?? '—',
+            phone: data.subject?.phone ?? '',
             score: data.score ?? 'yellow',
             generatedAt: data.generatedAt ?? '',
             searchId: data.searchId ?? '',
@@ -93,7 +93,7 @@ function SearchContent() {
     loadPastSearches();
 
     // She typed his number before she had an account and has now arrived with
-    // one — most often from the welcome email. Take her to the picker for that
+    // one, most often from the welcome email. Take her to the picker for that
     // number instead of a search box she has already filled in.
     const pendingPhone = getPendingPhone();
     const pending = sessionStorage.getItem('verity-pending-candidate');
@@ -167,7 +167,7 @@ function SearchContent() {
 
     // A phone search goes through the picker, because a number can sit on
     // several people and only she knows which one she means. The picker was
-    // wired to the landing hero, which a signed-in member never sees — so
+    // wired to the landing hero, which a signed-in member never sees, so
     // every search from this page was still being auto-resolved by
     // pickBestMatch, which is the guess the picker exists to replace.
     //
@@ -235,7 +235,7 @@ function SearchContent() {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(40px, 8vw, 80px) clamp(20px, 5vw, 56px)' }}>
       {demoMode && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', background: 'var(--gold-pale)', borderRadius: 'var(--r-pill)', marginBottom: 20, fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)', letterSpacing: 0.3 }}>
-          Demo mode — sample data, not real records.
+          Demo mode, sample data, not real records.
         </div>
       )}
       <div style={{ width: '100%', maxWidth: 600 }}>
@@ -349,7 +349,7 @@ function SearchContent() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {pastSearches.map((s) => {
                 const scoreColor = getScoreColor(s.score);
-                const date = s.generatedAt ? new Date(s.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                const date = s.generatedAt ? new Date(s.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
                 return (
                   <div key={s.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'var(--pearl)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-sm)', gap: 12 }}>
                     <div onClick={() => router.push(`/report/${s.searchId}`)} style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, cursor: 'pointer' }}>

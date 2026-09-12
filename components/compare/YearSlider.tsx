@@ -54,7 +54,7 @@ export function YearSlider({
         </span>
       </div>
 
-      {/* Custom track — pointer + touch driven */}
+      {/* Custom track, pointer + touch driven */}
       <div
         ref={trackRef}
         role="slider"

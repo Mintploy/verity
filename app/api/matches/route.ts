@@ -4,20 +4,20 @@ import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { toPublicCandidates } from '@/lib/candidates';
 
 /**
- * Who is on this number — the picker's data source.
+ * Who is on this number, the picker's data source.
  *
  * Members only. She types his number on the landing page, but nothing is
  * looked up until she has verified and paid, so by the time this runs she is
  * already a member. That keeps the one metered third-party database we pay
  * per call for off the open internet entirely.
  *
- * It still answers with the least that lets her recognise him — a name, an
+ * It still answers with the least that lets her recognise him, a name, an
  * approximate age, a city. The aliases, relatives and address history are the
  * report, and the report is a separate, quota-counted call.
  */
 
 // Per-member throttle. In-memory means per-instance, so it is a backstop
-// against a runaway client rather than a quota — the real spend limit is
+// against a runaway client rather than a quota, the real spend limit is
 // consumeSearch on the report itself.
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 5;

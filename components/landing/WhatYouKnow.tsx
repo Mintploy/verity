@@ -1,7 +1,7 @@
 export function WhatYouKnow() {
   const sections = [
     { l: 'Phone intelligence', d: 'Carrier, line type, VoIP detection, geographic origin, age of number.' },
-    { l: 'Identity signals', d: 'Full legal name, age, date of birth — cross-referenced across three sources.' },
+    { l: 'Identity signals', d: 'Full legal name, age, date of birth, cross-referenced across three sources.' },
     { l: 'Address history', d: 'Last five known addresses, ownership vs. rental, purchase and sale prices, trust holdings.' },
     { l: 'Marital & relationships', d: 'Current marital status, prior marriages, known relatives, close associates.' },
     { l: 'Professional profile', d: 'Employer, title, tenure, business registrations, and LLC filings from public record.' },
@@ -25,7 +25,7 @@ export function WhatYouKnow() {
               fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.6,
               margin: '24px 0 0', maxWidth: 380, fontWeight: 300,
             }}>
-              We cross-reference four independent sources — Enformion, CourtListener, FEC, NSOPW — and write you the report your brilliant older sister would, if she had access to a PI.
+              We cross-reference four independent sources, Enformion, CourtListener, FEC, NSOPW, and write you the report your brilliant older sister would, if she had access to a PI.
             </p>
           </div>
 

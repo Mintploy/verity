@@ -13,7 +13,6 @@ const col1: Card[] = [
   { type: 'score', score: 'yellow', label: 'Soft yellow', sub: 'A few things to weigh.' },
   { type: 'data', label: 'Phone carrier', val: 'T-Mobile · mobile line · 6 years' },
   { type: 'tag', text: 'Sex offender registry: clear', tone: 'clear' },
-  { type: 'quote', text: 'Finally felt safe meeting someone from Hinge.', attr: 'Sofia R. · 29 · LA' },
   { type: 'data', label: 'Identity', val: 'Cross-referenced · 3 sources confirmed' },
   { type: 'tag', text: 'No eviction history', tone: 'clear' },
 ];
@@ -22,7 +21,6 @@ const col2: Card[] = [
   { type: 'data', label: 'Marital status', val: 'Divorced · 2021 · 1 prior marriage' },
   { type: 'score', score: 'red', label: 'Deep rose', sub: "We'd skip this one." },
   { type: 'tag', text: 'Bankruptcy filed · 2020', tone: 'flag' },
-  { type: 'quote', text: 'He had an active warrant. I nearly went on that date.', attr: 'Priya M. · 31 · Chicago' },
   { type: 'data', label: 'Employer', val: 'Accenture · Senior Manager · est. $140k' },
   { type: 'tag', text: 'VoIP secondary line detected', tone: 'flag' },
   { type: 'data', label: 'Sources checked', val: 'Enformion · CourtListener · FEC · NSOPW' },
@@ -34,7 +32,6 @@ const col3: Card[] = [
   { type: 'tag', text: 'Identity verified · 3 sources', tone: 'clear' },
   { type: 'data', label: 'Property record', val: '2 properties · Austin TX · owned since 2019' },
   { type: 'score', score: 'yellow', label: 'Soft yellow', sub: 'Proceed with care.' },
-  { type: 'quote', text: 'I use it before every first date. Non-negotiable.', attr: 'Aisha T. · 26 · NYC' },
   { type: 'data', label: 'Public records', val: '1 civil suit open · 2023 · Los Angeles' },
   { type: 'tag', text: 'Every member ID-verified before access', tone: 'clear' },
   { type: 'data', label: 'Social footprint', val: 'Age discrepancy found on X / Instagram' },

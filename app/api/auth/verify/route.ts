@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/checkout?reason=no-subscription', req.url));
     }
 
-    // "Verified women only" is the product promise — enforce it rather than
+    // "Verified women only" is the product promise, enforce it rather than
     // asserting it. Fails closed: any doubt sends her back through ID check.
     const identityVerified = await hasVerifiedIdentity(email, stripeCustomerId);
     if (!identityVerified) {

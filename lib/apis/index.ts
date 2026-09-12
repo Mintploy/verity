@@ -38,7 +38,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   if (person.ofacHits?.length) flags.push('sanctions');
 
   // A registry listing, a criminal record, or a sanctions hit each stand on
-  // their own — they are not one flag among several to be averaged away.
+  // their own, they are not one flag among several to be averaged away.
   const gravest = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
     || criminal?.onSexOffenderRegistry
     || confirmedCriminal.length > 0
@@ -58,12 +58,12 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
 
   const resolvedName = person.fullName ?? req.name ?? 'Unknown';
   const resolvedAge = person.age ?? 0;
-  const resolvedDob = person.dob ?? '—';
+  const resolvedDob = person.dob ?? '';
   const resolvedAliases = person.aliases?.length ? person.aliases : undefined;
 
   const bizCount = person.counts?.business ?? 0;
   const businessEntities = bizCount > 0
-    ? `${bizCount} business affiliation${bizCount === 1 ? '' : 's'} on record — details require further lookup.`
+    ? `${bizCount} business affiliation${bizCount === 1 ? '' : 's'} on record, details require further lookup.`
     : 'None found.';
 
   const publicRecords = buildPublicRecords(pub, fecResult, person, so);
@@ -86,15 +86,15 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       age: resolvedAge,
       // On a non-phone search the subject's own primary number is the result,
       // not the query.
-      phone: req.phone ?? person.additionalPhones?.[0] ?? '—',
+      phone: req.phone ?? person.additionalPhones?.[0] ?? '',
       dob: resolvedDob,
     },
     phone: {
-      carrier: phone?.carrier ?? '—',
+      carrier: phone?.carrier ?? '',
       lineType: phone?.lineType ?? 'mobile',
       voipFlag: phone?.voipFlag,
-      numberAge: '—',
-      origin: phone?.origin ?? '—',
+      numberAge: '',
+      origin: phone?.origin ?? '',
       active: phone?.active ?? true,
     },
     identity: {
@@ -111,9 +111,9 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     ),
     propertyIntelligence: person.propertyIntelligence ?? [],
     relationships: {
-      status: person.maritalStatus ?? '—',
+      status: person.maritalStatus ?? '',
       spouse: person.spouseName,
-      priors: person.divorceRecords?.join('; ') ?? person.priorMarriages ?? '—',
+      priors: person.divorceRecords?.join('; ') ?? person.priorMarriages ?? '',
       relatives: person.relatives ?? [],
       associates: person.associates?.length
         ? person.associates
@@ -125,14 +125,14 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       // Enformion reports a workplace count but does not return the WorkPlace
       // array unless that include is entitled on the account. Say so rather
       // than showing a bare dash, which reads as "no employment on record".
-      title: person.jobTitle ?? '—',
+      title: person.jobTitle ?? '',
       company: person.company
-        ?? ((person.counts?.workplace ?? 0) > 0 ? 'Employment on record — details not available' : '—'),
-      tenure: '—',
+        ?? ((person.counts?.workplace ?? 0) > 0 ? 'Employment on record, details not available' : ''),
+      tenure: '',
       llcs: 'None found.',
       licenses: (person.counts?.licenses ?? 0) > 0
         ? `${person.counts!.licenses} professional license${person.counts!.licenses === 1 ? '' : 's'} on record`
-        : '—',
+        : '',
       businessEntities,
     },
     publicRecords,
@@ -155,7 +155,7 @@ function getHeadline(score: ScoreState): string {
 
 function getSummary(score: ScoreState): string {
   if (score === 'green') return 'The record is clean across all sources. Identity is verified, public records are clear, and the social footprint is consistent. You can proceed with confidence.';
-  if (score === 'yellow') return 'The file isn\'t spotless. There are a few items worth a conversation — nothing that requires walking away, but enough to go in with eyes open and ask the right questions.';
+  if (score === 'yellow') return 'The file isn\'t spotless. There are a few items worth a conversation, nothing that requires walking away, but enough to go in with eyes open and ask the right questions.';
   return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
 }
 
@@ -163,20 +163,20 @@ function getSummary(score: ScoreState): string {
 // one. "On file" without a number reads as vaguer than the data actually is.
 function plural(count: number | undefined, noun: string): string {
   if (!count || count < 1) return 'None on file';
-  return `${count} ${noun}${count === 1 ? '' : 's'} on file — details require further review`;
+  return `${count} ${noun}${count === 1 ? '' : 's'} on file, details require further review`;
 }
 
 // A registry listing is the single most consequential thing this report can
 // say, so it is never claimed clear on a check that did not run. Criminal
 // Search V2 carries state sex offender registry records, which can confirm a
-// listing even when NSOPW itself is unavailable — but it cannot prove absence,
+// listing even when NSOPW itself is unavailable, but it cannot prove absence,
 // so a clean Criminal result still leaves the registry "not verified".
 function buildRegistryRow(so: any, criminal: any): any {
   if (criminal?.onSexOffenderRegistry) {
     const hits = criminal.findings.filter((f: any) => f.sexOffender && f.corroborated);
     return {
       label: 'Sex offender registry',
-      value: `Listed — ${hits[0]?.summary ?? 'registry record found'}`,
+      value: `Listed, ${hits[0]?.summary ?? 'registry record found'}`,
       good: false,
       flag: true,
     };
@@ -184,20 +184,20 @@ function buildRegistryRow(so: any, criminal: any): any {
   if (so?.checked) {
     return {
       label: 'Sex offender registry',
-      value: so.onRegistry ? `Listed — ${so.details ?? 'record found'}` : 'Not listed',
+      value: so.onRegistry ? `Listed, ${so.details ?? 'record found'}` : 'Not listed',
       good: !so.onRegistry,
       flag: !!so.onRegistry,
     };
   }
   return {
     label: 'Sex offender registry',
-    value: 'Not verified — search nsopw.gov directly',
+    value: 'Not verified, search nsopw.gov directly',
     neutral: true,
   };
 }
 
 // Criminal Search V2 matches on name alone, so an uncorroborated hit means
-// "someone with this name has a record" — not "he does". Presenting the two as
+// "someone with this name has a record", not "he does". Presenting the two as
 // the same thing would risk pinning a stranger's conviction on the person being
 // searched. Corroborated records are stated plainly; name-only matches are
 // shown as needing verification and are never counted as a confirmed finding.
@@ -214,7 +214,7 @@ function buildCriminalRow(criminal: any): any {
   if (criminal?.nameOnlyMatches) {
     return {
       label: 'Criminal records',
-      value: `${criminal.findings.length} record${criminal.findings.length === 1 ? '' : 's'} match the name but could not be confirmed as this person — verify before relying on this`,
+      value: `${criminal.findings.length} record${criminal.findings.length === 1 ? '' : 's'} match the name but could not be confirmed as this person, verify before relying on this`,
       neutral: true,
     };
   }
@@ -223,7 +223,7 @@ function buildCriminalRow(criminal: any): any {
 
 function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<any> {
   const records = [
-    // A failed check must never render as "Not listed" — that is a false
+    // A failed check must never render as "Not listed", that is a false
     // assurance. Only claim the registry is clear when it was actually searched.
     buildRegistryRow(so, person?.criminal),
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
@@ -241,14 +241,14 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
 function getNextSteps(score: ScoreState, flags: string[]): string[] {
   const steps: string[] = [];
   if (score === 'green') {
-    steps.push('The record is clean. Meet in a public place for your first date — not because you need to, but because it\'s your standard.');
+    steps.push('The record is clean. Meet in a public place for your first date, not because you need to, but because it\'s your standard.');
     steps.push('Do a quick reverse-image search on his profile photos. Takes 30 seconds.');
     steps.push('If anything feels off in person, trust that instinct over the clean report.');
   } else if (score === 'yellow') {
     steps.push('Ask about the flagged items naturally. His response will tell you more than the record did.');
     steps.push('Meet in a public place, midday or early evening, first meeting only.');
     steps.push('Re-run this report in 30 days if you decide to keep seeing him.');
-    if (flags.includes('voip')) steps.push('The VoIP number is worth a casual mention — "do you have two phones?" is a natural way to surface it.');
+    if (flags.includes('voip')) steps.push('The VoIP number is worth a casual mention, "do you have two phones?" is a natural way to surface it.');
   } else {
     steps.push('We\'d recommend not proceeding. The flags in the public record are significant.');
     steps.push('If you feel you need to meet, choose an extremely public location and tell someone exactly where you\'re going.');

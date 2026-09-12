@@ -6,7 +6,7 @@
 // registered API key issued by NSOPW.
 //
 // SAFETY: `checked` distinguishes "we searched and found nothing" from "we were
-// unable to search". Never render a failed check as "Not listed" — that is a
+// unable to search". Never render a failed check as "Not listed", that is a
 // false assurance, which is the most dangerous possible failure mode for this
 // product.
 

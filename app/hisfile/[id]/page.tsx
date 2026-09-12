@@ -93,7 +93,7 @@ export default function HisFileDetail() {
   };
 
   // Entries created before the split, and any row missing the column, read as
-  // dating — that is what the old questionnaire assumed of everyone.
+  // dating, that is what the old questionnaire assumed of everyone.
   const fileType: FileType = file.file_type ?? 'dating';
   const isSafety = fileType === 'safety';
 
@@ -158,7 +158,7 @@ export default function HisFileDetail() {
           )}
         </div>
 
-        {/* What kind of file this is — decides everything below it. */}
+        {/* What kind of file this is, decides everything below it. */}
         <div style={{ marginBottom: 20 }}>
           <div className="v-eyebrow" style={{ marginBottom: 10 }}>Why you opened this file</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -180,12 +180,12 @@ export default function HisFileDetail() {
           </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)', marginTop: 8, opacity: 0.8 }}>
             {isSafety
-              ? 'Just the essentials — where you met, where you’re meeting, and your notes.'
-              : 'The full questionnaire — how you met, first dates, icks and compatibility.'}
+              ? 'Just the essentials, where you met, where you’re meeting, and your notes.'
+              : 'The full questionnaire, how you met, first dates, icks and compatibility.'}
           </div>
         </div>
 
-        {/* Compatibility — dating only, or a prompt if she hasn't set her DOB yet */}
+        {/* Compatibility, dating only, or a prompt if she hasn't set her DOB yet */}
         {isSafety ? null : hasDob === false ? (
           <Link href="/settings" style={{ textDecoration: 'none', display: 'block', marginBottom: 20 }}>
             <div style={{
@@ -281,7 +281,7 @@ export default function HisFileDetail() {
           </Field>
         </Section>
 
-        {/* Meeting up — safety files only. No first date, no who-paid: this is
+        {/* Meeting up, safety files only. No first date, no who-paid: this is
             a one-off handoff, and the only thing that matters is where. */}
         {isSafety && (
           <Section eyebrow="02" title="Meeting up">

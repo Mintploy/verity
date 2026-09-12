@@ -6,18 +6,18 @@ import { getStarSign } from '@/lib/starsigns';
 import Link from 'next/link';
 
 const SIGN_DESCRIPTIONS: Record<string, string> = {
-  Aries:       'Bold and magnetic — you move first and figure it out later.',
-  Taurus:      'Sensual and steadfast — you know your worth and you wait for it.',
-  Gemini:      'Quick-minded and curious — you see every angle.',
-  Cancer:      'Deeply intuitive — you love fiercely and protect what\'s yours.',
-  Leo:         'Radiant and generous — you light up every room you walk into.',
-  Virgo:       'Perceptive and precise — nothing escapes your eye.',
-  Libra:       'Graceful and fair-minded — you make everyone feel seen.',
-  Scorpio:     'Intense and magnetic — your depth is your superpower.',
-  Sagittarius: 'Free-spirited and honest — you live for the journey.',
-  Capricorn:   'Ambitious and composed — you play the long game and win.',
-  Aquarius:    'Original and principled — you\'re ahead of your time.',
-  Pisces:      'Empathetic and dreamy — you feel what others miss.',
+  Aries:       'Bold and magnetic, you move first and figure it out later.',
+  Taurus:      'Sensual and steadfast, you know your worth and you wait for it.',
+  Gemini:      'Quick-minded and curious, you see every angle.',
+  Cancer:      'Deeply intuitive, you love fiercely and protect what\'s yours.',
+  Leo:         'Radiant and generous, you light up every room you walk into.',
+  Virgo:       'Perceptive and precise, nothing escapes your eye.',
+  Libra:       'Graceful and fair-minded, you make everyone feel seen.',
+  Scorpio:     'Intense and magnetic, your depth is your superpower.',
+  Sagittarius: 'Free-spirited and honest, you live for the journey.',
+  Capricorn:   'Ambitious and composed, you play the long game and win.',
+  Aquarius:    'Original and principled, you\'re ahead of your time.',
+  Pisces:      'Empathetic and dreamy, you feel what others miss.',
 };
 
 const SIGN_EMOJI: Record<string, string> = {
@@ -62,7 +62,7 @@ export default function SettingsPage() {
       });
       const d = await res.json();
       if (!res.ok || !d.profile) {
-        setError(d.error ?? 'Could not save — please try again.');
+        setError(d.error ?? 'Could not save, please try again.');
         return;
       }
       setSaved(true);
@@ -123,7 +123,7 @@ export default function SettingsPage() {
           <div style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Privacy note */}
             <p style={{ margin: 0, fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', lineHeight: 1.65, fontWeight: 300 }}>
-              Your birthday stays private. We use it only to calculate compatibility with the men in your files — so you can see at a glance whether the stars are with you on this one.
+              Your birthday stays private. We use it only to calculate compatibility with the men in your files, so you can see at a glance whether the stars are with you on this one.
             </p>
 
             {/* Date input */}
@@ -204,7 +204,7 @@ export default function SettingsPage() {
                   animation: 'fadeIn 0.2s ease',
                 }}>
                   <span style={{ fontSize: 16 }}>✓</span>
-                  Saved{sign ? ` — compatibility updated across all your files.` : '.'}
+                  Saved{sign ? `, compatibility updated across all your files.` : '.'}
                 </div>
               )}
             </div>

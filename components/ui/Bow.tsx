@@ -1,5 +1,5 @@
 /**
- * A satin ribbon bow — the house mark, replacing the eight-petal floret.
+ * A satin ribbon bow, the house mark, replacing the eight-petal floret.
  *
  * Deliberately drawn rather than an emoji or an icon-font glyph: it has to sit
  * next to Bodoni at 16px and at 80px without the strokes going muddy, and it

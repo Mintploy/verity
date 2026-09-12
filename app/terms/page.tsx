@@ -28,7 +28,7 @@ export default function TermsPage() {
             },
             {
               title: '3. Permitted use',
-              body: 'Verity is for personal safety research only. You may use Verity to conduct background research on individuals for your own personal, non-commercial purposes — for example, researching someone you are considering dating. You may not use Verity for employment screening, tenant screening, credit decisions, or any purpose governed by the Fair Credit Reporting Act.',
+              body: 'Verity is for personal safety research only. You may use Verity to conduct background research on individuals for your own personal, non-commercial purposes, for example, researching someone you are considering dating. You may not use Verity for employment screening, tenant screening, credit decisions, or any purpose governed by the Fair Credit Reporting Act.',
             },
             {
               title: '4. Prohibited use',

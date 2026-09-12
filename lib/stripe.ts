@@ -50,9 +50,9 @@ export async function createCheckoutSession({
 // Whether this person has actually completed Stripe Identity.
 //
 // Stripe is the source of truth; there is no local record to fall out of sync.
-// Fast path is customer metadata. When that is missing — the customer is created
+// Fast path is customer metadata. When that is missing, the customer is created
 // at checkout, which happens *after* verification, so the first login always
-// misses — we fall back to matching a verified session by the email stashed in
+// misses, we fall back to matching a verified session by the email stashed in
 // its metadata, then back-fill the customer so later logins hit the fast path.
 //
 // The fallback scans a page of recent sessions. That is fine at current volume;
@@ -86,7 +86,7 @@ export async function hasVerifiedIdentity(
 }
 
 // Record a completed verification against the customer, if one exists yet.
-// Returns false when there is no customer to write to — not an error: the
+// Returns false when there is no customer to write to, not an error: the
 // customer is created later at checkout, and the login fallback covers it.
 export async function recordVerifiedIdentity(
   email: string,

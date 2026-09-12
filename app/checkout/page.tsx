@@ -153,7 +153,7 @@ export default function CheckoutPage() {
           setFoundingAvailable(false);
           setSlotsLeft(0);
           setSelectedPlan('annual');
-          throw new Error('Founding slots just filled up — we\'ve switched you to the Annual plan.');
+          throw new Error('Founding slots just filled up, we\'ve switched you to the Annual plan.');
         }
         throw new Error(data.error ?? 'Failed to create checkout');
       }

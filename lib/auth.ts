@@ -14,7 +14,7 @@ export interface SessionPayload {
  *
  * This matters in two places. Stripe's customer list filters on an exact,
  * case-sensitive match, so "Kaori.tempel@gmail.com" finds nothing when the
- * customer was stored lowercase — the sign-in then fails as "no account found".
+ * customer was stored lowercase, the sign-in then fails as "no account found".
  * And the email doubles as the user_id for His Files, quota and profile, so an
  * uppercase variant would open a second, empty vault for the same woman.
  *

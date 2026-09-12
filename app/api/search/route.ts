@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const { phone, name, email, address, location, candidateToken } = body;
 
     // A man she picked from the disambiguation list. The token is signed, so
-    // the client can only ask for a candidate we actually offered — it carries
+    // the client can only ask for a candidate we actually offered, it carries
     // both the record id and the number it was found on.
     let tahoeId: string | undefined;
     let chosenPhone: string | undefined;
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Phone is the primary lookup, but a search by name, email or address is
-    // equally valid — require only that at least one of them is present.
+    // equally valid, require only that at least one of them is present.
     if (!phone && !chosenPhone && !name && !email && !address) {
       return Response.json(
         { error: 'Enter a phone number, name, email or address to search' },

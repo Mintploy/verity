@@ -95,7 +95,7 @@ export default function HisFilePage() {
           ))}
         </div>
 
-        {/* Birthday prompt — shown once profile is loaded and DOB is missing */}
+        {/* Birthday prompt, shown once profile is loaded and DOB is missing */}
         {!loading && hasDob === false && (
           <Link href="/settings" style={{ textDecoration: 'none', display: 'block', marginBottom: 16 }}>
             <div style={{
@@ -221,7 +221,7 @@ export default function HisFilePage() {
                 Generate your <em style={{ color: 'var(--blush)' }}>Verity Wrapped</em>
               </div>
               <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ivory)', opacity: 0.75, marginTop: 6, fontWeight: 300 }}>
-                {files.length} men researched — see your year at a glance.
+                {files.length} men researched, see your year at a glance.
               </div>
             </div>
             <Link href="/wrapped" style={{

@@ -27,7 +27,7 @@ function decemberBannerMsg(year: number): { label: string; sub: string; urgent: 
 
   if (diffDays === 0) return {
     label: 'Today is the day.',
-    sub: `Post your ${year} Verity Wrapped to Instagram Stories right now — ${formatStoryDate(postDay)}.`,
+    sub: `Post your ${year} Verity Wrapped to Instagram Stories right now, ${formatStoryDate(postDay)}.`,
     urgent: true,
   };
   if (diffDays > 0 && diffDays <= 7) return {
@@ -36,14 +36,14 @@ function decemberBannerMsg(year: number): { label: string; sub: string; urgent: 
     urgent: false,
   };
   if (diffDays > 7 && diffDays <= 60) return {
-    label: `Mark your calendar — ${formatStoryDate(postDay)}.`,
+    label: `Mark your calendar, ${formatStoryDate(postDay)}.`,
     sub: `Post your ${year} Verity Wrapped to Stories on the first Wednesday of December.`,
     urgent: false,
   };
   // Past or far future
   return {
     label: 'Share your Wrapped to Instagram Stories.',
-    sub: `Next posting day: first Wednesday of December — ${formatStoryDate(getFirstWedInDec(CURRENT_YEAR))}.`,
+    sub: `Next posting day: first Wednesday of December, ${formatStoryDate(getFirstWedInDec(CURRENT_YEAR))}.`,
     urgent: false,
   };
 }
@@ -103,7 +103,7 @@ async function downloadStoryCard(wrapped: VerityWrapped) {
   ctx.lineTo(W - px, 430);
   ctx.stroke();
 
-  // Big number — total researched
+  // Big number, total researched
   ctx.fillStyle = '#FFF4F4';
   ctx.font = '300 220px "Cormorant Garamond", Georgia, serif';
   ctx.fillText(String(wrapped.total_searches ?? 0), px - 8, 680);
@@ -257,7 +257,7 @@ export default function WrappedPage() {
               Verity <em style={{ color: 'var(--primary)' }}>Wrapped</em>
             </h1>
             <p style={{ fontFamily: 'var(--sans)', fontSize: 17, color: 'var(--dark-soft)', lineHeight: 1.6, maxWidth: 480, margin: '0 auto 40px', fontWeight: 300 }}>
-              See your research year at a glance — who you vetted, what patterns you found, and what the data says about your dating year.
+              See your research year at a glance, who you vetted, what patterns you found, and what the data says about your dating year.
             </p>
 
             {/* Year selector */}
@@ -507,7 +507,7 @@ function StorySection({ wrapped, onDownload, downloading }: { wrapped: VerityWra
             A 1080×1920 Story card, ready to post.
           </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', lineHeight: 1.7, fontWeight: 300 }}>
-            Download the image, then open Instagram → Stories → add from camera roll. No names, no details — just your year in numbers.
+            Download the image, then open Instagram → Stories → add from camera roll. No names, no details, just your year in numbers.
           </div>
           <div style={{ marginTop: 14, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', lineHeight: 1.6 }}>
             Suggested caption: <em style={{ color: 'var(--dark)' }}>"I did my research this year. Did you? 🌹 verityprive.com"</em>

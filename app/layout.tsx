@@ -27,10 +27,10 @@ const script = Pinyon_Script({
 });
 
 export const metadata: Metadata = {
-  title: 'Verity — Private intelligence, for her',
+  title: 'Verity, Private intelligence, for her',
   description: 'Know him before you meet him. Private background intelligence exclusively for women. Verified, quiet, and in seconds.',
   openGraph: {
-    title: 'Verity — Private intelligence, for her',
+    title: 'Verity, Private intelligence, for her',
     description: 'Know him before you meet him. Verified background reports, privately.',
     type: 'website',
   },

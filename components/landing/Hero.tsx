@@ -76,7 +76,7 @@ export function Hero() {
           }}>
             Verity is private intelligence for the woman who's done taking unnecessary risks.
             A first date, a marketplace pickup, anyone you're about to meet alone.
-            Drop in a phone number. Get back the full picture — quietly, in seconds.
+            Drop in a phone number. Get back the full picture, quietly, in seconds.
           </p>
 
           <div className="v-hero-pill" style={{
@@ -163,7 +163,7 @@ function SampleReportCard() {
             "A few things to weigh."
           </div>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', margin: '8px 0 0', lineHeight: 1.55, fontWeight: 300 }}>
-            Marcus is who he says he is — but the file isn't spotless. A secondary VoIP line and one open civil matter warrant a slower pace.
+            Marcus is who he says he is, but the file isn't spotless. A secondary VoIP line and one open civil matter warrant a slower pace.
           </p>
         </div>
 

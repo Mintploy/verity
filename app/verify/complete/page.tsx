@@ -127,7 +127,7 @@ function VerifyCompleteContent() {
                 Verification received.
               </p>
               <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '0 0 32px', fontWeight: 300 }}>
-                Stripe is still processing your ID. You can continue to membership now — it may take a moment to confirm.
+                Stripe is still processing your ID. You can continue to membership now, it may take a moment to confirm.
               </p>
               <Link href="/checkout" style={{
                 display: 'inline-block', padding: '16px 32px', borderRadius: 'var(--r-pill)',
@@ -146,7 +146,7 @@ function VerifyCompleteContent() {
                 Verification incomplete
               </p>
               <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '0 0 32px', fontWeight: 300 }}>
-                We weren't able to complete your ID verification. Please try again — make sure your ID is clearly visible and your selfie is well-lit.
+                We weren't able to complete your ID verification. Please try again, make sure your ID is clearly visible and your selfie is well-lit.
               </p>
               <button
                 onClick={() => router.push('/verify')}

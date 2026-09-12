@@ -42,60 +42,6 @@ const SCORE_CONFIG: Record<string, { bg: string; dot: string; text: string; deep
 
 // ── Sample data ────────────────────────────────────────────────────────────
 
-const SAMPLE_MEN: CompareEntry[] = [
-  {
-    id: 'alex', name: 'Alex Pierre', initials: 'AP', age: 32,
-    title: 'Founder & CEO', company: 'Fielder AI (Series A)', tenure: '4 years',
-    llcs: 'Fielder AI Inc., JAH Ventures LLC',
-    score: 'yellow',
-    addressCount: 3, currentAddress: 'San Francisco, CA (renting)',
-    publicFlags: ['VoIP secondary line detected', '1 civil dispute open · 2023'],
-    publicClears: ['Sex offender registry: clear', 'No bankruptcy', 'No evictions'],
-    phoneType: 'VoIP detected · possible secondary line',
-    verifiedBy: 3,
-    summary: 'Identity cross-references cleanly. Two items worth a conversation: the VoIP line and an open civil filing. Neither is a hard stop, but both are worth asking about.',
-    nextSteps: ['Ask about the VoIP number directly — "do you have two phones?" is natural.', 'The civil dispute is open, not closed. Ask casually what the situation is.', 'Meet in public for the first meeting.'],
-  },
-  {
-    id: 'reid', name: 'Reid Whitman', initials: 'RW', age: 36,
-    title: 'Corporate Attorney', company: 'Cravath, Swaine & Moore', tenure: '6 years',
-    llcs: 'None found.',
-    score: 'green',
-    addressCount: 2, currentAddress: 'Manhattan, NY · 1 Columbus Circle (owned)',
-    publicFlags: [],
-    publicClears: ['Sex offender registry: clear', 'No bankruptcy', 'No evictions', 'No criminal record', 'Identity verified · 4 sources'],
-    phoneType: 'T-Mobile · mobile · 8 years',
-    verifiedBy: 4,
-    summary: 'Clean across all sources. Identity verified at four cross-references. Bar registration active. No flags of any kind.',
-    nextSteps: ['Record is clean. Meet in a public place — your standard, not a safety measure.', 'Quick reverse image search on his photos takes 30 seconds.', 'If anything feels off in person, trust that over the green score.'],
-  },
-  {
-    id: 'marcus', name: 'Marcus Anderson', initials: 'MA', age: 41,
-    title: 'Real Estate Operator', company: 'Anderson Holdings LLC', tenure: '11 years',
-    llcs: 'Anderson Holdings LLC, SunBelt Properties LLC, MR 2017 Trust',
-    score: 'yellow',
-    addressCount: 5, currentAddress: 'Scottsdale, AZ (owned)',
-    publicFlags: ['Active civil suit · Los Angeles County · 2024'],
-    publicClears: ['Sex offender registry: clear', 'No criminal record', 'No evictions', 'No bankruptcy'],
-    phoneType: 'AT&T · mobile · 11 years',
-    verifiedBy: 3,
-    summary: 'Clean record except for an active civil case in LA County. Three LLCs and a trust in public filings. Address history spans five states.',
-    nextSteps: ['The civil suit is worth a casual mention.', 'Five addresses in 11 years is worth understanding.', 'Meet in public, daytime first meeting.'],
-  },
-  {
-    id: 'daniel', name: 'Daniel Chen', initials: 'DC', age: 34,
-    title: 'Senior Staff Engineer', company: 'Stripe · Infrastructure', tenure: '5 years',
-    llcs: 'None found.',
-    score: 'green',
-    addressCount: 2, currentAddress: 'San Francisco, CA (renting)',
-    publicFlags: [],
-    publicClears: ['Sex offender registry: clear', 'No criminal record', 'No bankruptcy', 'No evictions', 'Identity verified · 4 sources'],
-    phoneType: 'T-Mobile · mobile · 6 years',
-    verifiedBy: 4,
-    summary: 'Clean across all sources. Identity verified at four cross-references. Phone is a stable mobile line. No flags.',
-    nextSteps: ['Clean record. Meet in public — your standard.', 'Reverse image search on his profile photos.', 'Trust your instincts in person.'],
-  },
-];
 
 function reportToEntry(report: Report): CompareEntry {
   const parts = report.subject.name.trim().split(/\s+/);
@@ -105,7 +51,7 @@ function reportToEntry(report: Report): CompareEntry {
 
   const publicFlags = report.publicRecords.filter(r => r.flag || (!r.good && !r.neutral)).map(r => `${r.label}: ${r.value}`);
   const publicClears = report.publicRecords.filter(r => r.good).map(r => r.label + ': clear');
-  const currentAddr = report.addresses.find(a => a.current)?.addr ?? report.addresses[0]?.addr ?? '—';
+  const currentAddr = report.addresses.find(a => a.current)?.addr ?? report.addresses[0]?.addr ?? '';
 
   return {
     id: report.searchId,
@@ -151,19 +97,64 @@ function sortedByScore(people: CompareEntry[]) {
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function ComparePage() {
-  const [people, setPeople] = useState<CompareEntry[]>(SAMPLE_MEN);
-  const [usingRealData, setUsingRealData] = useState(false);
+  const [people, setPeople] = useState<CompareEntry[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    const fromSession = loadSessionReports();
-    if (fromSession.length >= 2) { setPeople(fromSession); setUsingRealData(true); }
+    // This tab first, then everything she has saved. Compare used to fall back
+    // to invented men when it found fewer than two, which put fabricated
+    // employers and fabricated civil filings on screen under real headings.
+    // An empty comparison is honest; a populated fake one is not.
+    const seen = new Map<string, CompareEntry>();
+    for (const e of loadSessionReports()) seen.set(e.id, e);
+
+    fetch('/api/hisfile')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        for (const f of d?.files ?? []) {
+          if (!f.report_data) continue;
+          try {
+            const entry = reportToEntry(f.report_data);
+            if (!seen.has(entry.id)) seen.set(entry.id, entry);
+          } catch { /* a malformed stored report is simply skipped */ }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPeople([...seen.values()]));
   }, []);
 
-  const ranked = sortedByScore(people);
+  const ranked = sortedByScore(people ?? []);
   const leader = ranked[0];
   const flagCount = (p: CompareEntry) => p.publicFlags.length;
-  const totalFlags = people.reduce((s, p) => s + flagCount(p), 0);
+  const totalFlags = (people ?? []).reduce((s, p) => s + flagCount(p), 0);
+
+  // A comparison needs two men. Saying so beats a page of empty columns, and it
+  // beats what this used to do, which was fill the columns with invention.
+  if (people !== null && people.length < 2) {
+    return (
+      <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
+        <Nav />
+        <div style={{ maxWidth: 560, margin: '0 auto', padding: 'clamp(40px,8vw,96px) 24px', textAlign: 'center' }}>
+          <Bow size={44} color="var(--primary)" center="var(--blush)" />
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(26px,5vw,38px)', fontWeight: 500, color: 'var(--dark)', margin: '20px 0 12px' }}>
+            Nothing to compare yet
+          </h1>
+          <p style={{ fontFamily: 'var(--sans)', fontSize: 14.5, color: 'var(--dark-soft)', lineHeight: 1.65, fontWeight: 300, margin: '0 0 26px' }}>
+            {people.length === 1
+              ? 'One file so far. Run one more and you can put them side by side on public record, phone signals and address history.'
+              : 'Run two searches and you can put them side by side on public record, phone signals and address history.'}
+          </p>
+          <Link href="/search" style={{
+            display: 'inline-block', padding: '14px 30px', borderRadius: 'var(--r-pill)',
+            background: 'var(--primary)', color: 'var(--pearl)', textDecoration: 'none',
+            fontFamily: 'var(--display)', fontSize: 16, fontWeight: 500, boxShadow: 'var(--shadow-pop)',
+          }}>
+            Run a search
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
@@ -177,11 +168,6 @@ export default function ComparePage() {
             <Link href="/search" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', textDecoration: 'none', marginBottom: 14 }}>
               ← Back to search
             </Link>
-            {!usingRealData && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'var(--gold-pale)', borderRadius: 'var(--r-pill)', marginBottom: 14, marginLeft: 12, fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--gold-deep)' }}>
-                Sample data — run searches to compare real men
-              </div>
-            )}
             <h1 className="v-display-lg v-serif" style={{ fontWeight: 400, color: 'var(--dark)', margin: 0 }}>
               Side by side. <em style={{ color: 'var(--rose)' }}>All the facts.</em>
             </h1>
@@ -195,7 +181,7 @@ export default function ComparePage() {
         {/* Summary bar */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
           {(['green', 'yellow', 'red'] as const).map(score => {
-            const count = people.filter(p => p.score === score).length;
+            const count = (people ?? []).filter(p => p.score === score).length;
             const c = SCORE_CONFIG[score];
             return (
               <div key={score} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', background: c.bg, border: `1px solid ${c.dot}33`, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -332,12 +318,12 @@ export default function ComparePage() {
                 <div>
                   <div className="v-eyebrow" style={{ fontSize: 8, color: 'var(--gold-pale)', marginBottom: 5 }}>Cleanest file</div>
                   <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--ivory)', fontWeight: 400, lineHeight: 1.1 }}>{leader?.name}</div>
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 3 }}>{leader ? SCORE_LABELS[leader.score] : '—'}</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 3 }}>{leader ? SCORE_LABELS[leader.score] : ''}</div>
                 </div>
                 <div>
                   <div className="v-eyebrow" style={{ fontSize: 8, color: 'var(--gold-pale)', marginBottom: 5 }}>Total public flags</div>
                   <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: totalFlags === 0 ? 'var(--sage)' : 'var(--honey)', fontWeight: 400, lineHeight: 1.1 }}>{totalFlags}</div>
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 3 }}>across {people.length} files</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve)', marginTop: 3 }}>across {(people ?? []).length} files</div>
                 </div>
               </div>
             </div>

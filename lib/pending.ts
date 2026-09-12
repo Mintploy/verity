@@ -3,7 +3,7 @@
  *
  * She enters his number on the landing page, then goes through ID verification
  * and Stripe before we show her anything. That is several redirects and an
- * email, so the number has to outlive all of them — being asked to type it
+ * email, so the number has to outlive all of them, being asked to type it
  * again after paying is the kind of small friction that reads as the product
  * losing her place.
  *

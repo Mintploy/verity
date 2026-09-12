@@ -82,7 +82,7 @@ export default function VerifyPage() {
             </button>
 
             <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {["Government ID scanned by Stripe — never stored by us", "Quick selfie to confirm you're present", "One-time check — never repeated"].map((item, i) => (
+              {["Government ID scanned by Stripe, never stored by us", "Quick selfie to confirm you're present", "One-time check, never repeated"].map((item, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sage-pale)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2 2 4-4" stroke="var(--sage-deep)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>

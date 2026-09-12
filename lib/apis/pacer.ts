@@ -54,8 +54,8 @@ export async function lookupPublicRecords(name?: string, phone?: string): Promis
       bankruptcy: 'None found',
       evictions: 'None found',
       criminal: 'None found',
-      licenses: '—',
-      voter: '—',
+      licenses: '',
+      voter: '',
       hasFlags: hasOpen,
     };
   } catch {
