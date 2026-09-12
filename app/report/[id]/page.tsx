@@ -429,10 +429,20 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       <Section id="sec-7" eyebrow="07" title="Social footprint">
         {report.social.handles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 8 }}>Confirmed handles</div>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 8 }}>Profiles on record</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {report.social.handles.map((h, i) => (
                 <div key={i} style={{ padding: '10px 14px', background: 'var(--sage-pale)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--sage-deep)' }}>{h}</div>
+              ))}
+            </div>
+          </div>
+        )}
+        {report.social.emails && report.social.emails.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginBottom: 8 }}>Email addresses on record</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {report.social.emails.map((e, i) => (
+                <div key={i} style={{ padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)' }}>{e}</div>
               ))}
             </div>
           </div>

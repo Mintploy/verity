@@ -98,7 +98,10 @@ export interface SocialCandidate {
 }
 
 export interface SocialFootprint {
+  /** Actual profiles. An email address is not one of these. */
   handles: string[];
+  /** Addresses appearing on the record, stated as that and nothing more. */
+  emails?: string[];
   presence: string;
   inconsistency: string;
 }

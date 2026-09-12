@@ -854,8 +854,10 @@ async function lookupPropertyV2(
   if (results[0]) {
     console.log('ENFORMION_SHAPE[PROPERTY]:', Object.keys(results[0]).join(','));
     console.log('ENFORMION_CENSUS[PROPERTY]:', census(results[0]));
-    const firstAssessor = (results[0].AssessorRecords ?? results[0].assessorRecords ?? [])[0];
-    console.log('ENFORMION_PROPERTY_ASSESSOR:', firstAssessor ? census(firstAssessor) : 'NO AssessorRecords key');
+    const prop0 = results[0].property ?? results[0].Property ?? {};
+    console.log('ENFORMION_PROPERTY_SUMMARY:', census(prop0.summary ?? prop0.Summary));
+    const firstAssessor = (prop0.assessorRecords ?? prop0.AssessorRecords ?? [])[0];
+    console.log('ENFORMION_PROPERTY_ASSESSOR:', firstAssessor ? census(firstAssessor) : 'no assessorRecords entry');
   }
 
   // Property V2 does not return flat fields. Everything lives under
@@ -872,21 +874,29 @@ async function lookupPropertyV2(
   };
 
   return results.slice(0, 4).map((p: any) => {
-    const a = (p.AssessorRecords ?? p.assessorRecords ?? [])[0] ?? {};
-    const structure = a.Structure ?? {};
-    const size = a.PropertySize ?? {};
-    const tax = a.Tax ?? {};
-    const purchase = a.PurchaseTransaction ?? {};
-    const ownerMeta = a.OwnerMetaData ?? {};
-    const ident = a.PropertyIdentification ?? {};
-    const legal = a.PropertyLegal ?? {};
-    const location = a.Location ?? {};
-    const owner = (a.Owners ?? [])[0] ?? {};
+    // The record nests everything under `property`: the census reads
+    // `poseidonId:set property:{summary|assessorRecords|recorderRecords|
+    // openLienRecords}`. Reading AssessorRecords at the top level, as this
+    // did, found nothing on a response that plainly carried the data.
+    const prop = p.property ?? p.Property ?? {};
+    const summary = prop.summary ?? prop.Summary ?? {};
+    const a = (prop.assessorRecords ?? prop.AssessorRecords ?? [])[0] ?? {};
+    const structure = a.Structure ?? a.structure ?? {};
+    const size = a.PropertySize ?? a.propertySize ?? {};
+    const tax = a.Tax ?? a.tax ?? {};
+    const purchase = a.PurchaseTransaction ?? a.purchaseTransaction ?? {};
+    const ownerMeta = a.OwnerMetaData ?? a.ownerMetaData ?? {};
+    const ident = a.PropertyIdentification ?? a.propertyIdentification ?? {};
+    const legal = a.PropertyLegal ?? a.propertyLegal ?? {};
+    const location = a.Location ?? a.location ?? {};
+    const owner = (a.Owners ?? a.owners ?? [])[0] ?? {};
 
     // The address key is the one field the response schema does not name.
     // ENFORMION_CENSUS[PROPERTY] will reveal it; until then try the plausible
     // shapes rather than dropping the record.
-    const addr: string = p.fullAddress ?? p.FullAddress ?? a.PropertyAddress
+    const addr: string = summary.propertyAddress ?? summary.PropertyAddress
+      ?? summary.fullAddress ?? summary.address
+      ?? p.fullAddress ?? p.FullAddress ?? a.PropertyAddress ?? a.propertyAddress
       ?? [p.addressLine1 ?? p.AddressLine1, p.addressLine2 ?? p.AddressLine2]
         .filter(Boolean).join(', ');
 
@@ -1199,8 +1209,8 @@ async function lookupWorkplace(
     const t = pick(e, 'expJobTitle', 'jobTitle', 'title', 'position');
     const c = pick(e, 'expCompany', 'employer', 'company', 'companyName');
     if (!t && !c) continue;
-    const from = pick(e, 'expDateFrom', 'dateFrom', 'startDate', 'fromDate');
-    const to = pick(e, 'expDateTo', 'dateTo', 'endDate', 'toDate');
+    const from = pick(e, 'expStartDate', 'startDate', 'expDateFrom', 'dateFrom');
+    const to = pick(e, 'expEndDate', 'endDate', 'expDateTo', 'dateTo');
     const years = from || to ? ` (${[from, to].filter(Boolean).join(' to ')})` : '';
     const line = `${[t, c].filter(Boolean).join(' at ')}${years}`;
     if (seen.has(line)) continue;

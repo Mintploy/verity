@@ -68,9 +68,12 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
 
   const publicRecords = buildPublicRecords(pub, fecResult, person, so);
 
-  const confirmedHandles: string[] = [];
-  if (person.emails?.length) person.emails.forEach((e: string) => confirmedHandles.push(`Email: ${e}`));
-  if (person.linkedInUrl) confirmedHandles.push(`LinkedIn: ${person.linkedInUrl}${person.linkedInHeadline ? ` · ${person.linkedInHeadline}` : ''}`);
+  // An email address is not a social handle, and nothing here is confirmed:
+  // these are addresses and profiles that appear on the record, which is a
+  // weaker claim than "confirmed" and the only one we can actually make.
+  const profiles: string[] = [];
+  if (person.linkedInUrl) profiles.push(`LinkedIn: ${person.linkedInUrl}${person.linkedInHeadline ? ` · ${person.linkedInHeadline}` : ''}`);
+  const emailsOnRecord: string[] = person.emails ?? [];
 
   const report: Report = {
     id: searchId,
@@ -138,8 +141,13 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     },
     publicRecords,
     social: {
-      handles: confirmedHandles,
-      presence: confirmedHandles.length > 0 ? 'Confirmed profile(s) found.' : 'No confirmed profiles found.',
+      handles: profiles,
+      emails: emailsOnRecord,
+      presence: profiles.length > 0
+        ? 'A public profile appears on the record.'
+        : emailsOnRecord.length > 0
+          ? 'No public profile found. The addresses below appear on his record.'
+          : 'No public profile found.',
       inconsistency: 'None flagged.',
     },
     nextSteps: getNextSteps(score, flags),
