@@ -345,10 +345,12 @@ export interface EnformionQuery {
   address?: string;
   /** City, State or ZIP — narrows a name or address search. */
   location?: string;
+  /** A man she picked from the candidate list; bypasses pickBestMatch. */
+  tahoeId?: string;
 }
 
 export async function lookupEnformion(query: EnformionQuery): Promise<EnformionResult> {
-  const { name, email, address, location } = query;
+  const { name, email, address, location, tahoeId: chosenTahoeId } = query;
   const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
   const username = process.env.ENFORMION_USERNAME;
   const password = process.env.ENFORMION_PASSWORD;
@@ -437,7 +439,14 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     // Step 2 — Re-fetch the match by TahoeId. Includes require a unique
     // identifier, and a TahoeId is one, so this is where the full record
     // (addresses, relatives, indicators) legitimately comes from.
-    const seed = results.length ? pickBestMatch(results, cleaned) : null;
+    //
+    // When she picked a man from the candidate list, that choice wins outright:
+    // pickBestMatch exists to guess when nobody has told us who is meant, and
+    // overriding her answer with our guess is exactly the error the picker was
+    // built to prevent.
+    const seed = chosenTahoeId
+      ? { tahoeId: chosenTahoeId }
+      : results.length ? pickBestMatch(results, cleaned) : null;
     if (seed?.tahoeId) {
       const full = await personSearchById(username, password, seed.tahoeId, CORE_INCLUDES);
       if (full) results = [full];
@@ -484,8 +493,13 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     // A number can sit on several people's records (a shared office line, a
     // household). phoneOrder ranks a number within one person's own list, so
     // the record where the searched number ranks best is its real owner.
-    const best = pickBestMatch(results, cleaned);
-    console.log('ENFORMION_MATCH:', best?.fullName, 'of', results.length, 'results');
+    const best = chosenTahoeId
+      ? (results.find((r: any) => r?.tahoeId === chosenTahoeId) ?? results[0])
+      : pickBestMatch(results, cleaned);
+    console.log(
+      'ENFORMION_MATCH:', best?.fullName, 'of', results.length, 'results',
+      chosenTahoeId ? '(chosen)' : '(auto)',
+    );
 
     // --- Phone intelligence ---
     // Prefer carrier/line-type off the reverse-phone row for the searched
@@ -1237,4 +1251,66 @@ async function lookupDivorce(
 
 function emptyPhone(): EnformionPhone {
   return { lineType: 'mobile', origin: '—', active: true };
+}
+
+// ─── Candidate disambiguation ────────────────────────────────────────────────
+//
+// A number can sit on several people's records — a household line, a recycled
+// mobile, a shared office. lookupEnformion resolves that ambiguity itself via
+// pickBestMatch, which is right when we must answer with exactly one man, but
+// it means the other candidates are discarded silently and she never learns a
+// choice was made on her behalf. Picking the wrong one produces a confident
+// report about a stranger.
+//
+// This returns the candidates instead of collapsing them, so she can say which
+// man she means. It is deliberately the cheap half of the pipeline: one
+// ReversePhoneSearch call, no TahoeId drill-down, no detail endpoints, no
+// narrative. The expensive work happens only after she has chosen one.
+export interface PersonCandidate {
+  /** Enformion's identifier. Never sent to the browser — see lib/candidates.ts. */
+  tahoeId: string;
+  name: string;
+  age?: number;
+  city?: string;
+  state?: string;
+}
+
+export async function lookupCandidates(phone: string): Promise<PersonCandidate[]> {
+  const liveAllowed = process.env.ALLOW_LIVE_LOOKUPS === 'true';
+  const username = process.env.ENFORMION_USERNAME;
+  const password = process.env.ENFORMION_PASSWORD;
+  if (!liveAllowed || !username || !password) return [];
+
+  const digits = (phone ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  if (digits.length !== 10) return [];
+
+  const rows = await reversePhone(username, password, digits);
+
+  const seen = new Set<string>();
+  const candidates: PersonCandidate[] = [];
+
+  for (const r of rows) {
+    const tahoeId: string | undefined = r?.tahoeId;
+    const name: string | undefined = r?.fullName;
+    // Without an id there is nothing to drill into later, and without a name
+    // there is nothing for her to recognise — either way the row is not a
+    // choice she could meaningfully make.
+    if (!tahoeId || !name || seen.has(tahoeId)) continue;
+    seen.add(tahoeId);
+
+    const addr = (Array.isArray(r?.addresses) ? r.addresses[0] : undefined) ?? {};
+    const dobRecord = (r?.datesOfBirth ?? [])[0];
+    const dobRaw = r?.dob || dobRecord?.dob || dobRecord?.DateOfBirth || dobRecord?.dateOfBirth;
+
+    candidates.push({
+      tahoeId,
+      name,
+      age: r?.age ?? (dobRaw ? birthYearToApproxAge(dobRaw) ?? undefined : undefined),
+      city: addr.city ?? addr.City ?? undefined,
+      state: addr.state ?? addr.State ?? undefined,
+    });
+  }
+
+  console.log('ENFORMION_CANDIDATES:', candidates.length, 'for', digits);
+  return candidates;
 }

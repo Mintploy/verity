@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { generateReport } from '@/lib/apis/index';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { verifyCandidate } from '@/lib/candidates';
 import { consumeSearch } from '@/lib/quota';
 
 export async function POST(req: NextRequest) {
@@ -16,11 +17,29 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { phone, name, email, address, location } = body;
+    const { phone, name, email, address, location, candidateToken } = body;
+
+    // A man she picked from the disambiguation list. The token is signed, so
+    // the client can only ask for a candidate we actually offered — it carries
+    // both the record id and the number it was found on.
+    let tahoeId: string | undefined;
+    let chosenPhone: string | undefined;
+    if (candidateToken) {
+      try {
+        const chosen = await verifyCandidate(candidateToken);
+        tahoeId = chosen.tahoeId;
+        chosenPhone = chosen.phone;
+      } catch {
+        return Response.json(
+          { error: 'That selection expired. Search again to pick.' },
+          { status: 400 },
+        );
+      }
+    }
 
     // Phone is the primary lookup, but a search by name, email or address is
     // equally valid — require only that at least one of them is present.
-    if (!phone && !name && !email && !address) {
+    if (!phone && !chosenPhone && !name && !email && !address) {
       return Response.json(
         { error: 'Enter a phone number, name, email or address to search' },
         { status: 400 },
@@ -34,7 +53,9 @@ export async function POST(req: NextRequest) {
 
     const enrichHistorical = quota.plan === 'founding' || quota.plan === 'annual';
     const report = await generateReport({
-      phone, name, email, address, location,
+      phone: chosenPhone ?? phone,
+      name, email, address, location,
+      tahoeId,
       userId: session.email,
       enrichHistorical,
     });

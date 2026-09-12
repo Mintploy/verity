@@ -90,7 +90,34 @@ function SearchContent() {
   useEffect(() => {
     setDemoMode(sessionStorage.getItem('verity-demo') === '1');
     loadPastSearches();
-  }, []);
+
+    // She picked a man on /matches, then went away to log in or to verify.
+    // Landing her on an empty search box would make her choose him twice, so
+    // resume where she left off and build the file she already asked for.
+    const pending = sessionStorage.getItem('verity-pending-candidate');
+    if (!pending) return;
+    sessionStorage.removeItem('verity-pending-candidate');
+    try {
+      const { token } = JSON.parse(pending);
+      if (!token) return;
+      setLoading(true);
+      fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidateToken: token }),
+      })
+        .then(async (r) => {
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error ?? 'Could not build the report');
+          sessionStorage.setItem(`report-${d.report.searchId}`, JSON.stringify(d.report));
+          if (d.demoMode) sessionStorage.setItem('verity-demo', '1');
+          router.push(`/report/${d.report.searchId}`);
+        })
+        .catch((e: any) => { setError(e.message); setLoading(false); });
+    } catch {
+      // A malformed hand-off is not worth surfacing; she can just search again.
+    }
+  }, [router]);
 
   const deleteSearch = (key: string) => {
     sessionStorage.removeItem(key);

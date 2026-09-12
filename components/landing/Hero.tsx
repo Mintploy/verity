@@ -9,7 +9,9 @@ export function Hero() {
 
   const handleSearch = () => {
     if (phone.trim()) {
-      router.push(`/search?phone=${encodeURIComponent(phone)}`);
+      // The picker, not the search page: she sees who is on the number before
+      // being asked to verify or pay, and /search is behind the session gate.
+      router.push(`/matches?phone=${encodeURIComponent(phone)}`);
     } else {
       router.push('/verify');
     }

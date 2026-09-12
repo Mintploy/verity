@@ -15,6 +15,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       email: req.email,
       address: req.address,
       location: req.location,
+      tahoeId: req.tahoeId,
     }),
     lookupPublicRecords(req.name, req.phone),
     checkSexOffenderRegistry(req.name),
