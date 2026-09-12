@@ -496,6 +496,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     const best = chosenTahoeId
       ? (results.find((r: any) => r?.tahoeId === chosenTahoeId) ?? results[0])
       : pickBestMatch(results, cleaned);
+    console.log('ENFORMION_INDICATORS:', JSON.stringify(best?.indicators ?? {}));
     console.log(
       'ENFORMION_MATCH:', best?.fullName, 'of', results.length, 'results',
       chosenTahoeId ? '(chosen)' : '(auto)',
@@ -819,6 +820,27 @@ async function lookupPropertyV2(
   const data = await res.json();
   const results: any[] = extractRowsDefault(data);
   console.log('ENFORMION_PROPERTY_RESULTS:', results.length);
+
+  // This endpoint is fetched directly rather than through proSearch, so it
+  // never got the shape logging every other endpoint has. Every field below is
+  // read from a key name nobody has confirmed, which is why a 200 carrying a
+  // record still produced an empty section. Log what actually came back, at
+  // the top level and one level into the assessor record, so the mapping can
+  // be written against the real schema instead of a plausible one. Key names,
+  // array lengths and set/unset only, so this logs no personal data.
+  const census = (o: any) => Object.entries(o ?? {})
+    .map(([k, v]) => Array.isArray(v)
+      ? `${k}:[${v.length}]`
+      : (v && typeof v === 'object' ? `${k}:{${Object.keys(v).join('|')}}`
+        : (v === null || v === '' || v === undefined ? `${k}:-` : `${k}:set`)))
+    .join(' ');
+
+  if (results[0]) {
+    console.log('ENFORMION_SHAPE[PROPERTY]:', Object.keys(results[0]).join(','));
+    console.log('ENFORMION_CENSUS[PROPERTY]:', census(results[0]));
+    const firstAssessor = (results[0].AssessorRecords ?? results[0].assessorRecords ?? [])[0];
+    console.log('ENFORMION_PROPERTY_ASSESSOR:', firstAssessor ? census(firstAssessor) : 'NO AssessorRecords key');
+  }
 
   // Property V2 does not return flat fields. Everything lives under
   // AssessorRecords[] in typed sub-objects, so the previous flat reads
