@@ -39,7 +39,7 @@ const ANNUAL_FEATURES = [
 
 const FOUNDING_FEATURES = [
   'Reserved for the first 100 women',
-  'Lock in $199/year for life',
+  '$199 your first year, then $297',
   'Up to 15 background reports per month',
   'Phone intelligence on any number',
   'Compare multiple men side by side',
@@ -202,7 +202,7 @@ export default function CheckoutPage() {
                 onSelect={() => setSelectedPlan('founding')}
                 title="Founding Member"
                 price="$199"
-                sub={`/year · ${slotsLeft} of 100 spots left · locked for life`}
+                sub={`first year · ${slotsLeft} of 100 spots left · $297/year after`}
                 features={FOUNDING_FEATURES}
                 badge="Best value"
                 accent="var(--primary-mist)"
