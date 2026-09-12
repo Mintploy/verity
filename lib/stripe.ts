@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { normalizeEmail } from './auth';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? 'sk_placeholder', {
   apiVersion: '2026-04-22.dahlia',
@@ -66,9 +67,12 @@ export async function hasVerifiedIdentity(
     return true;
   }
 
+  // Both sides normalized: the metadata email was written from whatever the
+  // form submitted, which may differ in case from what she typed at sign-in.
+  const wanted = normalizeEmail(email);
   const sessions = await stripe.identity.verificationSessions.list({ limit: 100 });
   const match = sessions.data.find(
-    (s) => s.status === 'verified' && s.metadata?.email === email
+    (s) => s.status === 'verified' && s.metadata?.email && normalizeEmail(s.metadata.email) === wanted
   );
   if (!match) return false;
 
@@ -88,7 +92,7 @@ export async function recordVerifiedIdentity(
   email: string,
   verificationSessionId: string
 ): Promise<boolean> {
-  const customers = await stripe.customers.list({ email, limit: 1 });
+  const customers = await stripe.customers.list({ email: normalizeEmail(email), limit: 1 });
   const customer = customers.data[0];
   if (!customer) return false;
 

@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { normalizeEmail } from '@/lib/auth';
 import { createCheckoutSession, type Plan } from '@/lib/stripe';
 import { getFoundingCount, FOUNDING_MEMBER_CAP } from '@/lib/quota';
 
@@ -16,7 +17,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, plan, returnUrl } = body as { email?: string; plan?: Plan; returnUrl?: string };
+    const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: Plan; returnUrl?: string };
+    // Store the customer canonically so sign-in can find her later.
+    const email = rawEmail ? normalizeEmail(rawEmail) : undefined;
 
     if (!plan || !['founding', 'annual', 'single'].includes(plan)) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 });

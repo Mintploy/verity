@@ -50,6 +50,10 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                 placeholder="your@email.com" autoFocus
+                // A phone keyboard capitalizes the first letter by default,
+                // which is what turned this address into an unknown one.
+                autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                inputMode="email" autoComplete="email"
                 style={{
                   width: '100%', padding: '15px 18px', borderRadius: 'var(--r-pill)',
                   border: '1.5px solid var(--ivory-deep)', background: 'var(--ivory)',

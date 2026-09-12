@@ -9,6 +9,21 @@ export interface SessionPayload {
   identityVerified: boolean;
 }
 
+/**
+ * Canonical form of an email address for identity purposes.
+ *
+ * This matters in two places. Stripe's customer list filters on an exact,
+ * case-sensitive match, so "Kaori.tempel@gmail.com" finds nothing when the
+ * customer was stored lowercase — the sign-in then fails as "no account found".
+ * And the email doubles as the user_id for His Files, quota and profile, so an
+ * uppercase variant would open a second, empty vault for the same woman.
+ *
+ * Normalize wherever an address enters the system, never at the point of use.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function createMagicLinkToken(email: string, stripeCustomerId: string): Promise<string> {
   return new SignJWT({ email, stripeCustomerId, purpose: 'magic-link' })
     .setProtectedHeader({ alg: 'HS256' })
