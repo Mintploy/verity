@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getPendingPhone } from '@/lib/pending';
 import { Wordmark } from '@/components/ui/Wordmark';
-import { Floret } from '@/components/ui/Floret';
+import { Bow } from '@/components/ui/Bow';
 
 export default function CheckoutSuccessPage() {
   // She typed his number before she paid. Send her straight back to it rather
@@ -26,7 +26,7 @@ export default function CheckoutSuccessPage() {
           padding: '64px 48px', boxShadow: 'var(--shadow-lg)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
-            <Floret size={56} color="var(--rose)" center="var(--ivory)" />
+            <Bow size={56} color="var(--rose)" center="var(--ivory)" />
           </div>
 
           <h1 style={{

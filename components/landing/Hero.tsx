@@ -49,11 +49,24 @@ export function Hero() {
             <Sparkle size={11} color="var(--wine)" /> private intelligence, for her
           </span>
 
-          <h1 className="v-display-xl v-serif" style={{
-            fontWeight: 400, color: 'var(--dark)', margin: '28px 0 0',
+          {/* Didone sets the statement; the roundhand carries the one word the
+              sentence turns on. Its cap height runs small and it sits high, so
+              it needs its own size and a nudge down to share a baseline. */}
+          <h1 className="v-display-xl" style={{
+            fontFamily: 'var(--display)',
+            fontWeight: 500, color: 'var(--dark)', margin: '28px 0 0',
+            // Roundhand descends further than the Didone it sits between, so
+            // the display leading opens up to clear the swash.
+            lineHeight: 1.04,
           }}>
             Know him<br />
-            <em style={{ color: 'var(--primary)', fontWeight: 300 }}>before</em> you<br />
+            <span style={{
+              fontFamily: 'var(--script)', fontWeight: 400,
+              color: 'var(--primary)',
+              fontSize: '1.34em', lineHeight: 0.78,
+              display: 'inline-block', transform: 'translateY(0.1em)',
+              marginRight: '0.06em',
+            }}>before</span> you<br />
             meet him<span style={{ color: 'var(--primary)' }}>.</span>
           </h1>
 

@@ -1,4 +1,4 @@
-import { Floret } from '@/components/ui/Floret';
+import { Bow } from '@/components/ui/Bow';
 
 export function HowItWorks() {
   const steps = [
@@ -35,7 +35,7 @@ export function HowItWorks() {
               <em style={{ color: 'var(--primary)' }}>peace of mind</em> for as long as you'd like it.
             </h2>
           </div>
-          <Floret size={48} color="var(--blush-deep)" center="var(--ivory)" />
+          <Bow size={48} color="var(--blush-deep)" center="var(--ivory)" />
         </div>
 
         <div className="v-grid-3">

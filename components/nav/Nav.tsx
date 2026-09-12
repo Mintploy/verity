@@ -40,7 +40,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
     <>
       <nav className="v-nav" style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(255,244,244,0.9)',
+        background: 'rgba(234,227,219,0.88)',
         backdropFilter: 'blur(20px) saturate(180%)',
         borderBottom: '1px solid var(--gold-pale)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

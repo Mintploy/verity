@@ -64,15 +64,6 @@ export function Footer() {
           <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--gold-deep)', letterSpacing: 0.3 }}>
             © 2026 Mintploy, Inc. · Made quietly in Los Angeles · For women only
           </div>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 16px', background: 'var(--sage-pale)', borderRadius: 'var(--r-pill)',
-          }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sage-deep)' }} />
-            <span style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--sage-deep)', fontWeight: 500, letterSpacing: 0.3 }}>
-              ID-verified female access · powered by Stripe
-            </span>
-          </div>
         </div>
       </div>
     </footer>

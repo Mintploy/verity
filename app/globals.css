@@ -1,46 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Outfit:wght@300;400;500;600;700&family=Italiana&display=swap');
-
 :root {
-  --ivory:        #FFF4F4;
-  --ivory-warm:   #FFE0DE;
-  --ivory-deep:   #F5D0CE;
-  --champagne:    #F3E5C6;
-  --pearl:        #FFFCF8;
-  --primary:      #FF4E8E;
-  --primary-deep: #B41E61;
-  --primary-pale: #FFD2E0;
-  --primary-mist: #FFE5EE;
-  --blush:        #FFD2E0;
-  --blush-deep:   #FF4E8E;
-  --blush-pale:   #FFE5EE;
-  --rose:         #E7506C;
-  --gold:         #C9A66B;
-  --gold-pale:    #F3E5C6;
-  --gold-deep:    #8A6E3A;
-  --mauve:        #C8A6B4;
-  --mauve-deep:   #956D82;
-  --dark:         #1F0A15;
-  --dark-soft:    #4A1E35;
-  --plum:         #1F0A15;
-  --plum-soft:    #4A1E35;
-  --wine:         #B41E61;
-  --sage:         #87AE7E;
-  --sage-deep:    #2F4A2C;
-  --sage-pale:    #DEECD6;
-  --honey:        #E9B25C;
+  /* ── Ground: cream (Pantone Jet Stream) ──────────────── */
+  --ivory:        #E4D6C9;
+  --ivory-warm:   #DACBBB;
+  --ivory-deep:   #C7B5A2;
+  --champagne:    #E8DCC8;
+  --pearl:        #F5EDEC;
+
+  /* ── Primary: burgundy (Pantone Vintage Wine) ────────── */
+  --primary:      #551212;
+  --primary-deep: #3A0B0B;
+  --primary-mid:  #771126;
+  --primary-pale: #F0B0BB;
+  --primary-mist: #FAE8EA;
+
+  /* ── Secondary accent: soft blush ────────────────────── */
+  --blush:        #F0B0BB;
+  --blush-deep:   #C55C6F;
+  --blush-pale:   #FAE8EA;
+  --rose:         #C55C6F;
+
+  --gold:         #A98B57;
+  --gold-pale:    #D8CAB4;
+  --gold-deep:    #6F5830;
+  --mauve:        #BFA7AB;
+  --mauve-deep:   #8A666D;
+  --dark:         #2A0E12;
+  --dark-soft:    #5E3A40;
+  --plum:         #2A0E12;
+  --plum-soft:    #5E3A40;
+  --wine:         #771126;
+  --sage:         #8A7B52;
+  --sage-deep:    #4A421F;
+  --sage-pale:    #E2DBC4;
+  --honey:        #D9A55C;
   --honey-deep:   #6E4F1D;
-  --honey-pale:   #F9DCAA;
-  --deeprose:     #E7506C;
-  --deeprose-deep:#7A1E36;
-  --deeprose-pale:#F8CAD2;
-  --serif: 'Cormorant Garamond', Georgia, serif;
-  --sans:  'Outfit', -apple-system, sans-serif;
-  --logo:  'Italiana', 'Cormorant Garamond', serif;
-  --shadow-xs: 0 1px 2px rgba(31,10,21,0.04);
-  --shadow-sm: 0 2px 8px rgba(31,10,21,0.06), 0 1px 2px rgba(31,10,21,0.03);
-  --shadow-md: 0 8px 24px rgba(31,10,21,0.08), 0 2px 6px rgba(31,10,21,0.04);
-  --shadow-lg: 0 24px 60px rgba(31,10,21,0.12), 0 8px 16px rgba(31,10,21,0.06);
-  --shadow-pop: 0 12px 40px rgba(255, 78, 142, 0.22);
+  --honey-pale:   #F0DCB4;
+  --deeprose:     #C55C6F;
+  --deeprose-deep:#771126;
+  --deeprose-pale:#F5DADF;
+  /* Didone for anything that has to carry the brand; Cormorant still sets
+     running text, where Bodoni's thin strokes would tire the eye. */
+  --display: var(--font-display), 'Cormorant Garamond', Georgia, serif;
+  --script:  var(--font-script), 'Cormorant Garamond', cursive;
+  --serif: var(--font-serif), Georgia, serif;
+  --sans:  var(--font-sans), -apple-system, sans-serif;
+  --logo:  var(--font-display), 'Cormorant Garamond', serif;
+  --shadow-xs: 0 1px 2px rgba(36,16,26,0.05);
+  --shadow-sm: 0 2px 8px rgba(36,16,26,0.07), 0 1px 2px rgba(36,16,26,0.04);
+  --shadow-md: 0 8px 24px rgba(36,16,26,0.10), 0 2px 6px rgba(36,16,26,0.05);
+  --shadow-lg: 0 24px 60px rgba(36,16,26,0.14), 0 8px 16px rgba(36,16,26,0.07);
+  --shadow-pop: 0 12px 32px rgba(85, 18, 18, 0.30);
   --r-sm: 10px;
   --r-md: 18px;
   --r-lg: 28px;
@@ -58,7 +67,7 @@ html, body {
 }
 a { color: inherit; text-decoration: none; }
 button { font-family: var(--sans); cursor: pointer; }
-button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+button:focus, input:focus, a:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .v-serif { font-family: var(--serif); }
 .v-logo  { font-family: var(--logo); letter-spacing: 0.04em; }
@@ -68,7 +77,7 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--gold-deep);
+  color: var(--wine);
   white-space: nowrap;
 }
 .v-sticker {
@@ -77,11 +86,11 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
   gap: 6px;
   padding: 6px 14px;
   border-radius: var(--r-pill);
-  background: var(--gold-pale);
+  background: var(--blush-pale);
   font-family: var(--serif);
   font-style: italic;
   font-size: 14px;
-  color: var(--gold-deep);
+  color: var(--wine);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -121,7 +130,7 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
 /* ── Mobile menu ─────────────────────────────────────────── */
 .v-mobile-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(31,10,21,0.55); backdrop-filter: blur(6px);
+  background: rgba(36,16,26,0.55); backdrop-filter: blur(6px);
   opacity: 0; pointer-events: none; transition: opacity 0.25s;
 }
 .v-mobile-overlay.open { opacity: 1; pointer-events: all; }
@@ -130,7 +139,7 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--gold); outline-off
   position: fixed; top: 0; right: -100%; width: min(340px, 88vw);
   height: 100dvh; z-index: 201;
   background: var(--pearl);
-  box-shadow: -24px 0 60px rgba(31,10,21,0.18);
+  box-shadow: -24px 0 60px rgba(36,16,26,0.18);
   display: flex; flex-direction: column;
   padding: 0; overflow-y: auto;
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);

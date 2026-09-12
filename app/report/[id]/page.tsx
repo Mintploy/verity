@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
 import { Wordmark } from '@/components/ui/Wordmark';
-import { Floret } from '@/components/ui/Floret';
+import { Bow } from '@/components/ui/Bow';
 import { Report, ScoreState } from '@/lib/types';
 import { getStarSign, getCompatibility, SIGN_EMOJI, StarSign } from '@/lib/starsigns';
 import type { FileType } from '@/lib/hisfile';
@@ -458,7 +458,7 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
         <div style={{ position: 'absolute', top: -30, right: -30, width: 140, height: 140, borderRadius: '50%', background: 'radial-gradient(circle, var(--rose) 0%, transparent 65%)', opacity: 0.4 }} />
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <Floret size={18} color="var(--blush)" center="var(--wine)" />
+            <Bow size={18} color="var(--blush)" center="var(--wine)" />
             <div className="v-eyebrow" style={{ color: 'var(--blush)', fontSize: 10 }}>your move</div>
           </div>
           <h3 style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 400, lineHeight: 1.1, margin: 0, color: 'var(--ivory)' }}>
@@ -601,8 +601,11 @@ function Section({ id, eyebrow, title, children, accent = 'var(--blush-pale)' }:
   return (
     <div id={id} style={{ borderRadius: 'var(--r-lg)', background: 'var(--pearl)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '24px 28px 18px' }}>
-        <div style={{ width: 42, height: 42, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--gold)', fontWeight: 300 }}>{eyebrow}</span>
+        {/* The circle became a bow: same footprint, house mark instead of a
+            generic disc, with the section number set beneath it. */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 42 }}>
+          <Bow size={30} color="var(--primary)" center="var(--blush)" />
+          <span style={{ fontFamily: 'var(--display)', fontSize: 11, color: 'var(--primary-mid)', fontWeight: 600, letterSpacing: 0.5 }}>{eyebrow}</span>
         </div>
         <div>
           <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>Section {eyebrow}</div>

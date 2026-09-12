@@ -1,4 +1,4 @@
-import { Floret } from '@/components/ui/Floret';
+import { Bow } from '@/components/ui/Bow';
 
 export function Testimonial() {
   return (
@@ -11,7 +11,7 @@ export function Testimonial() {
       }} />
       <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-          <Floret size={32} color="var(--primary)" center="var(--ivory)" />
+          <Bow size={32} color="var(--primary)" center="var(--ivory)" />
         </div>
         <blockquote className="v-display-md v-serif" style={{
           fontWeight: 400, color: 'var(--dark)', margin: 0, fontStyle: 'italic',

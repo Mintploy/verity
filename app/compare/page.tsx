@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Nav } from '@/components/nav/Nav';
 import { Footer } from '@/components/landing/Footer';
-import { Floret } from '@/components/ui/Floret';
+import { Bow } from '@/components/ui/Bow';
 import Link from 'next/link';
 import { Report } from '@/lib/types';
 
@@ -189,7 +189,7 @@ export default function ComparePage() {
               Every man from your recent searches, compared on public record, identity verification, phone signals, and address history. Sorted by safety score.
             </p>
           </div>
-          <Floret size={48} color="var(--blush-deep)" center="var(--ivory)" />
+          <Bow size={48} color="var(--blush-deep)" center="var(--ivory)" />
         </div>
 
         {/* Summary bar */}
