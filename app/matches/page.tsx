@@ -58,7 +58,17 @@ function MatchesInner() {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Search failed');
         clearPendingPhone();
-        setCandidates(d.candidates ?? []);
+        const found: Candidate[] = d.candidates ?? [];
+
+        // One candidate is not a choice. Showing a picker with a single card
+        // asks her to confirm what we already know, so go straight to his file.
+        if (found.length === 1) {
+          setChosen(found[0]);
+          sessionStorage.setItem(PENDING_KEY, JSON.stringify({ token: found[0].token, name: found[0].name }));
+          buildReport(found[0].token);
+          return;
+        }
+        setCandidates(found);
       })
       .catch((e) => {
         if (e?.message === 'redirecting') return;

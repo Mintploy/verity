@@ -127,6 +127,28 @@ function ReportSidebar({ report, onCompare }: { report: Report; onCompare: () =>
   );
 }
 
+/**
+ * Renders a value that should be text but might not be.
+ *
+ * A vendor field that arrives as an object throws "Objects are not valid as a
+ * React child" and takes the entire report down, turning one unreadable field
+ * into a blank page. Reports stored before the mapper was hardened still carry
+ * such values, so the render guards too.
+ */
+function asText(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(asText).filter(Boolean).join(', ');
+  if (typeof v === 'object') {
+    return Object.values(v as Record<string, unknown>)
+      .filter(x => typeof x === 'string' || typeof x === 'number')
+      .join(' ')
+      .trim();
+  }
+  return '';
+}
+
 function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign | null }) {
   const scoreConfig = getScoreConfig(report.score);
   const initials = report.subject.name.split(' ').map((n: string) => n[0]).join('');
@@ -313,7 +335,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                   )}
                 </div>
                 
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark-soft)', marginBottom: 16, fontStyle: 'italic' }}>{prop.address}</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark-soft)', marginBottom: 16, fontStyle: 'italic' }}>{asText(prop.address)}</div>
                 <div className="v-grid-r3" style={{ gap: 14, marginTop: 12 }}>
                   {prop.currentValue && (
                     <div style={{ padding: '12px 14px', background: 'var(--pearl)', borderRadius: 'var(--r-md)' }}>
