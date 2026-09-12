@@ -175,7 +175,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.65, color: 'var(--dark)', margin: '20px 0 0', fontWeight: 300 }}>{report.summary}</p>
 
           {/* Star sign compatibility */}
-          {(compat || userSign === null) && (
+          {(compat || userSign === null || !subjectSign) && (
             <div style={{ marginTop: 22, paddingTop: 20, borderTop: '1px solid var(--gold-pale)' }}>
               <div className="v-eyebrow" style={{ marginBottom: 14 }}>Star sign compatibility</div>
               {compat && subjectSign && userSign ? (
@@ -222,6 +222,18 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                   </p>
                 </>
               ) : (
+                !subjectSign ? (
+                /* His record carries no date of birth. Enformion returns `age`
+                   without a `dob` on plenty of people, and a sign needs the
+                   month and day, so there is nothing to compute. Say so —
+                   before this, the panel simply vanished, which read as the
+                   feature being broken rather than the data being absent. */
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', fontWeight: 300, lineHeight: 1.6 }}>
+                  No date of birth on his record, so we cannot place his sign.
+                  {report.subject.age ? ` We have his age — ${report.subject.age} — but a sign needs the day.` : ''}
+                  {' '}Add it in his file if you learn it and the reading appears.
+                </div>
+              ) : (
                 /* User has no DOB set */
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', fontWeight: 300 }}>
@@ -236,7 +248,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                     Settings →
                   </a>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
