@@ -86,7 +86,7 @@ export function Hero() {
           </div>
 
           <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--mauve-deep)', marginTop: 16, letterSpacing: 0.3 }}>
-            Verified women only · Your search stays private · He'll never know
+            Verified women only · Your search stays private
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginTop: 36 }}>

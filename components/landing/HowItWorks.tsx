@@ -11,7 +11,7 @@ export function HowItWorks() {
     {
       num: '02',
       title: 'Drop in a number',
-      body: "His phone is the only thing we truly need. A name sharpens the picture. He will never know you searched.",
+      body: "His phone is the only thing we truly need. A name sharpens the picture.",
       accent: 'var(--primary-pale)',
     },
     {

@@ -34,7 +34,7 @@ const ANNUAL_FEATURES = [
   'Up to 15 background reports per month',
   'Phone intelligence on any number',
   'Compare multiple men side by side',
-  'He will never know you searched',
+  'Every search stays confidential',
 ];
 
 const FOUNDING_FEATURES = [
@@ -43,14 +43,14 @@ const FOUNDING_FEATURES = [
   'Up to 15 background reports per month',
   'Phone intelligence on any number',
   'Compare multiple men side by side',
-  'He will never know you searched',
+  'Every search stays confidential',
 ];
 
 const SINGLE_FEATURES = [
   'One complete background report',
   'Phone intelligence included',
   'No subscription required',
-  'He will never know you searched',
+  'Every search stays confidential',
 ];
 
 interface PlanCardProps {
@@ -191,7 +191,7 @@ export default function CheckoutPage() {
             Choose your plan
           </h1>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--mauve-deep)', marginBottom: 32, lineHeight: 1.5 }}>
-            All plans include full background reports. He'll never know you searched.
+            All plans include full background reports.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>

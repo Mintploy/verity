@@ -269,7 +269,7 @@ function SearchContent() {
           </button>
 
           <div style={{ textAlign: 'center', fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>
-            Your search is private · He'll never know · Results in ~14 seconds
+            Your search is private · Results in ~14 seconds
           </div>
         </div>
 

@@ -9,8 +9,7 @@ const wrap = (body: string) => `
     <div style="font-size:26px;letter-spacing:0.06em;margin-bottom:40px;color:#2C0E26">Verity</div>
     ${body}
     <div style="margin-top:48px;padding-top:24px;border-top:1px solid #FFE0DE;font-family:-apple-system,sans-serif;font-size:11px;color:#C8A6B4;letter-spacing:0.3px;line-height:1.7">
-      FOR VERIFIED WOMEN ONLY · VERITYPRIVE.COM<br>
-      He will never know you searched.
+      FOR VERIFIED WOMEN ONLY · VERITYPRIVE.COM
     </div>
   </div>
 `;
