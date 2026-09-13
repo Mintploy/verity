@@ -866,7 +866,15 @@ async function lookupPropertyV2(
     console.log('ENFORMION_SHAPE[PROPERTY]:', Object.keys(results[0]).join(','));
     console.log('ENFORMION_CENSUS[PROPERTY]:', census(results[0]));
     const prop0 = results[0].property ?? results[0].Property ?? {};
-    console.log('ENFORMION_PROPERTY_SUMMARY:', census(prop0.summary ?? prop0.Summary));
+    const sum0 = prop0.summary ?? prop0.Summary ?? {};
+    console.log('ENFORMION_PROPERTY_SUMMARY:', census(sum0));
+    // currentOwners maps to nothing, so OWNER OF RECORD never renders and the
+    // deed check that decides whether he owns a property or merely touched it
+    // is inert. Name the keys rather than guess at them a second time.
+    const owner0 = (sum0.currentOwners ?? [])[0];
+    console.log('ENFORMION_PROPERTY_OWNER:',
+      owner0 && typeof owner0 === 'object' ? Object.keys(owner0).join('|')
+        : owner0 !== undefined ? `scalar:${typeof owner0}` : 'no currentOwners entry');
     const firstAssessor = (prop0.assessorRecords ?? prop0.AssessorRecords ?? [])[0];
     console.log('ENFORMION_PROPERTY_ASSESSOR:', firstAssessor ? census(firstAssessor) : 'no assessorRecords entry');
   }
@@ -925,9 +933,15 @@ async function lookupPropertyV2(
       ?? money(sum.assessedValue?.price);
 
     const owners: string[] = (sum.currentOwners ?? [])
-      .map((o: any) => str(o?.fullName)
-        ?? [str(o?.firstName), str(o?.lastName)].filter(Boolean).join(' '))
-      .filter(Boolean);
+      .map((o: any) => {
+        if (typeof o === 'string') return o.trim() || undefined;
+        const named = str(o?.fullName) ?? str(o?.name) ?? str(o?.ownerName);
+        if (named) return named;
+        const built = [str(o?.firstName) ?? str(o?.first), str(o?.lastName) ?? str(o?.last)]
+          .filter(Boolean).join(' ');
+        return built || undefined;
+      })
+      .filter(Boolean) as string[];
 
     return {
       address: fullAddress ?? '',
