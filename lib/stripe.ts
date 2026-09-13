@@ -130,3 +130,56 @@ export async function createIdentityVerificationSession({
   });
   return session;
 }
+
+/**
+ * Steps a founding membership up to the standard rate after its first year.
+ *
+ * The founding price is a flat recurring $199, so on its own it would renew at
+ * $199 forever, which is not the offer: $199 covers her first year and $297
+ * applies after. A plain price cannot express that, so the subscription is
+ * converted to a schedule with two phases.
+ *
+ * end_behavior 'release' matters. When the second phase ends the schedule lets
+ * go and the subscription carries on renewing at the standard price, rather
+ * than cancelling her membership the moment the schedule runs out.
+ *
+ * Best-effort by design. A failure here must not fail the webhook, because
+ * Stripe would retry it and she would receive a second welcome email; the
+ * membership is already paid for and valid either way. It logs loudly instead,
+ * since a silent miss means someone is billed $199 next year.
+ */
+export async function scheduleFoundingStepUp(subscriptionId: string): Promise<boolean> {
+  if (!STRIPE_PRICE_FOUNDING || !STRIPE_PRICE_ANNUAL) {
+    console.error('[stripe] Cannot schedule step-up: founding or annual price env var is unset.');
+    return false;
+  }
+
+  try {
+    const schedule = await stripe.subscriptionSchedules.create({ from_subscription: subscriptionId });
+    const current = schedule.phases[0];
+
+    await stripe.subscriptionSchedules.update(schedule.id, {
+      end_behavior: 'release',
+      phases: [
+        // This API version expresses phase length as `duration`, not the
+        // `iterations` the older docs use.
+        {
+          items: [{ price: STRIPE_PRICE_FOUNDING, quantity: 1 }],
+          start_date: current.start_date,
+          duration: { interval: 'year', interval_count: 1 },
+        },
+        {
+          items: [{ price: STRIPE_PRICE_ANNUAL, quantity: 1 }],
+          duration: { interval: 'year', interval_count: 1 },
+        },
+      ],
+      metadata: { app: 'verity', step_up: 'founding_to_annual' },
+    });
+
+    console.log(`[stripe] Founding step-up scheduled for ${subscriptionId} (schedule ${schedule.id})`);
+    return true;
+  } catch (err: any) {
+    console.error(`[stripe] Founding step-up FAILED for ${subscriptionId}:`, err?.message ?? err);
+    return false;
+  }
+}

@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { stripe, scheduleFoundingStepUp } from '@/lib/stripe';
 import { createMagicLinkToken } from '@/lib/auth';
 import { sendWelcomeEmail } from '@/lib/email';
 import { getServiceSupabase } from '@/lib/supabase';
@@ -42,6 +42,17 @@ export async function POST(req: NextRequest) {
             },
             { onConflict: 'user_id', ignoreDuplicates: false }
           );
+
+          // A founding membership is $199 for the first year and $297 after,
+          // which a single recurring price cannot express: left alone it would
+          // renew at $199 forever. Convert it to a two-phase schedule now,
+          // while we know which plan she bought.
+          if (plan === 'founding' && session.subscription) {
+            const subId = typeof session.subscription === 'string'
+              ? session.subscription
+              : session.subscription.id;
+            await scheduleFoundingStepUp(subId);
+          }
 
           const token = await createMagicLinkToken(email, customerId);
           await sendWelcomeEmail(email, token);
