@@ -23,6 +23,9 @@ const CENSUS_URL = `${HOST}/CensusSearch`;
 const CRIMINAL_URL = `${HOST}/CriminalSearch/V2`;
 const OFAC_URL = `${HOST}/OfacSearch`;
 const WORKPLACE_URL = `${HOST}/WorkplaceSearch`;
+const EVICTION_URL = `${HOST}/EvictionSearch`;
+const FORECLOSURE_URL = `${HOST}/ForeclosureV2Search`;
+const MARRIAGE_URL = `${HOST}/MarriageSearch`;
 
 // galaxy-search-type values.
 //
@@ -47,6 +50,9 @@ const SEARCH_TYPE_CENSUS = 'Census';
 const SEARCH_TYPE_CRIMINAL = 'CriminalV2';
 const SEARCH_TYPE_OFAC = 'Ofac';
 const SEARCH_TYPE_WORKPLACE = 'Workplace';
+const SEARCH_TYPE_EVICTION = 'Eviction';
+const SEARCH_TYPE_FORECLOSURE = 'ForeclosureV2';
+const SEARCH_TYPE_MARRIAGE = 'Marriage';
 
 export interface EnformionPhone {
   lineType: 'mobile' | 'voip' | 'landline';
@@ -131,6 +137,11 @@ export interface EnformionPerson {
   censusNeighborhood?: string;
   criminal?: CriminalResult;
   ofacHits?: string[];
+  /** False when the sanctions search did not run, so no hits means unknown. */
+  ofacChecked?: boolean;
+  evictionRecords?: string[];
+  evictionChecked?: boolean;
+  foreclosureRecords?: string[];
   marriageRecords?: string[];
   divorceRecords?: string[];
   vehicles?: string[];
@@ -265,6 +276,9 @@ function extractRowsDefault(data: any): any[] {
     ?? [];
 }
 
+// Returns rows alone, for callers where an empty result and a failed call can
+// safely look the same. Anything feeding a clear/not-clear verdict must use
+// proSearchChecked instead: an empty list from a 400 is not an empty record.
 async function proSearch(
   username: string,
   password: string,
@@ -274,6 +288,22 @@ async function proSearch(
   label: string,
   extractRows?: (data: any) => any[],
 ): Promise<any[]> {
+  return (await proSearchChecked(username, password, url, searchType, body, label, extractRows)).rows;
+}
+
+// `ok` is true only when Enformion answered 200. A denied or failed call comes
+// back { rows: [], ok: false }, which is what lets the report say "not checked"
+// instead of "none found". Criminal and OFAC said "none found" for every search
+// run while the Pro plan was off, because this distinction did not exist.
+async function proSearchChecked(
+  username: string,
+  password: string,
+  url: string,
+  searchType: string,
+  body: Record<string, unknown>,
+  label: string,
+  extractRows?: (data: any) => any[],
+): Promise<{ rows: any[]; ok: boolean }> {
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -285,7 +315,7 @@ async function proSearch(
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       console.log(`ENFORMION_${label}_ERROR:`, failureSummary(res.status, errText));
-      return [];
+      return { rows: [], ok: false };
     }
 
     const data = await res.json();
@@ -310,11 +340,24 @@ async function proSearch(
       // pagination total explaining why. Surface it instead of discarding it.
       console.log(`ENFORMION_EMPTY[${label}]:`, JSON.stringify(data).slice(0, 2000));
     }
-    return rows;
+    return { rows, ok: true };
   } catch (e: any) {
     console.log(`ENFORMION_${label}_EXCEPTION:`, String(e), e?.cause ? `| ${String(e.cause)}` : '');
-    return [];
+    return { rows: [], ok: false };
   }
+}
+
+// Like pick(), but skips objects and arrays rather than stringifying them.
+function pickText(row: any, ...keys: string[]): string | undefined {
+  if (!row || typeof row !== 'object') return undefined;
+  const lower: Record<string, any> = {};
+  for (const k of Object.keys(row)) lower[k.toLowerCase()] = row[k];
+  for (const k of keys) {
+    const v = lower[k.toLowerCase()];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+  }
+  return undefined;
 }
 
 // Picks the first non-empty value among candidate keys, case-insensitively.
@@ -737,7 +780,8 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     // Criminal and OFAC have no indicator and are always queried.
     const [
       propertyIntelligence, divorceDetail, linkedInResult, censusResult,
-      criminalRecords, ofacHits, workplace,
+      criminalRecords, ofacResult, workplace,
+      evictionDetail, foreclosureDetail, marriageDetail,
     ] = await Promise.all([
       // Ungated. hasPropertyV2Records reads 0 on men whose record plainly
       // carries isCurrentPropertyOwner, so the gate was suppressing the square
@@ -758,12 +802,16 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         : Promise.resolve(null),
       lookupCriminal(username, password, fullName, {
         age,
+        tahoeId: best.tahoeId,
         states: (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
-      }).catch(() => ({ findings: [], onSexOffenderRegistry: false, nameOnlyMatches: false })),
-      lookupOfac(username, password, fullName).catch(() => []),
+      }).catch(() => ({ findings: [], onSexOffenderRegistry: false, nameOnlyMatches: false, checked: false })),
+      lookupOfac(username, password, fullName).catch(() => ({ hits: [] as string[], checked: false })),
       counts.workplace > 0
         ? lookupWorkplace(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
+      lookupEvictions(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
+      lookupForeclosures(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
+      lookupMarriages(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
     ]);
 
     return {
@@ -799,8 +847,14 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         censusNeighborhood: censusResult?.neighborhood,
         counts,
         criminal: criminalRecords,
-        ofacHits: ofacHits.length ? ofacHits : undefined,
-        marriageRecords: marriageRecords.length ? marriageRecords : undefined,
+        ofacHits: ofacResult.hits.length ? ofacResult.hits : undefined,
+        ofacChecked: ofacResult.checked,
+        evictionRecords: evictionDetail.items.length ? evictionDetail.items : undefined,
+        evictionChecked: evictionDetail.checked,
+        foreclosureRecords: foreclosureDetail.items.length ? foreclosureDetail.items : undefined,
+        marriageRecords: [...marriageRecords, ...marriageDetail.items].length
+          ? [...new Set([...marriageRecords, ...marriageDetail.items])]
+          : undefined,
         divorceRecords: inlineDivorce.length ? inlineDivorce : divorceDetail ? [divorceDetail] : undefined,
         vehicles: vehicles.length ? vehicles : undefined,
       },
@@ -1068,6 +1122,8 @@ export interface CriminalFinding {
   sexOffender: boolean;
   /** True when the record was corroborated against the subject's own age/state. */
   corroborated: boolean;
+  /** Booking photo URL. Only ever set on a corroborated record. */
+  imageUrl?: string;
 }
 
 export interface CriminalResult {
@@ -1076,6 +1132,8 @@ export interface CriminalResult {
   onSexOffenderRegistry: boolean;
   /** True if we searched but could only match on name, with no corroboration. */
   nameOnlyMatches: boolean;
+  /** False when no criminal search succeeded. Empty findings then mean unknown, not clear. */
+  checked: boolean;
 }
 
 // Criminal Search V2, POST /CriminalSearch/V2, body { FirstName, LastName,
@@ -1093,20 +1151,53 @@ async function lookupCriminal(
   username: string,
   password: string,
   fullName?: string,
-  subject?: { age?: number; states?: string[] },
+  subject?: { age?: number; states?: string[]; tahoeId?: string },
 ): Promise<CriminalResult> {
-  const empty: CriminalResult = { findings: [], onSexOffenderRegistry: false, nameOnlyMatches: false };
-  if (!fullName) return empty;
+  const empty: CriminalResult = { findings: [], onSexOffenderRegistry: false, nameOnlyMatches: false, checked: false };
+  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+  if (!subject?.tahoeId && parts.length < 2) return empty;
 
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return empty;
+  // Arrests, convictions, warrants and registry records. Traffic infractions
+  // are left out on purpose: every corroborated finding here forces the score
+  // red, and a speeding ticket must never do that.
+  const CATEGORIES = 'ARR,CRI,WAN,SEX';
+  const extract = (d: any) => d.CriminalRecords ?? d.criminalRecords ?? [];
 
-  const rows = await proSearch(
-    username, password, CRIMINAL_URL, SEARCH_TYPE_CRIMINAL,
-    { FirstName: parts[0], LastName: parts[parts.length - 1], Page: 1, ResultsPerPage: 10 },
-    'CRIMINAL',
-    (d: any) => d.CriminalRecords ?? d.criminalRecords ?? [],
-  );
+  // The TahoeId is his identifier, not his name, so records returned against it
+  // are his rather than a namesake's. That is the whole difference between
+  // "he has a record" and "someone called this has a record".
+  let linkedRows: any[] = [];
+  let checked = false;
+  if (subject?.tahoeId) {
+    const r = await proSearchChecked(
+      username, password, CRIMINAL_URL, SEARCH_TYPE_CRIMINAL,
+      { TahoeId: subject.tahoeId, CategoryTypes: CATEGORIES, Page: 1, ResultsPerPage: 20 },
+      'CRIMINAL_BYID', extract,
+    );
+    linkedRows = r.rows;
+    checked = checked || r.ok;
+  }
+
+  // Not every court record is linked to a TahoeId, so an empty identifier
+  // search falls back to the name, with the age narrowing it and the
+  // corroboration below deciding whether any hit is actually him.
+  let nameRows: any[] = [];
+  if (linkedRows.length === 0 && parts.length >= 2) {
+    const r = await proSearchChecked(
+      username, password, CRIMINAL_URL, SEARCH_TYPE_CRIMINAL,
+      {
+        FirstName: parts[0], LastName: parts[parts.length - 1],
+        ...(subject?.age ? { Age: subject.age } : {}),
+        CategoryTypes: CATEGORIES, Page: 1, ResultsPerPage: 20,
+      },
+      'CRIMINAL', extract,
+    );
+    nameRows = r.rows;
+    checked = checked || r.ok;
+  }
+
+  const linked = new Set<any>(linkedRows);
+  const rows = [...linkedRows, ...nameRows];
 
   const subjectStates = new Set((subject?.states ?? []).map(s => s.toUpperCase()));
   const findings: CriminalFinding[] = [];
@@ -1144,7 +1235,14 @@ async function lookupCriminal(
     // positively contradicts it. Unknown is never treated as agreement.
     const checksRun = ageMatch !== null || stateMatch !== null;
     const contradicted = ageMatch === false || stateMatch === false;
-    const corroborated = checksRun && !contradicted;
+    // An identifier match is itself a check that passed, but a contradiction on
+    // age or state still overrides it.
+    const corroborated = (linked.has(rec) || checksRun) && !contradicted;
+
+    const image = (rec.Images ?? rec.images ?? []).find((im: any) => im?.ImageUrl || im?.imageUrl);
+    const imageUrl: string | undefined = corroborated
+      ? (image?.ImageUrl ?? image?.imageUrl) || undefined
+      : undefined;
 
     const isSexOffence = String(rec.ShortCat ?? '').toUpperCase().includes('SEX')
       || cases.some((c: any) => /sex offender/i.test(String(c.MappedCategory ?? c.RawCategory ?? c.Source ?? '')));
@@ -1163,7 +1261,7 @@ async function lookupCriminal(
       const summary = [desc || category || 'Record on file', disposition, year, where]
         .filter(Boolean).join(' · ');
 
-      if (summary) findings.push({ summary, sexOffender: isSexOffence, corroborated });
+      if (summary) findings.push({ summary, sexOffender: isSexOffence, corroborated, imageUrl });
     }
   }
 
@@ -1174,17 +1272,104 @@ async function lookupCriminal(
     findings: findings.slice(0, 8),
     onSexOffenderRegistry: corroboratedFindings.some(f => f.sexOffender),
     nameOnlyMatches: findings.length > 0 && corroboratedFindings.length === 0,
+    checked,
   };
 }
 
 // OFAC / sanctions and prohibited-parties screening.
+// ─── Eviction, pre-foreclosure and marriage detail ──────────────────────────
+//
+// The person record says how many of each exist and nothing else, so the report
+// could only ever print "2 records on file, details require further review".
+// These fetch the records themselves, by TahoeId, so the rows belong to him.
+//
+// The response shapes are not documented. Every read below uses pickText over
+// plausible keys, and proSearchChecked logs SHAPE and CENSUS for each endpoint,
+// so the first live search names the real keys.
+export interface DetailLookup {
+  items: string[];
+  checked: boolean;
+}
+
+const detailRows = (key: string) => (d: any) =>
+  d?.[key] ?? d?.[key[0].toUpperCase() + key.slice(1)] ?? extractRowsDefault(d);
+
+const yearOnly = (v?: string): string | undefined => {
+  if (!v) return undefined;
+  const y = new Date(v).getFullYear();
+  return Number.isFinite(y) && y > 1900 ? String(y) : undefined;
+};
+
+const dollars = (v?: string): string | undefined => {
+  const n = Number(String(v ?? '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : undefined;
+};
+
+async function lookupEvictions(username: string, password: string, tahoeId?: string): Promise<DetailLookup> {
+  if (!tahoeId) return { items: [], checked: false };
+  const { rows, ok } = await proSearchChecked(
+    username, password, EVICTION_URL, SEARCH_TYPE_EVICTION,
+    { TahoeId: tahoeId, Page: 1, ResultsPerPage: 10 },
+    'EVICTION', detailRows('evictionRecords'),
+  );
+  const items = rows.slice(0, 6).map((r: any) => [
+    yearOnly(pickText(r, 'filingDate', 'fileDate', 'FilingDate', 'recordingDate', 'judgmentDate'))
+      ? `Filed ${yearOnly(pickText(r, 'filingDate', 'fileDate', 'FilingDate', 'recordingDate', 'judgmentDate'))}` : undefined,
+    pickText(r, 'plaintiffName', 'plaintiff', 'PlaintiffFullName') ? `by ${pickText(r, 'plaintiffName', 'plaintiff', 'PlaintiffFullName')}` : undefined,
+    pickText(r, 'judgmentType', 'caseType', 'filingType', 'disposition'),
+    dollars(pickText(r, 'judgmentAmount', 'amount', 'claimAmount')),
+    pickText(r, 'county', 'courtCounty') ? `${pickText(r, 'county', 'courtCounty')} County` : undefined,
+    pickText(r, 'state', 'courtState'),
+  ].filter(Boolean).join(' · ') || 'Eviction record on file');
+  return { items, checked: ok };
+}
+
+async function lookupForeclosures(username: string, password: string, tahoeId?: string): Promise<DetailLookup> {
+  if (!tahoeId) return { items: [], checked: false };
+  const { rows, ok } = await proSearchChecked(
+    username, password, FORECLOSURE_URL, SEARCH_TYPE_FORECLOSURE,
+    { TahoeId: tahoeId, Page: 1, ResultsPerPage: 10 },
+    'FORECLOSURE', detailRows('foreclosureRecords'),
+  );
+  const items = rows.slice(0, 6).map((r: any) => [
+    pickText(r, 'documentType', 'recordType', 'foreclosureStage', 'type'),
+    yearOnly(pickText(r, 'recordingDate', 'filingDate', 'defaultDate', 'auctionDate')),
+    dollars(pickText(r, 'loanAmount', 'defaultAmount', 'unpaidBalance', 'amount')),
+    pickText(r, 'lenderName', 'lender', 'beneficiaryName'),
+    pickText(r, 'propertyAddress', 'fullAddress', 'address'),
+  ].filter(Boolean).join(' · ') || 'Pre-foreclosure record on file');
+  return { items, checked: ok };
+}
+
+async function lookupMarriages(username: string, password: string, tahoeId?: string): Promise<DetailLookup> {
+  if (!tahoeId) return { items: [], checked: false };
+  const { rows, ok } = await proSearchChecked(
+    username, password, MARRIAGE_URL, SEARCH_TYPE_MARRIAGE,
+    { TahoeId: tahoeId, Page: 1, ResultsPerPage: 10 },
+    'MARRIAGE', detailRows('marriageRecords'),
+  );
+  const items = rows.slice(0, 6).map((r: any) => {
+    const spouseParts = [pickText(r, 'spouseFirstName', 'brideFirstName'), pickText(r, 'spouseLastName', 'brideLastName')]
+      .filter(Boolean).join(' ');
+    const spouse = pickText(r, 'spouseFullName', 'spouseName', 'brideFullName', 'groomFullName')
+      ?? (spouseParts || undefined);
+    return [
+      spouse ? `To ${spouse}` : undefined,
+      yearOnly(pickText(r, 'marriageDate', 'MarriageDate', 'licenseDate', 'filingDate')),
+      pickText(r, 'county', 'marriageCounty') ? `${pickText(r, 'county', 'marriageCounty')} County` : undefined,
+      pickText(r, 'state', 'marriageState'),
+    ].filter(Boolean).join(' · ') || 'Marriage record on file';
+  });
+  return { items, checked: ok };
+}
+
 async function lookupOfac(
   username: string, password: string, fullName?: string,
-): Promise<string[]> {
-  if (!fullName) return [];
+): Promise<{ hits: string[]; checked: boolean }> {
+  if (!fullName) return { hits: [], checked: false };
   const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return [];
-  const rows = await proSearch(
+  if (parts.length < 2) return { hits: [], checked: false };
+  const { rows, ok } = await proSearchChecked(
     username, password, OFAC_URL, SEARCH_TYPE_OFAC,
     // OfacSearch does not take FirstName/LastName. Its own 400 names the
     // accepted fields: "At least one must be provided. (EntityName or
@@ -1193,12 +1378,13 @@ async function lookupOfac(
     { PersonName: parts.join(' '), ResultsPerPage: 3 },
     'OFAC',
   );
-  return rows.slice(0, 3).map((o: any) => {
+  const hits = rows.slice(0, 3).map((o: any) => {
     // Documented: SourceName is the sanctions list, Name the matched party.
     const list = pick(o, 'SourceName', 'listName', 'program', 'source') ?? 'Sanctions list';
     const name = pick(o, 'Name', 'fullName', 'entityName');
     return [list, name].filter(Boolean).join(' · ');
   }).filter(Boolean);
+  return { hits, checked: ok };
 }
 
 // Workplace Search. Person Search reports hasWorkplaceRecords but does not

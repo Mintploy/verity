@@ -511,6 +511,16 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 3 }}>{p.label}</div>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, lineHeight: 1.4, color: p.flag ? 'var(--deeprose-deep)' : 'var(--dark)', fontWeight: p.flag ? 500 : 300 }}>{p.value}</div>
+                {p.images && p.images.length > 0 && (
+                  // A booking photo lets her confirm the record is the man she
+                  // is meeting, which is the question a name match cannot answer.
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    {p.images.slice(0, 3).map((src, j) => (
+                      <img key={j} src={src} alt="Booking photo on file" loading="lazy" referrerPolicy="no-referrer"
+                        style={{ width: 72, height: 90, objectFit: 'cover', borderRadius: 'var(--r-sm)', border: '1px solid var(--gold-pale)' }} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}

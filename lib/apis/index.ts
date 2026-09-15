@@ -205,7 +205,10 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     addresses: enrichedAddresses,
     propertyIntelligence: enrichedProperties,
     relationships: {
-      status: person.maritalStatus ?? '',
+      // A marriage record proves a marriage happened, not that it is current,
+      // so it is reported as a record rather than as "Married".
+      status: person.maritalStatus
+        ?? (person.marriageRecords?.length ? `Marriage record on file: ${person.marriageRecords[0]}` : ''),
       spouse: person.spouseName,
       priors: person.divorceRecords?.join('; ') ?? person.priorMarriages ?? '',
       relatives: person.relatives ?? [],
@@ -309,12 +312,22 @@ function buildCriminalRow(criminal: any): any {
       value: confirmed.map((f: any) => f.summary).join(' | '),
       good: false,
       flag: true,
+      images: confirmed.map((f: any) => f.imageUrl).filter(Boolean),
     };
   }
   if (criminal?.nameOnlyMatches) {
     return {
       label: 'Criminal records',
       value: `${criminal.findings.length} record${criminal.findings.length === 1 ? '' : 's'} match the name but could not be confirmed as this person, verify before relying on this`,
+      neutral: true,
+    };
+  }
+  // Empty findings from a search that never ran are not a clean record. Saying
+  // "None found" here is what every report did while the plan lacked access.
+  if (!criminal?.checked) {
+    return {
+      label: 'Criminal records',
+      value: 'Not checked. The criminal records search did not complete for this report, so this is unknown, not clear.',
       neutral: true,
     };
   }
@@ -328,10 +341,19 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
     buildRegistryRow(so, person?.criminal),
     { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
     { label: 'Bankruptcy filings', value: plural(person?.counts?.bankruptcy, 'filing'), good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
-    { label: 'Eviction records', value: plural(person?.counts?.evictions, 'record'), good: !person?.hasEvictions, flag: !!person?.hasEvictions },
+    person?.evictionRecords?.length
+      ? { label: 'Eviction records', value: person.evictionRecords.join(' | '), good: false, flag: true }
+      : { label: 'Eviction records', value: plural(person?.counts?.evictions, 'record'), good: !person?.hasEvictions, flag: !!person?.hasEvictions },
+    ...(person?.foreclosureRecords?.length
+      ? [{ label: 'Pre-foreclosure', value: person.foreclosureRecords.join(' | '), good: false, flag: true }]
+      : []),
     { label: 'Judgments / liens', value: plural((person?.counts?.judgments ?? 0) + (person?.counts?.liens ?? 0), 'record'), good: !person?.hasJudgments && !person?.hasLiens, flag: !!(person?.hasJudgments || person?.hasLiens) },
     buildCriminalRow(person?.criminal),
-    { label: 'Sanctions / watchlists', value: person?.ofacHits?.length ? person.ofacHits.join(' | ') : 'Not listed', good: !person?.ofacHits?.length, flag: !!person?.ofacHits?.length },
+    person?.ofacHits?.length
+      ? { label: 'Sanctions / watchlists', value: person.ofacHits.join(' | '), good: false, flag: true }
+      : person?.ofacChecked
+        ? { label: 'Sanctions / watchlists', value: 'Not listed', good: true }
+        : { label: 'Sanctions / watchlists', value: 'Not checked. The sanctions search did not complete for this report.', neutral: true },
     { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : plural(person?.counts?.vehicles, 'registration'), neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
   ];

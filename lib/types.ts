@@ -114,6 +114,8 @@ export interface PublicRecord {
   good?: boolean;
   flag?: boolean;
   neutral?: boolean;
+  /** Booking photos, only on records corroborated as his. */
+  images?: string[];
 }
 
 export interface SocialCandidate {
