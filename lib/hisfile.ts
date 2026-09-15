@@ -1,3 +1,4 @@
+import { ickText, type DateEntry, type IckEntry } from './journal';
 import { getServiceSupabase } from './supabase';
 import { getStarSign, getCompatibility, StarSign } from './starsigns';
 
@@ -29,7 +30,9 @@ export interface HisFile {
   first_date_date?: string;
   first_date_paid?: string;
   gifts?: string[];
-  icks?: string[];
+  icks?: Array<string | IckEntry>;
+  /** Every date, with how she felt. Date 1 is mirrored in first_date_*. */
+  dates?: DateEntry[];
   accurate_salary?: string;
   generosity_rating?: string;
   his_finsta?: string;
@@ -147,7 +150,7 @@ export async function findDuplicateHisFile(userId: string, file: HisFile): Promi
 }
 
 /** Fields a re-save may fill in but must never overwrite once the user has set them. */
-const USER_OWNED_FIELDS: (keyof HisFile)[] = [
+const USER_OWNED_FIELDS: (keyof HisFile)[] = ['dates', 
   'nickname', 'full_name', 'phone', 'date_of_birth', 'status', 'his_finsta', 'notes',
   'where_we_met', 'meetup_location', 'met_on_app', 'met_date',
   'first_date_location', 'first_date_date', 'first_date_paid',
@@ -312,8 +315,9 @@ export async function generateWrapped(userId: string, year: number): Promise<Ver
 
   const ickCounts: Record<string, number> = {};
   datingFiles.forEach((f: HisFile) => {
-    (f.icks ?? []).forEach((ick: string) => {
-      ickCounts[ick] = (ickCounts[ick] ?? 0) + 1;
+    (f.icks ?? []).forEach((ick) => {
+      const text = ickText(ick);
+      ickCounts[text] = (ickCounts[text] ?? 0) + 1;
     });
   });
   const mostCommonIck = Object.entries(ickCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;

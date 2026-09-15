@@ -19,7 +19,7 @@ const col1: Card[] = [
 
 const col2: Card[] = [
   { type: 'data', label: 'Marital status', val: 'Divorced · 2021 · 1 prior marriage' },
-  { type: 'score', score: 'red', label: 'Deep rose', sub: "We'd skip this one." },
+  { type: 'score', score: 'red', label: 'Red', sub: "We'd skip this one." },
   { type: 'tag', text: 'Bankruptcy filed · 2020', tone: 'flag' },
   { type: 'data', label: 'Employer', val: 'Accenture · Senior Manager · est. $140k' },
   { type: 'tag', text: 'VoIP secondary line detected', tone: 'flag' },
@@ -35,7 +35,7 @@ const col3: Card[] = [
   { type: 'data', label: 'Public records', val: '1 civil suit open · 2023 · Los Angeles' },
   { type: 'tag', text: 'Every member ID-verified before access', tone: 'clear' },
   { type: 'data', label: 'Social footprint', val: 'Age discrepancy found on X / Instagram' },
-  { type: 'score', score: 'red', label: 'Deep rose', sub: "We'd sit this one out." },
+  { type: 'score', score: 'red', label: 'Red', sub: "We'd sit this one out." },
   { type: 'tag', text: 'Report generated in 14 seconds', tone: 'clear' },
 ];
 

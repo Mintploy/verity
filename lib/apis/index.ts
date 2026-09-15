@@ -73,9 +73,16 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const person = en?.person ?? {};
   const phone = en?.phone ?? null;
 
+  // CourtListener searches by name. A phone or picker search has no name until
+  // Enformion resolves one, so it never ran and the row said "None found".
+  let pub: any = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
+  if (!req.name && person.fullName) {
+    pub = await lookupPublicRecords(person.fullName).catch(() => null);
+  }
+
   const flags: string[] = [];
   if (phone?.lineType === 'voip') flags.push('voip');
-  if (publicRecs.status === 'fulfilled' && publicRecs.value?.hasFlags) flags.push('public');
+  if (pub?.hasFlags) flags.push('public');
   if (soRegistry.status === 'fulfilled' && soRegistry.value?.onRegistry) flags.push('soregistry');
   if (person.hasBankruptcy) flags.push('bankruptcy');
   if (person.hasEvictions) flags.push('evictions');
@@ -100,7 +107,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     ? 'green'
     : 'yellow';
 
-  const pub = publicRecs.status === 'fulfilled' ? publicRecs.value : null;
   const so = soRegistry.status === 'fulfilled' ? soRegistry.value : null;
   const fecResult = await lookupDonations(person.fullName ?? req.name).catch(() => null);
 
@@ -138,6 +144,18 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     if (k && !propByKey.has(k)) propByKey.set(k, pr);
   }
 
+  // Ownership is decided once, for every property record wherever it came from.
+  // Address history used to read the records before this ran, so "He owns it"
+  // could never appear there.
+  const withOwnership = (pr?: typeof rawProperties[number]) => {
+    if (!pr) return undefined;
+    const owners = (pr.ownerNames ?? []).map(o => o.toUpperCase());
+    const subjectIsOwner = owners.length === 0
+      ? undefined
+      : owners.some(o => (!subjectLast || o.includes(subjectLast)) && (!subjectFirst || o.includes(subjectFirst)));
+    return { ...pr, subjectIsOwner };
+  };
+
   const enrichedProperties = rawProperties.map(pr => {
     const owners = (pr.ownerNames ?? []).map(o => o.toUpperCase());
     // Surname alone is too loose in a county full of relatives; require the
@@ -149,12 +167,13 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     return {
       ...pr,
       subjectIsOwner,
+      inAddressHistory: !!(pr.address && rawAddresses.some(a => a.addr && addrKey(a.addr) === addrKey(pr.address))),
       isCurrentResidence: !!(currentKey && pr.address && addrKey(pr.address) === currentKey),
     };
   });
 
   const enrichedAddresses = rawAddresses.map((a, i) => {
-    const match = a.addr ? propByKey.get(addrKey(a.addr)) : undefined;
+    const match = withOwnership(a.addr ? (propByKey.get(addrKey(a.addr)) ?? person.addressProperties?.[a.addr]) : undefined);
     const { kind, reason } = classifyAddress(a.addr, match);
     return {
       ...a,
@@ -166,6 +185,15 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       sqft: match?.sqft,
       yearBuilt: match?.yearBuilt,
       county: match?.county,
+      beds: match?.beds,
+      baths: match?.baths,
+      lotSqft: match?.lotSqft,
+      propertyType: match?.propertyType,
+      purchasePrice: match?.purchasePrice,
+      purchaseDate: match?.purchaseDate,
+      currentValue: match?.currentValue,
+      ownerName: match?.ownerName,
+      subjectIsOwner: match?.subjectIsOwner,
       owned: match?.subjectIsOwner === true ? true : a.owned,
     };
   });
@@ -208,10 +236,19 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       // A marriage record proves a marriage happened, not that it is current,
       // so it is reported as a record rather than as "Married".
       status: person.maritalStatus
-        ?? (person.marriageRecords?.length ? `Marriage record on file: ${person.marriageRecords[0]}` : ''),
+        ?? (person.marriageRecords?.length
+          ? `${person.marriageNameMatched ? 'Possible marriage record, matched by name, verify' : 'Marriage record on file'}: ${person.marriageRecords[0]}`
+          : person.marriageChecked ? 'No marriage record on file' : ''),
       spouse: person.spouseName,
-      priors: person.divorceRecords?.join('; ') ?? person.priorMarriages ?? '',
+      priors: person.divorceRecords?.length
+        ? person.divorceRecords.join('; ')
+        : person.priorMarriages
+          ? person.priorMarriages
+          : (person.marriageRecords?.length ?? 0) > 1
+            ? `${person.marriageRecords!.length} marriage records on file: ${person.marriageRecords!.join('; ')}`
+            : person.marriageChecked ? 'None on record' : 'Not available',
       relatives: person.relatives ?? [],
+      relativesDetail: person.relativesDetail,
       associates: person.associates?.length
         ? person.associates
         : person.additionalPhones?.length
@@ -292,9 +329,26 @@ function buildRegistryRow(so: any, criminal: any): any {
       flag: !!so.onRegistry,
     };
   }
+  const nameOnlySex = (criminal?.findings ?? []).filter((f: any) => f.sexOffender && !f.corroborated);
+  if (nameOnlySex.length) {
+    return {
+      label: 'Sex offender registry',
+      value: 'A sex offender record matches his name but could not be confirmed as him. Verify at nsopw.gov before relying on this.',
+      neutral: true,
+    };
+  }
+  // Criminal Search V2 carries sex offender records (category SEX), so a search
+  // that completed answers this even without NSOPW access.
+  if (criminal?.checked) {
+    return {
+      label: 'Sex offender registry',
+      value: 'Not listed. No sex offender records found in the criminal records search.',
+      good: true,
+    };
+  }
   return {
     label: 'Sex offender registry',
-    value: 'Not verified, search nsopw.gov directly',
+    value: 'Not checked. The criminal records search did not complete for this report.',
     neutral: true,
   };
 }
@@ -339,7 +393,21 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
     // A failed check must never render as "Not listed", that is a false
     // assurance. Only claim the registry is clear when it was actually searched.
     buildRegistryRow(so, person?.criminal),
-    { label: 'Federal lawsuits', value: pub?.lawsuits ?? 'None found', good: !pub?.lawsuits || pub.lawsuits === 'None found', flag: pub?.hasOpenLawsuit },
+    !pub?.checked
+      ? { label: 'Federal lawsuits', value: 'Not checked. The federal court search did not complete for this report.', neutral: true }
+      : pub.dockets?.length
+        ? {
+            label: 'Federal lawsuits',
+            value: `${pub.lawsuits}. Matched by name, so confirm each case is him before relying on it.`,
+            flag: !!pub.hasOpenLawsuit,
+            neutral: !pub.hasOpenLawsuit,
+            details: pub.dockets.map((d: any) => ({
+              text: [d.caseName, d.court, d.dateFiled ? `filed ${d.dateFiled}` : '', d.dateTerminated ? `closed ${d.dateTerminated}` : 'open', d.suitNature, d.docketNumber ? `no. ${d.docketNumber}` : '']
+                .filter(Boolean).join(' · '),
+              href: d.url,
+            })),
+          }
+        : { label: 'Federal lawsuits', value: 'None found', good: true },
     { label: 'Bankruptcy filings', value: plural(person?.counts?.bankruptcy, 'filing'), good: !person?.hasBankruptcy, flag: !!person?.hasBankruptcy },
     person?.evictionRecords?.length
       ? { label: 'Eviction records', value: person.evictionRecords.join(' | '), good: false, flag: true }
@@ -354,7 +422,6 @@ function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<an
       : person?.ofacChecked
         ? { label: 'Sanctions / watchlists', value: 'Not listed', good: true }
         : { label: 'Sanctions / watchlists', value: 'Not checked. The sanctions search did not complete for this report.', neutral: true },
-    { label: 'Vehicles on record', value: person?.vehicles?.length ? person.vehicles.join(', ') : plural(person?.counts?.vehicles, 'registration'), neutral: true },
     { label: 'Political donations', value: fec?.summary ?? 'None on record', neutral: true },
   ];
   return records;

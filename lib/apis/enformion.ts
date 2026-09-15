@@ -40,6 +40,8 @@ const MARRIAGE_URL = `${HOST}/MarriageSearch`;
 // exists only to turn a number into a TahoeId, and personSearchById then
 // re-fetches the full record with the paid Person type.
 const SEARCH_TYPE_PERSON = 'Person';
+// Masked, limited results for telling candidates apart before the paid drill-down.
+const SEARCH_TYPE_TEASER = 'Teaser';
 const SEARCH_TYPE_PHONE = 'ReversePhone';
 const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
@@ -105,6 +107,13 @@ export interface EnformionProperty {
   isCurrentResidence?: boolean;
 }
 
+export interface RelativeDetail {
+  name: string;
+  city?: string;
+  state?: string;
+  approxAge?: number;
+}
+
 export interface EnformionPerson {
   tahoeId?: string;
   fullName?: string;
@@ -143,8 +152,13 @@ export interface EnformionPerson {
   evictionChecked?: boolean;
   foreclosureRecords?: string[];
   marriageRecords?: string[];
+  marriageChecked?: boolean;
+  /** True when marriage records came from a name match rather than his TahoeId. */
+  marriageNameMatched?: boolean;
+  relativesDetail?: RelativeDetail[];
+  /** Property facts keyed by the address-history string they were looked up for. */
+  addressProperties?: Record<string, EnformionProperty>;
   divorceRecords?: string[];
-  vehicles?: string[];
   /** Record counts from Enformion's `indicators` object (they are counts, not flags). */
   counts?: EnformionCounts;
 }
@@ -435,7 +449,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
   // Drill-down includes. Enformion rejects these without a unique identifier
   // ("Unique identifiers must be provided for the requested includes"), so they
   // are requested in a second call keyed on the TahoeId from the first.
-  const DETAIL_INCLUDES = ['Criminal', 'Marriage', 'Divorce', 'VehicleRegistrations'];
+  const DETAIL_INCLUDES = ['Criminal', 'Marriage', 'Divorce'];
 
   const nameParts = name?.trim().split(/\s+/) ?? [];
   const firstName = nameParts[0];
@@ -607,6 +621,18 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       ? best.dob
       : dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth ?? undefined;
 
+    // DOB comes back empty on every Person drill-down seen so far, even with the
+    // DatesOfBirth include. Log the format of each date field with digits and
+    // letters masked, so the next search shows where a birth date sits without
+    // writing anyone's birth date to the log.
+    const maskFmt = (v: any) => (v == null || v === ''
+      ? '-'
+      : typeof v === 'object' ? `{${Object.keys(v).join('|')}}` : String(v).replace(/\d/g, 'N').replace(/[A-Za-z]/g, 'A'));
+    const dobs0 = Array.isArray(best.datesOfBirth) ? best.datesOfBirth : null;
+    console.log('ENFORMION_DOB_FORMAT:',
+      `dob:${maskFmt(best.dob)}`, `dobFirstSeen:${maskFmt(best.dobFirstSeen)}`, `dobLastSeen:${maskFmt(best.dobLastSeen)}`,
+      `datesOfBirth:${dobs0 ? `${dobs0.length}${dobs0[0] ? maskFmt(dobs0[0]) : ''}` : '-'}`);
+
     const phoneNumbers: any[] = best.phoneNumbers ?? [];
 
     const aliases: string[] = (best.akas ?? [])
@@ -625,17 +651,21 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       const isCurrent = i === 0;
       const fromRaw = a.firstReportedDate ?? null;
       const toRaw = a.lastReportedDate ?? null;
+      // Month and year at both ends, so she sees how long he actually lived
+      // somewhere rather than a bare year range.
+      const monthYear = (d: any) => {
+        const t = d ? new Date(d) : null;
+        return t && Number.isFinite(t.getTime()) ? t.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null;
+      };
+      const from = monthYear(fromRaw);
+      const to = monthYear(toRaw);
       let years = isCurrent ? 'Current' : 'Previous address';
-      if (fromRaw) {
-        const fromYear = new Date(fromRaw).getFullYear();
-        if (isCurrent) {
-          years = `Since ${fromYear}`;
-        } else if (toRaw) {
-          const toYear = new Date(toRaw).getFullYear();
-          years = fromYear === toYear ? String(fromYear) : `${fromYear}–${toYear}`;
-        } else {
-          years = `From ${fromYear}`;
-        }
+      if (isCurrent) {
+        if (from) years = `Since ${from}`;
+      } else if (from && to) {
+        years = from === to ? from : `${from} to ${to}`;
+      } else if (from || to) {
+        years = from ? `From ${from}` : `Until ${to}`;
       }
       return {
         addr,
@@ -690,15 +720,17 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         ? 'Divorced / previously married'
         : undefined;
 
-    const relatives: string[] = relativesSummary
+    const relativesDetail: RelativeDetail[] = relativesSummary
       .filter((r: any) => !isSpouse(r))
       .slice(0, 10)
-      .map((r: any) => {
-        const rName = buildName(r);
-        const approxAge = r.dob ? birthYearToApproxAge(r.dob) : null;
-        return approxAge ? `${rName} (approx. ${approxAge})` : rName;
-      })
-      .filter(Boolean);
+      .map((r: any) => ({
+        name: buildName(r),
+        city: typeof r.city === 'string' && r.city ? r.city : undefined,
+        state: typeof r.state === 'string' && r.state ? r.state : undefined,
+        approxAge: r.dob ? birthYearToApproxAge(r.dob) ?? undefined : undefined,
+      }))
+      .filter((r: RelativeDetail) => r.name);
+    const relatives: string[] = relativesDetail.map(r => (r.approxAge ? `${r.name} (approx. ${r.approxAge})` : r.name));
 
     // --- Associates ---
     const associates: string[] = (best.associatesSummary ?? [])
@@ -770,10 +802,6 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         .filter(Boolean).join(' · ');
     }, 3);
 
-    const vehicles: string[] = readDetailList(best.vehicleRegistrations, (v: any) =>
-      [v.modelYear ?? v.year, v.make, v.model, v.color ? `(${v.color})` : '']
-        .filter(Boolean).join(' '), 4);
-
     // --- Detail lookups (parallel) ---
     // Where an indicator exists it gates the call, so we only spend a request
     // when Person Search has already said there is something to fetch.
@@ -811,8 +839,24 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         : Promise.resolve(null),
       lookupEvictions(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
       lookupForeclosures(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
-      lookupMarriages(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
+      lookupMarriages(
+        username, password, best.tahoeId, fullName,
+        (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
+      ).catch(() => ({ items: [] as string[], checked: false, nameMatched: false })),
     ]);
+
+    // Property facts for every address in his history, not only the ones he
+    // owns. The TahoeId search returns up to three properties linked to him, so
+    // a rented apartment never had square footage and neither did most of a
+    // long history. Looked up by address, capped at six to keep cost bounded.
+    const propKey = (a: string) => (a ?? '').toUpperCase().replace(/[.,;#]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
+    const knownKeys = new Set((propertyIntelligence ?? []).map((pr: EnformionProperty) => propKey(pr.address)));
+    const addressProperties: Record<string, EnformionProperty> = {};
+    await Promise.all(addresses.slice(0, 6).map(async (a) => {
+      if (!a.addr || knownKeys.has(propKey(a.addr))) return;
+      const found = await lookupPropertyV2(username, password, undefined, a.addr).catch(() => [] as EnformionProperty[]);
+      if (found[0]) addressProperties[a.addr] = found[0];
+    }));
 
     return {
       phone: phoneResult,
@@ -830,10 +874,12 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         company: company ?? workplace?.company,
         employmentHistory: workplace?.history,
         additionalPhones,
+        relativesDetail,
         maritalStatus,
         spouseName,
         priorMarriages: divorceDetail ?? priorMarriages,
         propertyIntelligence,
+        addressProperties,
         hasBankruptcy,
         hasEvictions,
         hasForeclosures,
@@ -855,8 +901,9 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         marriageRecords: [...marriageRecords, ...marriageDetail.items].length
           ? [...new Set([...marriageRecords, ...marriageDetail.items])]
           : undefined,
+        marriageChecked: marriageDetail.checked,
+        marriageNameMatched: !!marriageDetail.nameMatched,
         divorceRecords: inlineDivorce.length ? inlineDivorce : divorceDetail ? [divorceDetail] : undefined,
-        vehicles: vehicles.length ? vehicles : undefined,
       },
     };
   } catch (e: any) {
@@ -878,10 +925,14 @@ async function lookupPropertyV2(
   const body: Record<string, unknown> = { ResultsPerPage: 3 };
   if (tahoeId) {
     body.TahoeId = tahoeId;
-  } else if (currentAddress && fullName) {
-    const nameParts = fullName.trim().split(' ');
-    body.FirstName = nameParts[0];
-    body.LastName = nameParts.slice(1).join(' ');
+  } else if (currentAddress) {
+    // Address alone returns the building whoever owns it, which is what an
+    // address-history entry needs. A name would narrow it to his ownership.
+    if (fullName) {
+      const nameParts = fullName.trim().split(' ');
+      body.FirstName = nameParts[0];
+      body.LastName = nameParts.slice(1).join(' ');
+    }
     // Split address into line1 / line2 at the city boundary (after first comma)
     const commaIdx = currentAddress.indexOf(';');
     body.AddressLine1 = commaIdx > -1 ? currentAddress.slice(0, commaIdx).trim() : currentAddress;
@@ -1341,13 +1392,41 @@ async function lookupForeclosures(username: string, password: string, tahoeId?: 
   return { items, checked: ok };
 }
 
-async function lookupMarriages(username: string, password: string, tahoeId?: string): Promise<DetailLookup> {
-  if (!tahoeId) return { items: [], checked: false };
-  const { rows, ok } = await proSearchChecked(
-    username, password, MARRIAGE_URL, SEARCH_TYPE_MARRIAGE,
-    { TahoeId: tahoeId, Page: 1, ResultsPerPage: 10 },
-    'MARRIAGE', detailRows('marriageRecords'),
-  );
+async function lookupMarriages(
+  username: string, password: string, tahoeId?: string, fullName?: string, states: string[] = [],
+): Promise<DetailLookup & { nameMatched?: boolean }> {
+  const extract = detailRows('marriageRecords');
+  let rows: any[] = [];
+  let checked = false;
+  let nameMatched = false;
+  if (tahoeId) {
+    const r = await proSearchChecked(
+      username, password, MARRIAGE_URL, SEARCH_TYPE_MARRIAGE,
+      { TahoeId: tahoeId, Page: 1, ResultsPerPage: 10 }, 'MARRIAGE', extract,
+    );
+    rows = r.rows;
+    checked = r.ok;
+  }
+
+  // Marriage records, like court records, are often not linked to a TahoeId.
+  // The name fallback keeps only records from states he has lived in, and what
+  // it finds is labelled a possible match rather than stated as his.
+  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+  if (rows.length === 0 && parts.length >= 2) {
+    const r = await proSearchChecked(
+      username, password, MARRIAGE_URL, SEARCH_TYPE_MARRIAGE,
+      { FirstName: parts[0], LastName: parts[parts.length - 1], Page: 1, ResultsPerPage: 10 },
+      'MARRIAGE_NAME', extract,
+    );
+    checked = checked || r.ok;
+    const wanted = new Set(states.map(st => st.toUpperCase()));
+    rows = wanted.size === 0 ? [] : r.rows.filter((row: any) => {
+      const st = pickText(row, 'state', 'marriageState');
+      return !!st && wanted.has(st.toUpperCase());
+    });
+    nameMatched = rows.length > 0;
+  }
+
   const items = rows.slice(0, 6).map((r: any) => {
     const spouseParts = [pickText(r, 'spouseFirstName', 'brideFirstName'), pickText(r, 'spouseLastName', 'brideLastName')]
       .filter(Boolean).join(' ');
@@ -1360,7 +1439,7 @@ async function lookupMarriages(username: string, password: string, tahoeId?: str
       pickText(r, 'state', 'marriageState'),
     ].filter(Boolean).join(' · ') || 'Marriage record on file';
   });
-  return { items, checked: ok };
+  return { items, checked, nameMatched };
 }
 
 async function lookupOfac(
@@ -1619,6 +1698,24 @@ export async function lookupCandidates(phone: string): Promise<PersonCandidate[]
       state: addr.state ?? addr.State ?? undefined,
     });
   }
+
+  // Reverse-phone rows carry no address or birth date, so the picker could only
+  // show names. Teaser is Enformion's masked, logged-out tier, meant for exactly
+  // this: enough to tell two people apart, before the paid Person drill-down.
+  await Promise.all(candidates.slice(0, 8).map(async (c) => {
+    if (c.age && c.city) return;
+    const rows = await proSearch(
+      username, password, BASE_URL, SEARCH_TYPE_TEASER,
+      { TahoeId: c.tahoeId, ResultsPerPage: 1 }, 'TEASER',
+    ).catch(() => [] as any[]);
+    const t = rows[0];
+    if (!t) return;
+    const loc = (Array.isArray(t.addresses) ? t.addresses[0] : undefined)
+      ?? (Array.isArray(t.locations) ? t.locations[0] : undefined) ?? {};
+    c.age = c.age ?? (typeof t.age === 'number' && t.age > 0 ? t.age : undefined);
+    c.city = c.city ?? (typeof loc.city === 'string' && loc.city ? loc.city : undefined);
+    c.state = c.state ?? (typeof loc.state === 'string' && loc.state ? loc.state : undefined);
+  }));
 
   console.log('ENFORMION_CANDIDATES:', candidates.length, 'for', digits);
   return candidates;

@@ -82,11 +82,11 @@ export function Nav({ showCompare, onCompare }: NavProps) {
         <div className="v-nav-actions">
           {isLoggedIn ? (
             <>
-              <Link href="/search" className="v-hide-mobile" style={{
+              <Link href="/compare" className="v-hide-mobile" style={{
                 fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)',
                 textDecoration: 'none',
               }}>
-                My searches
+                Compare with others
               </Link>
               <Link href="/search" className="v-hide-mobile" style={{
                 padding: '10px 20px', borderRadius: 'var(--r-pill)',

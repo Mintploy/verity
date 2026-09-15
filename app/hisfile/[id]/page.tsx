@@ -4,8 +4,19 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
 import type { HisFile, FileType } from '@/lib/hisfile';
+import { ickText, type DateEntry, type Feeling, type IckEntry } from '@/lib/journal';
 
-const APPS = ['Hinge', 'Tinder', 'Bumble', 'Coffee Meets Bagel', 'The League', 'Feeld', 'IRL', 'Instagram', 'Other'];
+const APPS = ['Hinge', 'Tinder', 'Bumble', 'Raya', 'Coffee Meets Bagel', 'The League', 'Feeld', 'IRL', 'Instagram', 'Other'];
+const FEELINGS: Array<{ value: Feeling; label: string }> = [
+  { value: 'loved it', label: 'Loved it' },
+  { value: 'good', label: 'Good' },
+  { value: 'unsure', label: 'Not sure' },
+  { value: 'off', label: 'Something felt off' },
+  { value: 'bad', label: 'Bad' },
+];
+const ICK_TOPICS = ['politics', 'past relationships', 'money', 'family', 'how he treated others', 'texting', 'manners', 'something else'];
+const ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+const ordinal = (n: number) => ORDINALS[n - 1] ?? `Date ${n}`;
 const WHERE_MET_SAFETY = ['Facebook Marketplace', 'Craigslist', 'OfferUp', 'eBay', 'Nextdoor', 'Depop', 'Rideshare', 'Referral', 'Other'];
 // Drawn from the same vocabulary as the dating statuses so the filter tabs on
 // the His File list keep working for both kinds of entry.
@@ -53,6 +64,8 @@ export default function HisFileDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saved, setSaved] = useState(false);
   const [ickInput, setIckInput] = useState('');
+  const [ickDate, setIckDate] = useState<number | ''>('');
+  const [ickTopic, setIckTopic] = useState('');
   const [hasDob, setHasDob] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -97,16 +110,54 @@ export default function HisFileDetail() {
   const fileType: FileType = file.file_type ?? 'dating';
   const isSafety = fileType === 'safety';
 
+  // Date 1 lives in the first_date_* columns on files saved before the journal
+  // existed, so the list is seeded from them rather than starting empty.
+  const datesOf = (f: HisFile): DateEntry[] => f.dates?.length
+    ? f.dates
+    : [{ number: 1, date: f.first_date_date, location: f.first_date_location, paid: f.first_date_paid }];
+  const dates = datesOf(file);
+  const latestDate = dates[dates.length - 1]?.number ?? 1;
+
+  const updateDate = (number: number, patch: Partial<DateEntry>) => {
+    setFile(f => {
+      const next = datesOf(f).map(d => (d.number === number ? { ...d, ...patch } : d));
+      const first = next.find(d => d.number === 1);
+      return {
+        ...f,
+        dates: next,
+        first_date_date: first?.date || undefined,
+        first_date_location: first?.location,
+        first_date_paid: first?.paid,
+      };
+    });
+  };
+  const addDate = () => setFile(f => {
+    const base = datesOf(f);
+    return { ...f, dates: [...base, { number: base.length + 1 }] };
+  });
+  const removeLastDate = () => setFile(f => {
+    const base = datesOf(f);
+    return base.length > 1 ? { ...f, dates: base.slice(0, -1) } : f;
+  });
+
   const addIck = (ick: string) => {
     const trimmed = ick.trim();
     if (!trimmed) return;
-    const existing = file.icks ?? [];
-    if (!existing.includes(trimmed)) setFile(f => ({ ...f, icks: [...existing, trimmed] }));
+    if ((file.icks ?? []).some(i => ickText(i) === trimmed)) { setIckInput(''); return; }
+    // Stamped with the date and the subject, so she can see after how many
+    // dates the icks start and what they tend to be about.
+    const entry: IckEntry = {
+      text: trimmed,
+      dateNumber: Number(ickDate || latestDate),
+      ...(ickTopic ? { topic: ickTopic } : {}),
+    };
+    setFile(f => ({ ...f, icks: [...(f.icks ?? []), entry] }));
     setIckInput('');
+    setIckTopic('');
   };
 
   const removeIck = (ick: string) => {
-    setFile(f => ({ ...f, icks: (f.icks ?? []).filter(i => i !== ick) }));
+    setFile(f => ({ ...f, icks: (f.icks ?? []).filter(i => ickText(i) !== ick) }));
   };
 
   if (loading) {
@@ -345,30 +396,50 @@ export default function HisFileDetail() {
         </Section>
         )}
 
-        {/* First date */}
+        {/* Dates */}
         {!isSafety && (
-        <Section eyebrow="03" title="First date">
-          <TwoCol>
-            <Field label="Location">
-              <input value={file.first_date_location ?? ''} onChange={e => setFile(f => ({ ...f, first_date_location: e.target.value }))} placeholder="Restaurant, bar..." style={inputStyle} />
-            </Field>
-            <Field label="Date">
-              <input type="date" value={file.first_date_date ?? ''} onChange={e => setFile(f => ({ ...f, first_date_date: e.target.value }))} style={inputStyle} />
-            </Field>
-          </TwoCol>
-          <Field label="Who paid?">
-            {(['split', 'he paid', 'i paid', 'neither'] as const).map(opt => (
-              <button key={opt} onClick={() => setFile(f => ({ ...f, first_date_paid: opt }))} style={{
-                padding: '7px 16px', borderRadius: 'var(--r-pill)', marginRight: 8, marginBottom: 8,
-                border: file.first_date_paid === opt ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)',
-                background: file.first_date_paid === opt ? 'var(--primary-mist)' : 'var(--pearl)',
-                color: file.first_date_paid === opt ? 'var(--primary-deep)' : 'var(--dark-soft)',
-                fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer', textTransform: 'capitalize',
-              }}>
-                {opt}
-              </button>
-            ))}
-          </Field>
+        <Section eyebrow="03" title="Dates">
+          {dates.map(d => (
+            <div key={d.number} style={{ padding: '16px 18px', borderRadius: 'var(--r-md)', background: 'var(--ivory)', border: '1px solid var(--gold-pale)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: 'var(--display)', fontSize: 17, color: 'var(--dark)' }}>{ordinal(d.number)} date</span>
+                {d.number === dates.length && d.number > 1 && (
+                  <button onClick={removeLastDate} style={{ background: 'none', border: 'none', color: 'var(--mauve-deep)', fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer' }}>Remove</button>
+                )}
+              </div>
+              <TwoCol>
+                <Field label="Location">
+                  <input value={d.location ?? ''} onChange={e => updateDate(d.number, { location: e.target.value })} placeholder="Restaurant, bar..." style={inputStyle} />
+                </Field>
+                <Field label="Date">
+                  <input type="date" value={d.date ?? ''} onChange={e => updateDate(d.number, { date: e.target.value })} style={inputStyle} />
+                </Field>
+              </TwoCol>
+              <Field label="Who paid?">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {(['split', 'he paid', 'i paid', 'neither'] as const).map(opt => (
+                    <button key={opt} onClick={() => updateDate(d.number, { paid: opt })} style={{ padding: '7px 16px', borderRadius: 'var(--r-pill)', border: d.paid === opt ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)', background: d.paid === opt ? 'var(--primary-mist)' : 'var(--pearl)', color: d.paid === opt ? 'var(--primary-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer', textTransform: 'capitalize' }}>{opt}</button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="How did you feel afterwards?">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {FEELINGS.map(fe => (
+                    <button key={fe.value} onClick={() => updateDate(d.number, { feeling: fe.value })} style={{ padding: '7px 16px', borderRadius: 'var(--r-pill)', border: d.feeling === fe.value ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)', background: d.feeling === fe.value ? 'var(--primary-mist)' : 'var(--pearl)', color: d.feeling === fe.value ? 'var(--primary-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>{fe.label}</button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="What made you like him more?">
+                <textarea value={d.likedMore ?? ''} onChange={e => updateDate(d.number, { likedMore: e.target.value })} placeholder="He listened, he planned it, he was kind to the waiter..." rows={2} style={{ ...inputStyle, resize: 'vertical' as const }} />
+              </Field>
+              <Field label="What made you like him less?">
+                <textarea value={d.likedLess ?? ''} onChange={e => updateDate(d.number, { likedLess: e.target.value })} placeholder="He was late, he talked about his ex..." rows={2} style={{ ...inputStyle, resize: 'vertical' as const }} />
+              </Field>
+            </div>
+          ))}
+          <button onClick={addDate} style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: 'var(--r-pill)', border: '1.5px dashed var(--primary)', background: 'transparent', color: 'var(--primary)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>
+            + Add {ordinal(dates.length + 1).toLowerCase()} date
+          </button>
         </Section>
         )}
 
@@ -399,53 +470,61 @@ export default function HisFileDetail() {
         {/* The Ick */}
         {!isSafety && (
         <Section eyebrow="05" title="The Ick">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {(file.icks ?? []).map(ick => (
-              <div key={ick} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 'var(--r-pill)',
-                background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)',
-                fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500,
-              }}>
-                {ick}
-                <button onClick={() => removeIck(ick)} style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--deeprose-deep)', padding: '0 0 0 2px', fontSize: 14, lineHeight: 1,
-                }}>×</button>
+          {(() => {
+            // A pattern, not a verdict: after how many dates the icks tend to
+            // start, and what they are usually about.
+            const stamped = (file.icks ?? []).filter((i): i is IckEntry => typeof i !== 'string');
+            if (!stamped.length) return null;
+            const firstAfter = Math.min(...stamped.map(i => i.dateNumber ?? Infinity));
+            const topics: Record<string, number> = {};
+            stamped.forEach(i => { if (i.topic) topics[i.topic] = (topics[i.topic] ?? 0) + 1; });
+            const topTopic = Object.entries(topics).sort((x, y) => y[1] - x[1])[0]?.[0];
+            return (
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', lineHeight: 1.6, padding: '10px 14px', background: 'var(--ivory)', borderRadius: 'var(--r-md)' }}>
+                {Number.isFinite(firstAfter) ? `First ick after the ${ordinal(firstAfter).toLowerCase()} date.` : ''}
+                {topTopic ? ` Most often about ${topTopic}.` : ''}
               </div>
-            ))}
+            );
+          })()}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(file.icks ?? []).map(ick => {
+              const text = ickText(ick);
+              const meta = typeof ick === 'string' ? '' : [ick.dateNumber ? `after date ${ick.dateNumber}` : '', ick.topic ?? ''].filter(Boolean).join(' · ');
+              return (
+                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 'var(--r-pill)', background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)', fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500 }}>
+                  {text}
+                  {meta && <span style={{ fontWeight: 300, opacity: 0.8 }}>· {meta}</span>}
+                  <button onClick={() => removeIck(text)} aria-label={`Remove ${text}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--deeprose-deep)', padding: '0 0 0 2px', fontSize: 14, lineHeight: 1 }}>×</button>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <input
-              value={ickInput}
-              onChange={e => setIckInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIck(ickInput); } }}
-              placeholder="Type an ick and press Enter"
-              style={{ ...inputStyle, flex: 1 }}
-            />
-            <button onClick={() => addIck(ickInput)} style={{
-              padding: '10px 16px', borderRadius: 'var(--r-md)',
-              background: 'var(--primary)', color: 'var(--ivory)',
-              border: 'none', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer',
-            }}>Add</button>
+          <TwoCol>
+            <Field label="Noticed it after">
+              <select value={ickDate || latestDate} onChange={e => setIckDate(Number(e.target.value))} style={inputStyle}>
+                {dates.map(d => <option key={d.number} value={d.number}>{ordinal(d.number)} date</option>)}
+              </select>
+            </Field>
+            <Field label="What was it about?">
+              <select value={ickTopic} onChange={e => setIckTopic(e.target.value)} style={inputStyle}>
+                <option value="">Choose one (optional)</option>
+                {ICK_TOPICS.map(t => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
+              </select>
+            </Field>
+          </TwoCol>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={ickInput} onChange={e => setIckInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIck(ickInput); } }} placeholder="Type an ick and press Enter" style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={() => addIck(ickInput)} style={{ padding: '10px 16px', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: 'var(--ivory)', border: 'none', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>Add</button>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {COMMON_ICKS.map(ick => (
-              <button
-                key={ick}
-                onClick={() => addIck(ick)}
-                disabled={(file.icks ?? []).includes(ick)}
-                style={{
-                  padding: '5px 12px', borderRadius: 'var(--r-pill)',
-                  border: '1px solid var(--gold-pale)',
-                  background: (file.icks ?? []).includes(ick) ? 'var(--deeprose-pale)' : 'var(--pearl)',
-                  color: (file.icks ?? []).includes(ick) ? 'var(--deeprose-deep)' : 'var(--dark-soft)',
-                  fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer', opacity: (file.icks ?? []).includes(ick) ? 0.5 : 1,
-                }}
-              >
-                {ick}
-              </button>
-            ))}
+            {COMMON_ICKS.map(ick => {
+              const has = (file.icks ?? []).some(i => ickText(i) === ick);
+              return (
+                <button key={ick} onClick={() => addIck(ick)} disabled={has} style={{ padding: '5px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: has ? 'var(--deeprose-pale)' : 'var(--pearl)', color: has ? 'var(--deeprose-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer', opacity: has ? 0.5 : 1 }}>
+                  {ick}
+                </button>
+              );
+            })}
           </div>
         </Section>
         )}

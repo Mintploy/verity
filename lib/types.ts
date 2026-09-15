@@ -52,6 +52,16 @@ export interface Address {
   sqft?: number;
   yearBuilt?: number;
   county?: string;
+  beds?: number;
+  baths?: number;
+  lotSqft?: number;
+  propertyType?: string;
+  purchasePrice?: string;
+  purchaseDate?: string;
+  currentValue?: string;
+  ownerName?: string;
+  /** Whether he is on the deed for this address. */
+  subjectIsOwner?: boolean;
 }
 
 export interface PropertyIntelligence {
@@ -82,6 +92,8 @@ export interface PropertyIntelligence {
   subjectIsOwner?: boolean;
   /** Does this property match the current address in his address history? */
   isCurrentResidence?: boolean;
+  /** Already shown in address history, so not repeated under other properties. */
+  inAddressHistory?: boolean;
 }
 
 export interface Relationships {
@@ -90,6 +102,7 @@ export interface Relationships {
   priors: string;
   relatives: string[];
   associates: string[];
+  relativesDetail?: Array<{ name: string; city?: string; state?: string; approxAge?: number }>;
 }
 
 export interface Professional {
@@ -116,6 +129,8 @@ export interface PublicRecord {
   neutral?: boolean;
   /** Booking photos, only on records corroborated as his. */
   images?: string[];
+  /** Line items behind the summary, e.g. individual court cases. */
+  details?: Array<{ text: string; href?: string }>;
 }
 
 export interface SocialCandidate {

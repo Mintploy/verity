@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
 import { clearPendingPhone, getPendingPhone } from '@/lib/pending';
@@ -56,9 +56,9 @@ function getScoreColor(score: string) {
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<Mode>('phone');
-  const [primary, setPrimary] = useState(searchParams.get('phone') ?? '');
-  const [secondary, setSecondary] = useState('');
+  const [mode, setMode] = useState<Mode>(searchParams.get('name') ? 'name' : 'phone');
+  const [primary, setPrimary] = useState(searchParams.get('name') ?? searchParams.get('phone') ?? '');
+  const [secondary, setSecondary] = useState(searchParams.get('location') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
@@ -203,6 +203,16 @@ function SearchContent() {
       setLoading(false);
     }
   };
+
+  // A relative clicked on a report arrives with run=1, after she has already
+  // confirmed it uses a lookup, so it searches straight away.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current || searchParams.get('run') !== '1' || !primary.trim()) return;
+    autoRan.current = true;
+    handleSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (

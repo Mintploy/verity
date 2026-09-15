@@ -31,7 +31,7 @@ interface CompareEntry {
 const SCORE_LABELS: Record<string, string> = {
   green: 'Green light',
   yellow: 'Soft yellow',
-  red: 'Deep rose',
+  red: 'Red',
 };
 
 const SCORE_CONFIG: Record<string, { bg: string; dot: string; text: string; deep: string }> = {

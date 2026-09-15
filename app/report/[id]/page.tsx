@@ -300,57 +300,63 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
         </Section>
       </div>
 
-      <Section id="sec-3" eyebrow="03" title="Address history">
-        <div className="v-grid-r2" style={{ gap: '14px 32px' }}>
-          {report.addresses.map((a, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderTop: i >= 2 ? '1px solid var(--gold-pale)' : 'none' }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', marginTop: 8, flexShrink: 0, background: a.flag ? 'var(--deeprose)' : a.current ? 'var(--rose)' : 'var(--mauve)', boxShadow: a.current ? '0 0 0 3px var(--blush-pale)' : 'none' }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>{a.years}</span>
-                  {a.current && <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 13, color: 'var(--gold)' }}>· current</span>}
+      <Section id="sec-3" eyebrow="03" title="Addresses and property">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {report.addresses.map((a, i) => {
+            // One card per address with everything known about it: how long he
+            // was there, whether it is current, home or office, the building,
+            // what it sold for, and whether it is his.
+            const building = [
+              a.propertyType,
+              a.beds ? `${a.beds} bed` : null,
+              a.baths ? `${a.baths} bath` : null,
+              a.sqft ? `${a.sqft.toLocaleString()} sq ft` : null,
+              a.lotSqft ? `${a.lotSqft.toLocaleString()} sq ft lot` : null,
+              a.yearBuilt ? `Built ${a.yearBuilt}` : null,
+              a.county ? `${a.county} County` : null,
+            ].filter(Boolean) as string[];
+            const money = [
+              a.purchasePrice ? `Last sold for ${a.purchasePrice}${a.purchaseDate ? ` in ${a.purchaseDate}` : ''}` : null,
+              a.currentValue ? `Estimated value ${a.currentValue}` : null,
+            ].filter(Boolean) as string[];
+            return (
+              <div key={i} style={{ padding: '14px 16px', borderRadius: 'var(--r-md)', background: a.current ? 'var(--blush-pale)' : 'var(--ivory)', borderLeft: `3px solid ${a.flag ? 'var(--deeprose)' : a.current ? 'var(--primary)' : 'var(--gold-pale)'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11.5, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>{a.years}</span>
+                  {a.current && <Badge tone="primary">Current</Badge>}
                   {a.kind && a.kind !== 'unknown' && (
-                    <span
-                      title={a.kindReason ? `Based on: ${a.kindReason}` : undefined}
-                      style={{
-                        padding: '2px 9px', borderRadius: 'var(--r-pill)',
-                        fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.4,
-                        background: a.kind === 'office' ? 'var(--gold-pale)' : 'var(--sage-pale)',
-                        color: a.kind === 'office' ? 'var(--gold-deep)' : 'var(--sage-deep)',
-                      }}
-                    >
+                    <Badge tone={a.kind === 'office' ? 'gold' : 'sage'} title={a.kindReason ? `Based on: ${a.kindReason}` : undefined}>
                       {a.kind === 'office' ? 'Likely office' : 'Likely home'}
-                    </span>
+                    </Badge>
                   )}
+                  {a.subjectIsOwner === true && <Badge tone="sage">He owns it</Badge>}
+                  {a.subjectIsOwner === false && <Badge tone="honey">Not in his name</Badge>}
                 </div>
-                
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.2 }}><a href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.addr)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dark)', textDecoration: 'underline' }}>{a.addr}</a></div>
-                {(() => {
-                  // Facts about the building, where a property record matched
-                  // this address. She should not have to scroll to a different
-                  // section to learn that the "current address" is an office.
-                  const facts = [
-                    a.sqft ? `${a.sqft.toLocaleString()} sq ft` : null,
-                    a.yearBuilt ? `Built ${a.yearBuilt}` : null,
-                    a.county ? `${a.county} County` : null,
-                  ].filter(Boolean) as string[];
-                  return facts.length > 0 ? (
-                    <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 4, opacity: 0.85 }}>
-                      {facts.join(' · ')}
-                    </div>
-                  ) : null;
-                })()}
-                <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: a.flag ? 'var(--deeprose-deep)' : 'var(--dark-soft)', marginTop: 4, fontWeight: a.flag ? 500 : 300 }}>{a.detail}</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.3 }}>
+                  <a href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.addr)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dark)', textDecoration: 'underline' }}>{a.addr}</a>
+                </div>
+                {building.length > 0 && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 6, lineHeight: 1.55 }}>{building.join(' · ')}</div>
+                )}
+                {money.length > 0 && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', marginTop: 4, lineHeight: 1.55 }}>{money.join(' · ')}</div>
+                )}
+                {a.subjectIsOwner === false && a.ownerName && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 4 }}>Owner of record: {a.ownerName}</div>
+                )}
+                {a.flag && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--deeprose-deep)', marginTop: 4, fontWeight: 500 }}>{a.detail}</div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Section>
 
-      {report.propertyIntelligence && report.propertyIntelligence.length > 0 && (
-        <Section id="sec-3b" eyebrow="03b" title="Property intelligence">
+      {(report.propertyIntelligence ?? []).some(p => !p.inAddressHistory) && (
+        <Section id="sec-3b" eyebrow="03b" title="Other properties linked to him">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {report.propertyIntelligence.map((prop, i) => {
+            {report.propertyIntelligence!.filter(p => !p.inAddressHistory).map((prop, i) => {
               // Four groups, in the order she reads them: which address this
               // is, the building itself, what it is worth, and who holds it.
               const building = [
@@ -468,7 +474,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           {report.relationships.spouse && <KVRow label="Spouse" value={report.relationships.spouse} />}
           <KVRow label="Prior marriages" value={report.relationships.priors} />
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Known relatives</div>
-          <TagList items={report.relationships.relatives} />
+          <RelativeSearch relatives={report.relationships.relativesDetail ?? report.relationships.relatives.map(name => ({ name }))} />
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Close associates</div>
           <TagList items={report.relationships.associates} />
         </Section>
@@ -511,6 +517,17 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="v-eyebrow" style={{ fontSize: 10, marginBottom: 3 }}>{p.label}</div>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, lineHeight: 1.4, color: p.flag ? 'var(--deeprose-deep)' : 'var(--dark)', fontWeight: p.flag ? 500 : 300 }}>{p.value}</div>
+                {p.details && p.details.length > 0 && (
+                  <ul style={{ margin: '8px 0 0', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {p.details.map((d, j) => (
+                      <li key={j} style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', lineHeight: 1.5 }}>
+                        {d.href
+                          ? <a href={d.href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{d.text}</a>
+                          : d.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {p.images && p.images.length > 0 && (
                   // A booking photo lets her confirm the record is the man she
                   // is meeting, which is the question a name match cannot answer.
@@ -814,6 +831,94 @@ function Section({ id, eyebrow, title, children, accent = 'var(--blush-pale)' }:
   );
 }
 
+function Badge({ tone, title, children }: { tone: 'primary' | 'gold' | 'sage' | 'honey'; title?: string; children: React.ReactNode }) {
+  const tones = {
+    primary: { bg: 'var(--primary-mist)', fg: 'var(--primary)' },
+    gold: { bg: 'var(--gold-pale)', fg: 'var(--gold-deep)' },
+    sage: { bg: 'var(--sage-pale)', fg: 'var(--sage-deep)' },
+    honey: { bg: 'var(--honey-pale)', fg: 'var(--honey-deep)' },
+  }[tone];
+  return (
+    <span title={title} style={{ padding: '2px 9px', borderRadius: 'var(--r-pill)', background: tones.bg, color: tones.fg, fontFamily: 'var(--sans)', fontSize: 10.5, letterSpacing: 0.3 }}>
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Relatives she can search in one tap. Every search spends one of her monthly
+ * lookups, so the cost is stated, with what she has left, before anything runs.
+ */
+function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?: string; state?: string; approxAge?: number }> }) {
+  const router = useRouter();
+  const [pending, setPending] = useState<(typeof relatives)[number] | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [limit, setLimit] = useState(15);
+
+  if (!relatives.length) {
+    return <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)' }}>None on record</span>;
+  }
+
+  const open = (r: (typeof relatives)[number]) => {
+    setPending(r);
+    setRemaining(null);
+    fetch('/api/profile')
+      .then(res => (res.ok ? res.json() : null))
+      .then(d => {
+        const p = d?.profile;
+        if (!p) return;
+        const cap = p.plan === 'single' ? 1 : 15;
+        const reset = p.searches_reset_at ? new Date(p.searches_reset_at) : null;
+        const now = new Date();
+        const sameMonth = !!reset && reset.getFullYear() === now.getFullYear() && reset.getMonth() === now.getMonth();
+        const used = p.plan === 'single' || sameMonth ? (p.searches_this_month ?? 0) : 0;
+        setLimit(cap);
+        setRemaining(Math.max(0, cap - used));
+      })
+      .catch(() => {});
+  };
+
+  const go = () => {
+    if (!pending) return;
+    const q = new URLSearchParams({ name: pending.name, run: '1' });
+    const loc = [pending.city, pending.state].filter(Boolean).join(', ');
+    if (loc) q.set('location', loc);
+    router.push(`/search?${q.toString()}`);
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {relatives.map((r, i) => (
+          <button key={i} onClick={() => open(r)} title={`Search ${r.name}`} style={{ padding: '5px 12px', background: 'var(--ivory)', border: '1px solid var(--gold-pale)', borderRadius: 'var(--r-pill)', fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', cursor: 'pointer', textAlign: 'left' }}>
+            {r.name}
+            {r.approxAge ? `, ${r.approxAge}` : ''}
+            {r.city || r.state ? <span style={{ color: 'var(--dark-soft)' }}> · {[r.city, r.state].filter(Boolean).join(', ')}</span> : null}
+            <span style={{ color: 'var(--primary)', marginLeft: 6 }}>Search</span>
+          </button>
+        ))}
+      </div>
+      {pending && (
+        <div role="dialog" aria-modal="true" onClick={() => setPending(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(42,14,18,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: 'var(--pearl)', borderRadius: 'var(--r-lg)', padding: '24px 24px 20px', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--dark)', marginBottom: 8 }}>Search {pending.name}?</div>
+            <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '0 0 18px' }}>
+              This uses 1 of your {limit} monthly lookups.
+              {remaining !== null && ` You have ${remaining} left this month.`}
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setPending(null)} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: 'transparent', color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={go} disabled={remaining === 0} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: remaining === 0 ? 'var(--mauve)' : 'var(--primary)', color: 'var(--pearl)', fontFamily: 'var(--sans)', fontSize: 13, cursor: remaining === 0 ? 'not-allowed' : 'pointer' }}>
+                {remaining === 0 ? 'No lookups left' : 'Use a lookup'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function KVRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--gold-pale)' }}>
@@ -872,7 +977,7 @@ function getScoreConfig(score: ScoreState) {
   const configs = {
     green: { label: 'Green light', sub: 'Proceed with ease.', bg: 'var(--sage-pale)', deep: 'var(--sage-deep)', accent: 'var(--sage)', glow: 'rgba(135, 174, 126, 0.3)' },
     yellow: { label: 'Soft yellow', sub: 'Worth a slower pace.', bg: 'var(--honey-pale)', deep: 'var(--honey-deep)', accent: 'var(--honey)', glow: 'rgba(233, 178, 92, 0.3)' },
-    red: { label: 'Deep rose', sub: "We'd skip this one.", bg: 'var(--deeprose-pale)', deep: 'var(--deeprose-deep)', accent: 'var(--deeprose)', glow: 'rgba(231, 80, 108, 0.3)' },
+    red: { label: 'Red', sub: "We'd skip this one.", bg: 'var(--deeprose-pale)', deep: 'var(--deeprose-deep)', accent: 'var(--deeprose)', glow: 'rgba(231, 80, 108, 0.3)' },
   };
   return configs[score];
 }
