@@ -237,6 +237,14 @@ export default function ComparePage() {
                           </span>
                         )}
                       </div>
+                      <Link
+                        href={`/report/${person.id}`}
+                        onClick={e => e.stopPropagation()}
+                        title={`Open the full report on ${person.name}`}
+                        style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--primary)', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >
+                        Open report
+                      </Link>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--mauve-deep)', flexShrink: 0 }}>
                         <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
@@ -286,6 +294,16 @@ export default function ComparePage() {
                           <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', lineHeight: 1.5 }}>{person.llcs}</div>
                         </div>
                       )}
+
+                      {/* The whole report, not just this summary. */}
+                      <Link href={`/report/${person.id}`} style={{
+                        display: 'inline-block', marginTop: 16, padding: '10px 20px',
+                        borderRadius: 'var(--r-pill)', background: 'var(--primary)',
+                        color: 'var(--pearl)', textDecoration: 'none',
+                        fontFamily: 'var(--sans)', fontSize: 13,
+                      }}>
+                        Read his full report
+                      </Link>
 
                       {/* Summary */}
                       <div style={{ marginTop: 16, padding: '14px 16px', background: c.bg, borderRadius: 'var(--r-md)' }}>

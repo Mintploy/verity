@@ -373,12 +373,18 @@ function buildRegistryRow(so: any, criminal: any): any {
 function buildCriminalRow(criminal: any): any {
   const confirmed = criminal?.findings?.filter((f: any) => f.corroborated) ?? [];
   if (confirmed.length) {
+    // One line per record, each with what kind it is and the court detail
+    // behind it, rather than five copies of the same summary string.
     return {
       label: 'Criminal records',
-      value: confirmed.map((f: any) => f.summary).join(' | '),
+      value: `${confirmed.length} record${confirmed.length === 1 ? '' : 's'} on file`,
       good: false,
       flag: true,
       images: confirmed.map((f: any) => f.imageUrl).filter(Boolean),
+      details: confirmed.map((f: any) => ({
+        text: [f.summary, f.detail].filter(Boolean).join(' | '),
+      })),
+      detailTags: confirmed.map((f: any) => f.category ?? 'Record'),
     };
   }
   if (criminal?.nameOnlyMatches) {

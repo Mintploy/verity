@@ -41,8 +41,6 @@ const BUSINESS_URL = `${HOST}/BusinessV2Search`;
 // exists only to turn a number into a TahoeId, and personSearchById then
 // re-fetches the full record with the paid Person type.
 const SEARCH_TYPE_PERSON = 'Person';
-// Masked, limited results for telling candidates apart before the paid drill-down.
-const SEARCH_TYPE_TEASER = 'Teaser';
 const SEARCH_TYPE_PHONE = 'ReversePhone';
 const SEARCH_TYPE_PROPERTY = 'PropertyV2';
 const SEARCH_TYPE_DIVORCE = 'Divorce';
@@ -1182,6 +1180,10 @@ async function personSearchById(
 export interface CriminalFinding {
   /** Human-readable summary of the offence. Never contains SSN. */
   summary: string;
+  /** What kind of record it is: arrest, conviction, warrant, sex offender. */
+  category?: string;
+  /** Court, case number, dates, disposition. Never identifying attributes. */
+  detail?: string;
   /** True when the record comes from a sex offender registry. */
   sexOffender: boolean;
   /** True when the record was corroborated against the subject's own age/state. */
@@ -1266,18 +1268,41 @@ async function lookupCriminal(
   const subjectStates = new Set((subject?.states ?? []).map(s => s.toUpperCase()));
   const findings: CriminalFinding[] = [];
 
+  // The response is camelCase: SHAPE[CRIMINAL_BYID] reads
+  // "poseidonId,shortCat,names,offenderAttributes,photos,addresses,caseDetails,
+  // offenses,others,images". Reading the documented PascalCase names found
+  // nothing, so every record fell through to "Record on file" and the age and
+  // state checks below silently had nothing to compare.
+  const arr = (rec: any, ...keys: string[]): any[] => {
+    for (const k of keys) if (Array.isArray(rec?.[k])) return rec[k];
+    return [];
+  };
+  const val = (o: any, ...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = o?.[k];
+      if (Array.isArray(v) && v.length) return v.filter(Boolean).join('; ');
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+    }
+    return undefined;
+  };
+
   for (const rec of rows.slice(0, 10)) {
-    const offenses: any[] = rec.Offenses ?? [];
-    const cases: any[] = rec.CaseDetails ?? [];
-    const attrs: any[] = rec.OffenderAttributes ?? [];
-    const addrs: any[] = rec.Addresses ?? [];
+    const offenses = arr(rec, 'offenses', 'Offenses');
+    const cases = arr(rec, 'caseDetails', 'CaseDetails');
+    const attrs = arr(rec, 'offenderAttributes', 'OffenderAttributes');
+    const addrs = arr(rec, 'addresses', 'Addresses');
+    const shortCat = val(rec, 'shortCat', 'ShortCat');
 
     // --- Corroboration: does this record plausibly belong to our subject? ---
     let ageMatch: boolean | null = null;
     if (subject?.age) {
       for (const a of attrs) {
-        const recAge = a.Age ?? (a.Dob ? new Date().getFullYear() - new Date(a.Dob).getFullYear() : null);
-        if (typeof recAge === 'number' && Number.isFinite(recAge)) {
+        const rawDob = val(a, 'dob', 'Dob');
+        const rawAge = val(a, 'age', 'Age');
+        const recAge = rawAge ? Number(rawAge)
+          : rawDob ? new Date().getFullYear() - new Date(rawDob).getFullYear() : NaN;
+        if (Number.isFinite(recAge)) {
           // Allow two years' drift for partial dates and reporting lag.
           ageMatch = Math.abs(recAge - subject.age) <= 2;
           if (ageMatch) break;
@@ -1288,44 +1313,57 @@ async function lookupCriminal(
     let stateMatch: boolean | null = null;
     if (subjectStates.size) {
       const recStates = [
-        ...addrs.map((a: any) => a.State),
-        ...offenses.map((o: any) => o.SourceState),
-        ...cases.map((c: any) => c.CourtCounty),
-      ].filter(Boolean).map((s: string) => String(s).toUpperCase());
-      if (recStates.length) stateMatch = recStates.some(s => subjectStates.has(s));
+        ...addrs.map((a: any) => val(a, 'state', 'State')),
+        ...offenses.map((o: any) => val(o, 'sourceState', 'SourceState')),
+      ].filter(Boolean).map((x) => String(x).toUpperCase());
+      if (recStates.length) stateMatch = recStates.some(x => subjectStates.has(x));
     }
 
-    // Corroborated only when a check actually ran and passed, and nothing
-    // positively contradicts it. Unknown is never treated as agreement.
     const checksRun = ageMatch !== null || stateMatch !== null;
     const contradicted = ageMatch === false || stateMatch === false;
     // An identifier match is itself a check that passed, but a contradiction on
     // age or state still overrides it.
     const corroborated = (linked.has(rec) || checksRun) && !contradicted;
 
-    const image = (rec.Images ?? rec.images ?? []).find((im: any) => im?.ImageUrl || im?.imageUrl);
-    const imageUrl: string | undefined = corroborated
-      ? (image?.ImageUrl ?? image?.imageUrl) || undefined
-      : undefined;
+    const image = arr(rec, 'images', 'Images').find((im: any) => val(im, 'imageUrl', 'ImageUrl'));
+    const imageUrl: string | undefined = corroborated ? val(image, 'imageUrl', 'ImageUrl') : undefined;
 
-    const isSexOffence = String(rec.ShortCat ?? '').toUpperCase().includes('SEX')
-      || cases.some((c: any) => /sex offender/i.test(String(c.MappedCategory ?? c.RawCategory ?? c.Source ?? '')));
+    const category = val(cases[0], 'mappedCategory', 'MappedCategory', 'rawCategory', 'RawCategory')
+      ?? shortCat;
+    const isSexOffence = /sex/i.test(String(category ?? ''))
+      || /sex/i.test(String(shortCat ?? ''));
 
     for (const off of offenses.length ? offenses : [null]) {
-      const desc = off
-        ? (Array.isArray(off.OffenseDescription) ? off.OffenseDescription.join('; ') : off.OffenseDescription)
-        : null;
-      const category = cases[0]?.MappedCategory ?? cases[0]?.RawCategory ?? rec.ShortCat;
-      const year = yearOf(off?.ConvictionDate ?? off?.OffenseDate ?? off?.DispositionDate ?? cases[0]?.CaseDate);
-      const where = off?.SourceState ?? addrs[0]?.State;
-      const disposition = off?.Disposition;
+      const desc = off ? val(off, 'offenseDescription', 'OffenseDescription') : undefined;
+      const classification = off
+        ? val(off, 'classificationCodeDescription', 'ClassificationCodeDescription')
+        : undefined;
+      const disposition = off ? val(off, 'disposition', 'Disposition') : undefined;
+      const year = yearOf(
+        (off ? val(off, 'convictionDate', 'ConvictionDate', 'offenseDate', 'OffenseDate', 'dispositionDate', 'DispositionDate') : undefined)
+        ?? val(cases[0], 'caseDate', 'CaseDate'),
+      );
+      const where = (off ? val(off, 'sourceState', 'SourceState') : undefined)
+        ?? val(addrs[0], 'state', 'State');
 
-      // Deliberately excludes Names[].Ssn and every identifying attribute
-      // (Race, Sex, Height, ScarsMarks), none of it belongs in this report.
+      // Deliberately excludes names[].ssn and every identifying attribute
+      // (race, sex, height, scarsMarks): none of it belongs in this report.
       const summary = [desc || category || 'Record on file', disposition, year, where]
         .filter(Boolean).join(' · ');
 
-      if (summary) findings.push({ summary, sexOffender: isSexOffence, corroborated, imageUrl });
+      const detail = [
+        classification,
+        val(cases[0], 'caseType', 'CaseType'),
+        val(cases[0], 'court', 'Court') ? `Court: ${val(cases[0], 'court', 'Court')}` : undefined,
+        val(cases[0], 'courtCounty', 'CourtCounty') ? `${val(cases[0], 'courtCounty', 'CourtCounty')} County` : undefined,
+        val(cases[0], 'caseNumber', 'CaseNumber') ? `Case no. ${val(cases[0], 'caseNumber', 'CaseNumber')}` : undefined,
+        off && val(off, 'offenseDate', 'OffenseDate') ? `Offence ${val(off, 'offenseDate', 'OffenseDate')}` : undefined,
+        off && val(off, 'convictionDate', 'ConvictionDate') ? `Convicted ${val(off, 'convictionDate', 'ConvictionDate')}` : undefined,
+        off && val(off, 'sentenced', 'Sentenced') ? `Sentence: ${val(off, 'sentenced', 'Sentenced')}` : undefined,
+        val(cases[0], 'source', 'Source'),
+      ].filter(Boolean).join(' · ');
+
+      if (summary) findings.push({ summary, category, detail: detail || undefined, sexOffender: isSexOffence, corroborated, imageUrl });
     }
   }
 
@@ -1472,16 +1510,31 @@ async function lookupBusinesses(username: string, password: string, tahoeId?: st
       .join(' ');
     console.log('ENFORMION_BUSINESS_NESTED:', nested || '(none)');
   }
-  const items = rows.slice(0, 10).map((r: any) => {
-    const corp = r.corporation ?? (Array.isArray(r.corporations) ? r.corporations[0] : undefined) ?? r.business ?? r;
-    const filed = pickText(corp, 'filingDate', 'incorporationDate', 'dateFiled', 'recordDate', 'fileDate');
+  // Each record nests its filings by type, per SHAPE[BUSINESS]:
+  // "poseidonId,uccFilings,newBusinessFilings,usCorpFilings".
+  const filings: any[] = [];
+  for (const r of rows) {
+    for (const key of ['newBusinessFilings', 'usCorpFilings', 'uccFilings']) {
+      const list = Array.isArray(r?.[key]) ? r[key] : [];
+      for (const f of list) filings.push({ ...f, kind: key });
+    }
+  }
+
+  const items = filings.slice(0, 10).map((f: any) => {
+    const company = f.company ?? {};
+    const name = pickText(company, 'name', 'businessName', 'companyName')
+      ?? pickText(f, 'businessName', 'companyName', 'name');
+    const dates = f.nbfDates ?? f.filingHistoryDates ?? {};
+    const filed = pickText(dates, 'filingDate', 'firstSeen', 'startDate')
+      ?? pickText(f, 'filingDate', 'incorporationDate', 'dateFiled');
+    const where = pickText(company, 'state') ?? pickText(f, 'state');
     return [
-      pickText(corp, 'businessName', 'corporationName', 'companyName', 'name'),
-      pickText(corp, 'businessType', 'corporationType', 'entityType', 'filingType'),
-      pickText(corp, 'status', 'corporationStatus', 'filingStatus'),
+      name,
+      pickText(f, 'legalBusinessDescription', 'licenseTypeDesc', 'description'),
+      pickText(f, 'statusDesc', 'status'),
       filed ? `filed ${yearOnly(filed) ?? filed}` : undefined,
-      pickText(corp, 'state', 'stateOfIncorporation', 'filingState'),
-      pickText(r, 'title', 'role', 'officerTitle', 'position'),
+      where,
+      f.kind === 'uccFilings' ? 'UCC filing' : undefined,
     ].filter(Boolean).join(' · ');
   }).filter(Boolean);
   return { items, checked: ok };
@@ -1744,23 +1797,10 @@ export async function lookupCandidates(phone: string): Promise<PersonCandidate[]
     });
   }
 
-  // Reverse-phone rows carry no address or birth date, so the picker could only
-  // show names. Teaser is Enformion's masked, logged-out tier, meant for exactly
-  // this: enough to tell two people apart, before the paid Person drill-down.
-  await Promise.all(candidates.slice(0, 8).map(async (c) => {
-    if (c.age && c.city) return;
-    const rows = await proSearch(
-      username, password, BASE_URL, SEARCH_TYPE_TEASER,
-      { TahoeId: c.tahoeId, ResultsPerPage: 1 }, 'TEASER',
-    ).catch(() => [] as any[]);
-    const t = rows[0];
-    if (!t) return;
-    const loc = (Array.isArray(t.addresses) ? t.addresses[0] : undefined)
-      ?? (Array.isArray(t.locations) ? t.locations[0] : undefined) ?? {};
-    c.age = c.age ?? (typeof t.age === 'number' && t.age > 0 ? t.age : undefined);
-    c.city = c.city ?? (typeof loc.city === 'string' && loc.city ? loc.city : undefined);
-    c.state = c.state ?? (typeof loc.state === 'string' && loc.state ? loc.state : undefined);
-  }));
+  // A Teaser lookup per candidate would add age and city, which the picker
+  // badly needs, but this access profile answers "Access Profile does not
+  // permit client to call Person Search" every time. Removed rather than left
+  // to fail silently on every search; restore it if Teaser is enabled.
 
   console.log('ENFORMION_CANDIDATES:', candidates.length, 'for', digits);
   return candidates;

@@ -584,6 +584,11 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                   <ul style={{ margin: '8px 0 0', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {p.details.map((d, j) => (
                       <li key={j} style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', lineHeight: 1.5 }}>
+                        {p.detailTags?.[j] && (
+                          <span style={{ display: 'inline-block', marginRight: 6, padding: '1px 7px', borderRadius: 'var(--r-pill)', background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)', fontSize: 10, letterSpacing: 0.3, textTransform: 'uppercase' as const }}>
+                            {p.detailTags[j]}
+                          </span>
+                        )}{' '}
                         {d.href
                           ? <a href={d.href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{d.text}</a>
                           : d.text}
@@ -937,6 +942,7 @@ function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?:
   const [pending, setPending] = useState<(typeof relatives)[number] | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [limit, setLimit] = useState(15);
+  const [unlimited, setUnlimited] = useState(false);
 
   if (!relatives.length) {
     return <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)' }}>None on record</span>;
@@ -945,18 +951,13 @@ function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?:
   const open = (r: (typeof relatives)[number]) => {
     setPending(r);
     setRemaining(null);
-    fetch('/api/profile')
+    fetch('/api/quota')
       .then(res => (res.ok ? res.json() : null))
-      .then(d => {
-        const p = d?.profile;
-        if (!p) return;
-        const cap = p.plan === 'single' ? 1 : 15;
-        const reset = p.searches_reset_at ? new Date(p.searches_reset_at) : null;
-        const now = new Date();
-        const sameMonth = !!reset && reset.getFullYear() === now.getFullYear() && reset.getMonth() === now.getMonth();
-        const used = p.plan === 'single' || sameMonth ? (p.searches_this_month ?? 0) : 0;
-        setLimit(cap);
-        setRemaining(Math.max(0, cap - used));
+      .then(q => {
+        if (!q) return;
+        setLimit(q.limit ?? 15);
+        setUnlimited(!!q.unlimited);
+        setRemaining(q.unlimited ? null : q.remaining ?? 0);
       })
       .catch(() => {});
   };
@@ -986,13 +987,15 @@ function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?:
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: 'var(--pearl)', borderRadius: 'var(--r-lg)', padding: '24px 24px 20px', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--dark)', marginBottom: 8 }}>Search {pending.name}?</div>
             <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '0 0 18px' }}>
-              This uses 1 of your {limit} monthly lookups.
-              {remaining !== null && ` You have ${remaining} left this month.`}
+              {unlimited
+                ? 'This account has unlimited lookups, so nothing is deducted.'
+                : `This uses 1 of your ${limit} monthly lookups.`}
+              {!unlimited && remaining !== null && ` You have ${remaining} left this month.`}
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => setPending(null)} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: 'transparent', color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={go} disabled={remaining === 0} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: remaining === 0 ? 'var(--mauve)' : 'var(--primary)', color: 'var(--pearl)', fontFamily: 'var(--sans)', fontSize: 13, cursor: remaining === 0 ? 'not-allowed' : 'pointer' }}>
-                {remaining === 0 ? 'No lookups left' : 'Use a lookup'}
+              <button onClick={go} disabled={!unlimited && remaining === 0} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: !unlimited && remaining === 0 ? 'var(--mauve)' : 'var(--primary)', color: 'var(--pearl)', fontFamily: 'var(--sans)', fontSize: 13, cursor: !unlimited && remaining === 0 ? 'not-allowed' : 'pointer' }}>
+                {!unlimited && remaining === 0 ? 'No lookups left' : unlimited ? 'Search' : 'Use a lookup'}
               </button>
             </div>
           </div>

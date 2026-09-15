@@ -138,6 +138,8 @@ export interface PublicRecord {
   images?: string[];
   /** Line items behind the summary, e.g. individual court cases. */
   details?: Array<{ text: string; href?: string }>;
+  /** A short tag per detail line, such as the type of criminal record. */
+  detailTags?: string[];
 }
 
 export interface SocialCandidate {
