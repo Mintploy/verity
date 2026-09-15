@@ -26,6 +26,7 @@ const WORKPLACE_URL = `${HOST}/WorkplaceSearch`;
 const EVICTION_URL = `${HOST}/EvictionSearch`;
 const FORECLOSURE_URL = `${HOST}/ForeclosureV2Search`;
 const MARRIAGE_URL = `${HOST}/MarriageSearch`;
+const BUSINESS_URL = `${HOST}/BusinessV2Search`;
 
 // galaxy-search-type values.
 //
@@ -55,6 +56,7 @@ const SEARCH_TYPE_WORKPLACE = 'Workplace';
 const SEARCH_TYPE_EVICTION = 'Eviction';
 const SEARCH_TYPE_FORECLOSURE = 'ForeclosureV2';
 const SEARCH_TYPE_MARRIAGE = 'Marriage';
+const SEARCH_TYPE_BUSINESS = 'BusinessV2';
 
 export interface EnformionPhone {
   lineType: 'mobile' | 'voip' | 'landline';
@@ -71,6 +73,7 @@ export interface EnformionAddress {
   detail: string;
   flag?: boolean;
   owned?: boolean;
+  county?: string;
 }
 
 export interface EnformionProperty {
@@ -151,6 +154,8 @@ export interface EnformionPerson {
   evictionRecords?: string[];
   evictionChecked?: boolean;
   foreclosureRecords?: string[];
+  businessRecords?: string[];
+  businessChecked?: boolean;
   marriageRecords?: string[];
   marriageChecked?: boolean;
   /** True when marriage records came from a name match rather than his TahoeId. */
@@ -659,20 +664,18 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       };
       const from = monthYear(fromRaw);
       const to = monthYear(toRaw);
+      // First reported to last reported, the same for current and previous, as
+      // TruePeopleSearch shows it: "current" is itself the most recently reported.
       let years = isCurrent ? 'Current' : 'Previous address';
-      if (isCurrent) {
-        if (from) years = `Since ${from}`;
-      } else if (from && to) {
-        years = from === to ? from : `${from} to ${to}`;
-      } else if (from || to) {
-        years = from ? `From ${from}` : `Until ${to}`;
-      }
+      if (from && to) years = from === to ? from : `${from} - ${to}`;
+      else if (from || to) years = (from ?? to) as string;
       return {
         addr,
         years,
         current: isCurrent,
         detail: isCurrent ? 'Current address' : 'Previous address',
         flag: !!(a.highRiskMarker?.isHighRisk),
+        county: pickText(a, 'county'),
       };
     }).filter((a: any) => a.addr);
 
@@ -809,7 +812,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     const [
       propertyIntelligence, divorceDetail, linkedInResult, censusResult,
       criminalRecords, ofacResult, workplace,
-      evictionDetail, foreclosureDetail, marriageDetail,
+      evictionDetail, foreclosureDetail, marriageDetail, businessDetail,
     ] = await Promise.all([
       // Ungated. hasPropertyV2Records reads 0 on men whose record plainly
       // carries isCurrentPropertyOwner, so the gate was suppressing the square
@@ -843,16 +846,17 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         username, password, best.tahoeId, fullName,
         (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
       ).catch(() => ({ items: [] as string[], checked: false, nameMatched: false })),
+      lookupBusinesses(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
     ]);
 
-    // Property facts for every address in his history, not only the ones he
-    // owns. The TahoeId search returns up to three properties linked to him, so
-    // a rented apartment never had square footage and neither did most of a
-    // long history. Looked up by address, capped at six to keep cost bounded.
+    // Property details for his current address, whoever owns it. The TahoeId
+    // search returns only properties linked to him, so a rented current home had
+    // none. Previous addresses show county and dates only, as TruePeopleSearch
+    // does, so they are not looked up.
     const propKey = (a: string) => (a ?? '').toUpperCase().replace(/[.,;#]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
     const knownKeys = new Set((propertyIntelligence ?? []).map((pr: EnformionProperty) => propKey(pr.address)));
     const addressProperties: Record<string, EnformionProperty> = {};
-    await Promise.all(addresses.slice(0, 6).map(async (a) => {
+    await Promise.all(addresses.slice(0, 1).map(async (a) => {
       if (!a.addr || knownKeys.has(propKey(a.addr))) return;
       const found = await lookupPropertyV2(username, password, undefined, a.addr).catch(() => [] as EnformionProperty[]);
       if (found[0]) addressProperties[a.addr] = found[0];
@@ -898,6 +902,8 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         evictionRecords: evictionDetail.items.length ? evictionDetail.items : undefined,
         evictionChecked: evictionDetail.checked,
         foreclosureRecords: foreclosureDetail.items.length ? foreclosureDetail.items : undefined,
+        businessRecords: businessDetail.items.length ? businessDetail.items : undefined,
+        businessChecked: businessDetail.checked,
         marriageRecords: [...marriageRecords, ...marriageDetail.items].length
           ? [...new Set([...marriageRecords, ...marriageDetail.items])]
           : undefined,
@@ -1010,6 +1016,9 @@ async function lookupPropertyV2(
     const value = sum.propertyValue ?? {};
     const ident = sum.propertyIdentification ?? {};
     const ownerMeta = sum.currentOwnerMetaData ?? {};
+    // Subdivision and school district exist only on the assessor record, which
+    // is empty on most live responses, so they are often N/A.
+    const assessor = (prop.assessorRecords ?? prop.AssessorRecords ?? [])[0] ?? {};
 
     const n = (v: any): number | undefined => {
       const x = Number(v);
@@ -1073,15 +1082,19 @@ async function lookupPropertyV2(
       totalRooms: n(details.totalRooms),
       taxAmount: money(value.taxAmount),
       taxYear: n(value.taxYear) ?? n(value.assessedYear),
-      occupancy: str(ownerMeta.ownerOccupancyCodeDescription),
+      occupancy: typeof sum.isOwnerOccupied === 'boolean'
+        ? (sum.isOwnerOccupied ? 'Owner Occupied' : 'Non-Owner Occupied')
+        : str(ownerMeta.ownerOccupancyCodeDescription),
       ownerOccupied: typeof sum.isOwnerOccupied === 'boolean' ? sum.isOwnerOccupied : undefined,
       previousOwnerCount: Array.isArray(sum.previousOwners) ? sum.previousOwners.length : undefined,
-      ownershipType: str(ownerMeta.ownershipeRightsCodeDescription),
+      ownershipType: typeof (sum.currentOwners ?? [])[0]?.isCorporationOrBusiness === 'boolean'
+        ? (sum.currentOwners[0].isCorporationOrBusiness ? 'Business' : 'Individual')
+        : str(ownerMeta.relationshipTypeCodeDescription),
       landUse: str(ident.landUseCodeDescription) ?? str(ident.countyUseDescr),
       propertyClass: str(ident.propertyIndicatorCodeDescription),
-      subdivision: undefined,
+      subdivision: str(assessor.propertyLegal?.subdivisionName) ?? str(assessor.PropertyLegal?.SubdivisionName),
       apn: str(sum.apn) ?? str(sum.originalApn),
-      schoolDistrict: undefined,
+      schoolDistrict: str(assessor.location?.schoolDistrict) ?? str(assessor.Location?.SchoolDistrict),
     };
   }).filter((p: any) => p.address);
 }
@@ -1440,6 +1453,38 @@ async function lookupMarriages(
     ].filter(Boolean).join(' · ') || 'Marriage record on file';
   });
   return { items, checked, nameMatched };
+}
+
+// BusinessV2 takes camelCase request properties, unlike most endpoints here.
+// Its response schema is not documented, so reads go through pickText over
+// plausible keys and the nested keys are logged on the first live record.
+async function lookupBusinesses(username: string, password: string, tahoeId?: string): Promise<DetailLookup> {
+  if (!tahoeId) return { items: [], checked: false };
+  const { rows, ok } = await proSearchChecked(
+    username, password, BUSINESS_URL, SEARCH_TYPE_BUSINESS,
+    { tahoeId, page: 1, resultsPerPage: 10 }, 'BUSINESS',
+    (d: any) => d?.businessV2Records ?? d?.BusinessV2Records ?? d?.businessRecords ?? d?.BusinessRecords ?? extractRowsDefault(d),
+  );
+  if (rows[0]) {
+    const nested = Object.entries(rows[0])
+      .filter(([, v]) => v && typeof v === 'object')
+      .map(([k, v]) => `${k}:{${Object.keys(Array.isArray(v) ? (v[0] ?? {}) : (v as object)).join('|')}}`)
+      .join(' ');
+    console.log('ENFORMION_BUSINESS_NESTED:', nested || '(none)');
+  }
+  const items = rows.slice(0, 10).map((r: any) => {
+    const corp = r.corporation ?? (Array.isArray(r.corporations) ? r.corporations[0] : undefined) ?? r.business ?? r;
+    const filed = pickText(corp, 'filingDate', 'incorporationDate', 'dateFiled', 'recordDate', 'fileDate');
+    return [
+      pickText(corp, 'businessName', 'corporationName', 'companyName', 'name'),
+      pickText(corp, 'businessType', 'corporationType', 'entityType', 'filingType'),
+      pickText(corp, 'status', 'corporationStatus', 'filingStatus'),
+      filed ? `filed ${yearOnly(filed) ?? filed}` : undefined,
+      pickText(corp, 'state', 'stateOfIncorporation', 'filingState'),
+      pickText(r, 'title', 'role', 'officerTitle', 'position'),
+    ].filter(Boolean).join(' · ');
+  }).filter(Boolean);
+  return { items, checked: ok };
 }
 
 async function lookupOfac(

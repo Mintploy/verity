@@ -6,7 +6,7 @@ import { Nav } from '@/components/nav/Nav';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Bow } from '@/components/ui/Bow';
 import { Report, ScoreState } from '@/lib/types';
-import { getStarSign, getCompatibility, SIGN_EMOJI, StarSign } from '@/lib/starsigns';
+import { getStarSign, getCompatibility, inferStarSign, SIGN_EMOJI, StarSign } from '@/lib/starsigns';
 import type { FileType } from '@/lib/hisfile';
 
 export default function ReportPage() {
@@ -153,7 +153,11 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
   const scoreConfig = getScoreConfig(report.score);
   const initials = report.subject.name.split(' ').map((n: string) => n[0]).join('');
 
-  const subjectSign = getStarSign(report.identity.dob) ?? getStarSign(report.subject.dob ?? '');
+  // Enformion gives month and year, not the day. The sign is then the one that
+  // covers most of that month, and the panel says "Likely".
+  const inferred = inferStarSign(report.identity.dob) ?? inferStarSign(report.subject.dob);
+  const subjectSign = inferred?.sign ?? null;
+  const signEstimated = !!inferred?.estimated;
   const compat = (subjectSign && userSign) ? getCompatibility(subjectSign, userSign) : null;
   const compatPct = compat ? Math.round(compat.score * 10) : null;
 
@@ -211,7 +215,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
                     <span style={{ color: 'var(--mauve)', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 16 }}>×</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 20 }}>{SIGN_EMOJI[subjectSign]}</span>
-                      <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{subjectSign} <em style={{ opacity: 0.55 }}>him</em></span>
+                      <span style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)' }}>{signEstimated ? `Likely ${subjectSign}` : subjectSign} <em style={{ opacity: 0.55 }}>{signEstimated ? 'him, from birth month' : 'him'}</em></span>
                     </div>
                   </div>
 
@@ -294,63 +298,122 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           <div className="v-grid-r2" style={{ gap: 14 }}>
             <Stat label="Full name" value={report.identity.fullName} />
             <Stat label="Age" value={String(report.identity.age || '')} />
-            <Stat label="Date of birth" value={report.identity.dob} />
+            <Stat label="Date of birth" value={formatDob(report.identity.dob)} />
             <Stat label="Verified by" value={`${report.identity.verifiedBy} sources`} />
           </div>
         </Section>
       </div>
 
-      <Section id="sec-3" eyebrow="03" title="Addresses and property">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {report.addresses.map((a, i) => {
-            // One card per address with everything known about it: how long he
-            // was there, whether it is current, home or office, the building,
-            // what it sold for, and whether it is his.
-            const building = [
-              a.propertyType,
-              a.beds ? `${a.beds} bed` : null,
-              a.baths ? `${a.baths} bath` : null,
-              a.sqft ? `${a.sqft.toLocaleString()} sq ft` : null,
-              a.lotSqft ? `${a.lotSqft.toLocaleString()} sq ft lot` : null,
-              a.yearBuilt ? `Built ${a.yearBuilt}` : null,
-              a.county ? `${a.county} County` : null,
-            ].filter(Boolean) as string[];
-            const money = [
-              a.purchasePrice ? `Last sold for ${a.purchasePrice}${a.purchaseDate ? ` in ${a.purchaseDate}` : ''}` : null,
-              a.currentValue ? `Estimated value ${a.currentValue}` : null,
-            ].filter(Boolean) as string[];
-            return (
-              <div key={i} style={{ padding: '14px 16px', borderRadius: 'var(--r-md)', background: a.current ? 'var(--blush-pale)' : 'var(--ivory)', borderLeft: `3px solid ${a.flag ? 'var(--deeprose)' : a.current ? 'var(--primary)' : 'var(--gold-pale)'}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11.5, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.3 }}>{a.years}</span>
-                  {a.current && <Badge tone="primary">Current</Badge>}
-                  {a.kind && a.kind !== 'unknown' && (
-                    <Badge tone={a.kind === 'office' ? 'gold' : 'sage'} title={a.kindReason ? `Based on: ${a.kindReason}` : undefined}>
-                      {a.kind === 'office' ? 'Likely office' : 'Likely home'}
-                    </Badge>
-                  )}
-                  {a.subjectIsOwner === true && <Badge tone="sage">He owns it</Badge>}
-                  {a.subjectIsOwner === false && <Badge tone="honey">Not in his name</Badge>}
+      <Section id="sec-3" eyebrow="03" title="Addresses">
+        {(() => {
+          // Laid out as TruePeopleSearch does: the current address with its
+          // building and dates, a property details panel for that address, then
+          // every previous address with county and dates.
+          const current = report.addresses.find(a => a.current) ?? report.addresses[0];
+          if (!current) {
+            return <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)' }}>No addresses on record.</div>;
+          }
+          const previous = report.addresses.filter(a => a !== current);
+          const na = (v?: string | number | null) =>
+            v === undefined || v === null || v === '' ? 'N/A' : typeof v === 'number' ? v.toLocaleString() : v;
+          const facts = [
+            current.beds ? `${current.beds} Bed` : null,
+            current.baths ? `${current.baths} Bath` : null,
+            current.sqft ? `${current.sqft.toLocaleString()} Sq Ft` : null,
+            current.yearBuilt ? `Built ${current.yearBuilt}` : null,
+          ].filter(Boolean) as string[];
+          const details: Array<[string, string]> = [
+            ['Bedrooms', na(current.beds)],
+            ['Bathrooms', na(current.baths)],
+            ['Square Feet', na(current.sqft)],
+            ['Year Built', current.yearBuilt ? String(current.yearBuilt) : 'N/A'],
+            ['Estimated Value', na(current.currentValue)],
+            ['Estimated Equity', 'N/A'],
+            ['Last Sale Amount', na(current.purchasePrice)],
+            ['Last Sale Date', na(current.purchaseDate)],
+            ['Occupancy Type', na(current.occupancy)],
+            ['Ownership Type', na(current.ownershipType)],
+            ['Land Use', na(titleCase(current.landUse))],
+            ['Property Class', na(titleCase(current.propertyClass))],
+            ['Subdivision', na(titleCase(current.subdivision))],
+            ['Lot Square Feet', na(current.lotSqft)],
+            ['APN', na(current.apn)],
+            ['School District', na(titleCase(current.schoolDistrict))],
+          ];
+          const hasProperty = details.some(([, v]) => v !== 'N/A');
+          const heading = (t: string, note: string) => (
+            <>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 18, color: 'var(--dark)', marginBottom: 2 }}>{t}</div>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginBottom: 10 }}>{note}</div>
+            </>
+          );
+          const addressLink = (addr: string) => (
+            <a href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr.replace(/;/g, ','))} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dark)', textDecoration: 'underline', display: 'block' }}>
+              {addr.split(';').map(l => l.trim()).filter(Boolean).map((l, i) => <span key={i} style={{ display: 'block' }}>{l}</span>)}
+            </a>
+          );
+          return (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                {heading('Current Address', `This is the most recently reported address for ${report.subject.name}.`)}
+                <div style={{ padding: '14px 16px', borderRadius: 'var(--r-md)', background: 'var(--blush-pale)', borderLeft: '3px solid var(--primary)' }}>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: 17, lineHeight: 1.35 }}>{addressLink(current.addr)}</div>
+                  {facts.length > 0 && <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark)', marginTop: 6 }}>{facts.join(' | ')}</div>}
+                  {current.county && <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 2 }}>{countyLabel(current.county)}</div>}
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 2 }}>({current.years})</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {current.kind && current.kind !== 'unknown' && (
+                      <Badge tone={current.kind === 'office' ? 'gold' : 'sage'} title={current.kindReason ? `Based on: ${current.kindReason}` : undefined}>
+                        {current.kind === 'office' ? 'Likely office' : 'Likely home'}
+                      </Badge>
+                    )}
+                    {current.subjectIsOwner === true && <Badge tone="sage">He owns it</Badge>}
+                    {current.subjectIsOwner === false && <Badge tone="honey">Not in his name</Badge>}
+                  </div>
                 </div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: 16, color: 'var(--dark)', lineHeight: 1.3 }}>
-                  <a href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.addr)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dark)', textDecoration: 'underline' }}>{a.addr}</a>
-                </div>
-                {building.length > 0 && (
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 6, lineHeight: 1.55 }}>{building.join(' · ')}</div>
-                )}
-                {money.length > 0 && (
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark)', marginTop: 4, lineHeight: 1.55 }}>{money.join(' · ')}</div>
-                )}
-                {a.subjectIsOwner === false && a.ownerName && (
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 4 }}>Owner of record: {a.ownerName}</div>
-                )}
-                {a.flag && (
-                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--deeprose-deep)', marginTop: 4, fontWeight: 500 }}>{a.detail}</div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                {heading('Current Address Property Details', `Property record details for the current residence of ${report.subject.name}.`)}
+                {hasProperty ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+                    {details.map(([label, value]) => (
+                      <div key={label} style={{ padding: '10px 12px', background: 'var(--ivory)', borderRadius: 'var(--r-sm)', minWidth: 0 }}>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 10, letterSpacing: 0.5, color: 'var(--mauve-deep)', textTransform: 'uppercase' as const }}>{label}</div>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: value === 'N/A' ? 'var(--mauve)' : 'var(--dark)', marginTop: 2, overflowWrap: 'anywhere' }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)' }}>No property record was found for this address.</div>
                 )}
               </div>
-            );
-          })}
-        </div>
+
+              {previous.length > 0 && (
+                <div>
+                  {heading('Previous Addresses', `All previously reported addresses for ${report.subject.name}.`)}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                    {previous.map((a, i) => (
+                      <div key={i} style={{ padding: '12px 14px', borderRadius: 'var(--r-md)', background: 'var(--ivory)', borderLeft: `3px solid ${a.flag ? 'var(--deeprose)' : 'var(--gold-pale)'}`, minWidth: 0 }}>
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, lineHeight: 1.4 }}>{addressLink(a.addr)}</div>
+                        {a.county && <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 2 }}>{countyLabel(a.county)}</div>}
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 2 }}>({a.years})</div>
+                        {a.kind && a.kind !== 'unknown' && (
+                          <div style={{ marginTop: 6 }}>
+                            <Badge tone={a.kind === 'office' ? 'gold' : 'sage'} title={a.kindReason ? `Based on: ${a.kindReason}` : undefined}>
+                              {a.kind === 'office' ? 'Likely office' : 'Likely home'}
+                            </Badge>
+                          </div>
+                        )}
+                        {a.flag && <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--deeprose-deep)', marginTop: 4, fontWeight: 500 }}>{a.detail}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </Section>
 
       {(report.propertyIntelligence ?? []).some(p => !p.inAddressHistory) && (
@@ -829,6 +892,26 @@ function Section({ id, eyebrow, title, children, accent = 'var(--blush-pale)' }:
       <div style={{ padding: '0 28px 24px' }}>{children}</div>
     </div>
   );
+}
+
+// Vendor values arrive in capitals ("SINGLE FAMILY RESIDENCE", "LOS ANGELES").
+function titleCase(v?: string): string | undefined {
+  if (!v) return v;
+  return v.toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase());
+}
+
+function countyLabel(v: string): string {
+  const t = titleCase(v.trim()) ?? v;
+  return /county$/i.test(t) ? t : `${t} County`;
+}
+
+// "1/1983" is month and year; a full date shows the day as well.
+function formatDob(v?: string): string {
+  if (!v) return '';
+  const my = v.trim().match(/^(\d{1,2})\/(\d{4})$/);
+  if (my) return new Date(Number(my[2]), Number(my[1]) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  const d = new Date(v);
+  return Number.isFinite(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : v;
 }
 
 function Badge({ tone, title, children }: { tone: 'primary' | 'gold' | 'sage' | 'honey'; title?: string; children: React.ReactNode }) {

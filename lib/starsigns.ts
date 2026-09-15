@@ -26,6 +26,37 @@ export function getStarSign(dob: string): StarSign | null {
   return 'Pisces';
 }
 
+// For each month, the sign covering most of its days: January is Capricorn for
+// 19 days and Aquarius for 12, so a January birth is most likely Capricorn.
+const MONTH_MAJORITY: StarSign[] = [
+  'Capricorn', 'Aquarius', 'Pisces', 'Aries', 'Taurus', 'Gemini',
+  'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius',
+];
+
+/**
+ * A sign from whatever birth date is on record. Enformion documents Dob as
+ * month and year ("1/1983"), with no day, so the sign is then an estimate:
+ * the one that covers most of that month. A full date gives the exact sign.
+ * Never fed to getStarSign directly, which would read "1/1983" as January 1st
+ * and present an estimate as a certainty.
+ */
+export function inferStarSign(dob?: string | null): { sign: StarSign; estimated: boolean } | null {
+  if (!dob) return null;
+  const s = dob.trim();
+  const monthYear = s.match(/^(\d{1,2})\/(\d{4})$/);
+  if (monthYear) {
+    const m = Number(monthYear[1]);
+    return m >= 1 && m <= 12 ? { sign: MONTH_MAJORITY[m - 1], estimated: true } : null;
+  }
+  // Only a date with a day is exact. getStarSign would read a bare year such as
+  // "1983" as January 1st and return Capricorn as if it were known; a year alone
+  // says nothing about the sign, so it gives none.
+  const hasDay = /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s) || /^\d{4}-\d{2}-\d{2}/.test(s);
+  if (!hasDay) return null;
+  const exact = getStarSign(s);
+  return exact ? { sign: exact, estimated: false } : null;
+}
+
 export interface CompatibilityResult {
   score: number;
   rating: string;

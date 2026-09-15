@@ -62,6 +62,13 @@ export interface Address {
   ownerName?: string;
   /** Whether he is on the deed for this address. */
   subjectIsOwner?: boolean;
+  occupancy?: string;
+  ownershipType?: string;
+  landUse?: string;
+  propertyClass?: string;
+  subdivision?: string;
+  apn?: string;
+  schoolDistrict?: string;
 }
 
 export interface PropertyIntelligence {

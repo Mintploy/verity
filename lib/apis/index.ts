@@ -116,9 +116,14 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   const resolvedAliases = person.aliases?.length ? person.aliases : undefined;
 
   const bizCount = person.counts?.business ?? 0;
-  const businessEntities = bizCount > 0
-    ? `${bizCount} business affiliation${bizCount === 1 ? '' : 's'} on record, details require further lookup.`
-    : 'None found.';
+  // The records themselves, one per line, when BusinessV2 returned them. A bare
+  // count gave her nothing she could act on.
+  const businessEntities = person.businessRecords?.length
+    ? person.businessRecords.join('\n')
+      + (bizCount > person.businessRecords.length ? `\n${bizCount - person.businessRecords.length} more on record` : '')
+    : bizCount > 0
+      ? `${bizCount} business record${bizCount === 1 ? '' : 's'} on file, but the business search ${person.businessChecked ? 'returned no details' : 'did not complete'} for this report.`
+      : 'None found.';
 
   const publicRecords = buildPublicRecords(pub, fecResult, person, so);
 
@@ -184,7 +189,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       kindReason: reason,
       sqft: match?.sqft,
       yearBuilt: match?.yearBuilt,
-      county: match?.county,
+      county: match?.county ?? a.county,
       beds: match?.beds,
       baths: match?.baths,
       lotSqft: match?.lotSqft,
@@ -194,6 +199,13 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       currentValue: match?.currentValue,
       ownerName: match?.ownerName,
       subjectIsOwner: match?.subjectIsOwner,
+      occupancy: match?.occupancy,
+      ownershipType: match?.ownershipType,
+      landUse: match?.landUse,
+      propertyClass: match?.propertyClass,
+      subdivision: match?.subdivision,
+      apn: match?.apn,
+      schoolDistrict: match?.schoolDistrict,
       owned: match?.subjectIsOwner === true ? true : a.owned,
     };
   });
