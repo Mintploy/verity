@@ -1,13 +1,13 @@
 export function WhatYouKnow() {
   const sections = [
-    { l: 'Phone intelligence', d: 'Carrier, line type, VoIP detection, geographic origin, age of number.' },
-    { l: 'Identity signals', d: 'Full legal name, age, date of birth, cross-referenced across three sources.' },
-    { l: 'Address history', d: 'Last five known addresses, ownership vs. rental, purchase and sale prices, trust holdings.' },
-    { l: 'Marital & relationships', d: 'Current marital status, prior marriages, known relatives, close associates.' },
-    { l: 'Professional profile', d: 'Employer, title, tenure, business registrations, and LLC filings from public record.' },
-    { l: 'Public record flags', d: 'Sex offender registry, bankruptcy, lawsuits and judgments, evictions, professional licenses, political donations.' },
-    { l: 'Social footprint', d: 'Known social handles, presence assessment, inconsistencies across profiles, age discrepancies.' },
-    { l: 'Our recommendation', d: "A plain-English score, a short verdict, and the three to five things we'd actually do next, in your shoes." },
+    { l: 'Phone intelligence', d: 'Carrier, line type, VoIP detection, and whether the line is still connected.' },
+    { l: 'Identity signals', d: 'Full legal name, age, and the aliases and alternate spellings attached to the same record.' },
+    { l: 'Address history', d: 'Known addresses with the dates each was reported and the county, whether each looks like a home or an office, and the property record behind his current address.' },
+    { l: 'Marital & relationships', d: 'Marriage and divorce records on file, known relatives and close associates. Any relative can be searched in one tap.' },
+    { l: 'Professional profile', d: 'Employer and title where the record carries them, professional licences, and the business entities registered to his name.' },
+    { l: 'Public record flags', d: 'Sex offender registry and criminal records, sanctions screening, bankruptcies, evictions and pre-foreclosure, judgments and liens, federal lawsuits, political donations.' },
+    { l: 'Social footprint', d: 'Public profiles and email addresses that appear on the record, stated as that and nothing more.' },
+    { l: 'Our recommendation', d: "A plain-English score, a short verdict that names the reason it landed there, and the three to five things we'd actually do next, in your shoes." },
   ];
 
   return (
@@ -25,7 +25,7 @@ export function WhatYouKnow() {
               fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)', lineHeight: 1.6,
               margin: '24px 0 0', maxWidth: 380, fontWeight: 300,
             }}>
-              We cross-reference four independent sources, Enformion, CourtListener, FEC, NSOPW, and write you the report your brilliant older sister would, if she had access to a PI.
+              We cross-reference three independent sources, Enformion, CourtListener and the FEC, and write you the report your brilliant older sister would, if she had access to a PI.
             </p>
           </div>
 

@@ -223,7 +223,7 @@ function SearchContent() {
             Pulling the file...
           </p>
           <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '12px 0 0', fontWeight: 300 }}>
-            Cross-referencing 7 sources. Usually about 14 seconds.
+            Cross-referencing public and licensed records. Usually about 14 seconds.
           </p>
         </div>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

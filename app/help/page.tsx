@@ -13,7 +13,7 @@ const faqs = [
       },
       {
         q: 'How long does a report take?',
-        a: "Most reports return in 10–20 seconds. We cross-reference seven independent sources in parallel. Complex records, multiple addresses, legal filings, business registrations, can take up to 45 seconds.",
+        a: "Most reports return in 10–20 seconds. We query Enformion, CourtListener and the FEC in parallel, and Enformion answers several record types in separate calls of its own. Complex records, multiple addresses, legal filings, business registrations, can take up to 45 seconds.",
       },
       {
         q: 'Will he know I searched him?',
@@ -21,7 +21,7 @@ const faqs = [
       },
       {
         q: 'What sources do you use?',
-        a: "Enformion (identity, phone, property, employment, criminal, and bankruptcy records), CourtListener (federal court dockets only, not state courts), FEC (political donations), and NSOPW (sex offender registry). Four sources, cross-referenced and scored.",
+        a: "Enformion (identity, phone, addresses and property, employment and business entities, criminal and sex offender registry records, marriage and divorce, evictions and pre-foreclosure, bankruptcies, judgments and liens, and sanctions screening), CourtListener (federal court dockets only, not state courts), and the FEC (political donations). Three sources, cross-referenced and scored. Sex offender registry records reach us through the criminal records search: NSOPW, the national registry website, publishes no API anyone can query, so we do not list it as a source and never report the registry as clear on a check that did not run.",
       },
     ],
   },
@@ -31,7 +31,7 @@ const faqs = [
     items: [
       {
         q: 'What does the score mean?',
-        a: "Green means no significant flags across our seven sources, the picture the data paints matches what a person would reasonably represent about themselves. Yellow means inconsistencies or single flags that warrant a conversation. Red means one or more serious flags: active marriages, sex offender registry matches, recent criminal filings, or identity that cannot be verified.",
+        a: "Green means nothing adverse surfaced in any check that completed. Yellow means at least one thing surfaced and none of it was grave: a VoIP line, a bankruptcy, an eviction, a judgment or lien, or an open federal docket. Your report names which one it was. Red is forced by any one of three things on its own: a sex offender registry match, a criminal record corroborated as his, or a sanctions or watchlist hit. A red is never averaged away against everything that came back clean.",
       },
       {
         q: 'Can a green score be wrong?',

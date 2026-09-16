@@ -647,7 +647,7 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
           It tells you what's true today, so you can decide tomorrow.
         </div>
         <div style={{ marginTop: 14, fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', letterSpacing: 0.3, lineHeight: 1.6 }}>
-          Sources: Enformion, CourtListener, FEC, NSOPW
+          Sources: Enformion, CourtListener, FEC. Sex offender registry records reach us through the criminal records search.
         </div>
       </div>
     </main>

@@ -23,7 +23,7 @@ const col2: Card[] = [
   { type: 'tag', text: 'Bankruptcy filed · 2020', tone: 'flag' },
   { type: 'data', label: 'Employer', val: 'Accenture · Senior Manager · est. $140k' },
   { type: 'tag', text: 'VoIP secondary line detected', tone: 'flag' },
-  { type: 'data', label: 'Sources checked', val: 'Enformion · CourtListener · FEC · NSOPW' },
+  { type: 'data', label: 'Sources checked', val: 'Enformion · CourtListener · FEC' },
   { type: 'score', score: 'green', label: 'Green light', sub: 'Proceed with ease.' },
   { type: 'tag', text: 'Age verified across profiles', tone: 'clear' },
 ];
