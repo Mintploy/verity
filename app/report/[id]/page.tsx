@@ -190,7 +190,13 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, var(--ivory-warm), var(--champagne))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 20, color: 'var(--dark-soft)', boxShadow: `0 0 0 3px ${scoreConfig.bg}, 0 0 0 4px ${scoreConfig.deep}33` }}>{initials}</div>
               <div>
                 <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: scoreConfig.deep }}>{report.subject.name}</div>
-                <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: scoreConfig.deep, opacity: 0.7, marginTop: 2 }}>Age {report.subject.age} · {report.subject.phone}</div>
+                {/* A missing age arrives as 0, because the mapper defaults it
+                    to a number. Printing that literally told her a grown man
+                    was "Age 0". Say the record does not carry one instead. */}
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: scoreConfig.deep, opacity: 0.7, marginTop: 2 }}>
+                  {[report.subject.age ? `Age ${report.subject.age}` : 'Age not on record', report.subject.phone]
+                    .filter(Boolean).join(' · ')}
+                </div>
               </div>
             </div>
           </div>

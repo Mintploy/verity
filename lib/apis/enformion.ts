@@ -733,26 +733,47 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         relTypes[t] = (relTypes[t] ?? 0) + 1;
         if (r.spouse || r.oldSpouse || r.isSpouse || r.Spouse || r.OldSpouse) spouseFlagged += 1;
       }
+      // The literal flag values, so the 1-versus-true question is answered by
+      // the data rather than by inference. Flags and type only, never a name.
+      const flagShapes = relativesSummary
+        .filter((r: any) => r.spouse || r.oldSpouse || r.isSpouse || r.Spouse || r.OldSpouse)
+        .slice(0, 3)
+        .map((r: any) => `type=${r.relativeType ?? '-'} spouse=${JSON.stringify(r.spouse)} oldSpouse=${JSON.stringify(r.oldSpouse)}`);
       console.log('ENFORMION_RELATIVE_TYPES:', JSON.stringify(relTypes),
-        '| spouse-flagged:', spouseFlagged, 'of', relativesSummary.length);
+        '| spouse-flagged:', spouseFlagged, 'of', relativesSummary.length,
+        '| flags:', flagShapes.join(' ; ') || 'none');
     }
 
     // Spouse detection reads relativeType / spouse / oldSpouse, none of which
     // have ever been confirmed against a live row, and marital status is blank
     // on every report. Widened to match case-insensitively and to accept the
     // plausible spellings; ENFORMION_RELATIVE_KEYS says which one is real.
+    // These flags come back as 1 and 0, not true and false, the same way
+    // emailAddresses uses nonBusiness === 1. Comparing with === true meant a
+    // former spouse carrying oldSpouse: 1 satisfied neither branch: she was
+    // not the current spouse because !r.oldSpouse was false, and not a prior
+    // marriage because 1 is not true. She fell through both, so a man whose
+    // own record names a spouse was reported as having no marriage on file.
+    const truthy = (v: any) => v === true || v === 1 || v === '1'
+      || String(v).toLowerCase() === 'true';
+
     const isSpouse = (r: any) => {
       const t = String(r.relativeType ?? r.RelativeType ?? r.relationship ?? r.Relationship ?? '').toLowerCase();
       return t.includes('spouse') || t.includes('husband') || t.includes('wife')
-        || r.spouse === 1 || r.spouse === true || r.isSpouse === true;
+        || truthy(r.spouse) || truthy(r.isSpouse);
     };
+    const isFormerSpouse = (r: any) => truthy(r.oldSpouse) || truthy(r.OldSpouse)
+      || truthy(r.isFormerSpouse);
+
     const currentSpouse = relativesSummary.find(
-      (r: any) => isSpouse(r) && !r.oldSpouse && !r.isDeceased
+      (r: any) => isSpouse(r) && !isFormerSpouse(r) && !truthy(r.isDeceased)
     );
     const spouseName: string | undefined = currentSpouse ? buildName(currentSpouse) : undefined;
 
+    // Has to be a spouse as well as former: this previously counted any
+    // relative at all who happened to carry an oldSpouse flag.
     const priorSpouses = relativesSummary.filter(
-      (r: any) => r.oldSpouse === true || r.OldSpouse === true || r.isFormerSpouse === true,
+      (r: any) => isSpouse(r) && isFormerSpouse(r),
     );
     const priorMarriages: string | undefined = priorSpouses.length > 0
       ? `${priorSpouses.length} prior marriage${priorSpouses.length !== 1 ? 's' : ''} on record`
@@ -764,8 +785,10 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         ? 'Divorced / previously married'
         : undefined;
 
+    // Spouses stay in this list. Filtering them out meant the one person she
+    // most wants to look up, his wife or his ex-wife, was the single name she
+    // could not tap. The Spouse row names them; this makes them searchable.
     const relativesDetail: RelativeDetail[] = relativesSummary
-      .filter((r: any) => !isSpouse(r))
       .slice(0, 10)
       .map((r: any) => ({
         name: buildName(r),
