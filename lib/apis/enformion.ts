@@ -679,14 +679,37 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       const year = Number(monthYear.split('/')[1]);
       return Math.abs((new Date().getFullYear() - year) - age) <= 2;
     };
-    const seenDob = [best.dobFirstSeen, best.dobLastSeen]
-      .map(monthYearOf)
-      .find((my): my is string => !!my && agreesWithAge(my));
+    const seenCandidates = [best.dobFirstSeen, best.dobLastSeen].map(monthYearOf);
+    const [firstSeenMY, lastSeenMY] = seenCandidates;
+
+    // Matching years on both ends is itself evidence of a birth date. A
+    // first-seen and last-seen pair describing when a record was observed
+    // would normally straddle different years; a person has one year of birth.
+    // This is the fallback for records that carry no age to check against,
+    // which is the case that produced a blank birth month on a relative whose
+    // dobFirstSeen was plainly populated.
+    const sameYear = !!firstSeenMY && !!lastSeenMY
+      && firstSeenMY.split('/')[1] === lastSeenMY.split('/')[1];
+
+    const seenDob = seenCandidates.find((my): my is string => !!my && agreesWithAge(my))
+      ?? (!age && sameYear ? firstSeenMY : undefined);
 
     const dobRaw: string | undefined = monthYearOf(best.dob)
       ?? monthYearOf(dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth)
       ?? seenDob
       ?? ((best.dob && best.dob !== '') ? best.dob : undefined);
+
+    // Which branch decided, and why, without writing a birth date to a log.
+    // Booleans and an age-known flag only: logging the age alongside "agrees"
+    // would give away the birth year, which is the thing worth protecting.
+    console.log('ENFORMION_DOB_DECISION:',
+      `ageKnown=${!!age}`,
+      `firstSeenParsed=${!!firstSeenMY}`,
+      `firstSeenAgrees=${firstSeenMY ? agreesWithAge(firstSeenMY) : false}`,
+      `lastSeenParsed=${!!lastSeenMY}`,
+      `lastSeenAgrees=${lastSeenMY ? agreesWithAge(lastSeenMY) : false}`,
+      `sameYear=${sameYear}`,
+      `resolved=${!!dobRaw}`);
 
     // DOB comes back empty on every Person drill-down seen so far, even with the
     // DatesOfBirth include. Log the format of each date field with digits and
