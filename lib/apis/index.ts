@@ -3,7 +3,6 @@ import { SearchRequest, Report, ScoreState } from '../types';
 import { lookupEnformion } from './enformion';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
-import { checkSexOffenderRegistry } from './nsopw';
 
 
 /**
@@ -56,7 +55,7 @@ function classifyAddress(
 export async function generateReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
-  const [enResult, publicRecs, soRegistry] = await Promise.allSettled([
+  const [enResult, publicRecs] = await Promise.allSettled([
     lookupEnformion({
       phone: req.phone,
       name: req.name,
@@ -66,7 +65,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       tahoeId: req.tahoeId,
     }),
     lookupPublicRecords(req.name, req.phone),
-    checkSexOffenderRegistry(req.name),
   ]);
 
   const en = enResult.status === 'fulfilled' ? enResult.value : null;
@@ -80,22 +78,26 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     pub = await lookupPublicRecords(person.fullName).catch(() => null);
   }
 
+  const criminal = person.criminal;
+  const confirmedCriminal = criminal?.findings.filter(f => f.corroborated) ?? [];
+
   const flags: string[] = [];
   if (phone?.lineType === 'voip') flags.push('voip');
   if (pub?.hasFlags) flags.push('public');
-  if (soRegistry.status === 'fulfilled' && soRegistry.value?.onRegistry) flags.push('soregistry');
   if (person.hasBankruptcy) flags.push('bankruptcy');
   if (person.hasEvictions) flags.push('evictions');
   if (person.hasJudgments || person.hasLiens || person.hasForeclosures) flags.push('financial');
-  const criminal = person.criminal;
-  const confirmedCriminal = criminal?.findings.filter(f => f.corroborated) ?? [];
+  // Criminal Search V2's SEX category is the only place a registry listing can
+  // come from, so it is raised from there. Kept as its own flag, ahead of the
+  // general criminal one, so the summary tells her he is on a sex offender
+  // registry rather than the far vaguer "a criminal record corroborated as his".
+  if (criminal?.onSexOffenderRegistry) flags.push('soregistry');
   if (confirmedCriminal.length) flags.push('criminal');
   if (person.ofacHits?.length) flags.push('sanctions');
 
   // A registry listing, a criminal record, or a sanctions hit each stand on
   // their own, they are not one flag among several to be averaged away.
-  const gravest = (soRegistry.status === 'fulfilled' && (soRegistry.value as any)?.onRegistry)
-    || criminal?.onSexOffenderRegistry
+  const gravest = criminal?.onSexOffenderRegistry
     || confirmedCriminal.length > 0
     || !!person.ofacHits?.length;
 
@@ -107,7 +109,6 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     ? 'green'
     : 'yellow';
 
-  const so = soRegistry.status === 'fulfilled' ? soRegistry.value : null;
   const fecResult = await lookupDonations(person.fullName ?? req.name).catch(() => null);
 
   const resolvedName = person.fullName ?? req.name ?? 'Unknown';
@@ -125,7 +126,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
       ? `${bizCount} business record${bizCount === 1 ? '' : 's'} on file, but the business search ${person.businessChecked ? 'returned no details' : 'did not complete'} for this report.`
       : 'None found.';
 
-  const publicRecords = buildPublicRecords(pub, fecResult, person, so);
+  const publicRecords = buildPublicRecords(pub, fecResult, person);
 
   // An email address is not a social handle, and nothing here is confirmed:
   // these are addresses and profiles that appear on the record, which is a
@@ -351,11 +352,15 @@ function plural(count: number | undefined, noun: string): string {
 }
 
 // A registry listing is the single most consequential thing this report can
-// say, so it is never claimed clear on a check that did not run. Criminal
-// Search V2 carries state sex offender registry records, which can confirm a
-// listing even when NSOPW itself is unavailable, but it cannot prove absence,
-// so a clean Criminal result still leaves the registry "not verified".
-function buildRegistryRow(so: any, criminal: any): any {
+// say, so it is never claimed clear on a check that did not run.
+//
+// Criminal Search V2's SEX category is the whole of our registry coverage.
+// NSOPW, the national registry site, publishes no API anyone can query, so
+// there was never a second opinion to fall back on and the code that pretended
+// to ask for one has been removed. A clean Criminal result is therefore a real
+// answer about the records that search covers, and a Criminal search that did
+// not run leaves this unknown rather than clear.
+function buildRegistryRow(criminal: any): any {
   if (criminal?.onSexOffenderRegistry) {
     const hits = criminal.findings.filter((f: any) => f.sexOffender && f.corroborated);
     return {
@@ -363,14 +368,6 @@ function buildRegistryRow(so: any, criminal: any): any {
       value: `Listed, ${hits[0]?.summary ?? 'registry record found'}`,
       good: false,
       flag: true,
-    };
-  }
-  if (so?.checked) {
-    return {
-      label: 'Sex offender registry',
-      value: so.onRegistry ? `Listed, ${so.details ?? 'record found'}` : 'Not listed',
-      good: !so.onRegistry,
-      flag: !!so.onRegistry,
     };
   }
   const nameOnlySex = (criminal?.findings ?? []).filter((f: any) => f.sexOffender && !f.corroborated);
@@ -381,8 +378,8 @@ function buildRegistryRow(so: any, criminal: any): any {
       neutral: true,
     };
   }
-  // Criminal Search V2 carries sex offender records (category SEX), so a search
-  // that completed answers this even without NSOPW access.
+  // Criminal Search V2 carries sex offender records under category SEX, so a
+  // search that completed is what answers this.
   if (criminal?.checked) {
     return {
       label: 'Sex offender registry',
@@ -438,11 +435,11 @@ function buildCriminalRow(criminal: any): any {
   return { label: 'Criminal records', value: 'None found', good: true };
 }
 
-function buildPublicRecords(pub: any, fec: any, person: any, so?: any): Array<any> {
+function buildPublicRecords(pub: any, fec: any, person: any): Array<any> {
   const records = [
     // A failed check must never render as "Not listed", that is a false
     // assurance. Only claim the registry is clear when it was actually searched.
-    buildRegistryRow(so, person?.criminal),
+    buildRegistryRow(person?.criminal),
     !pub?.checked
       ? { label: 'Federal lawsuits', value: 'Not checked. The federal court search did not complete for this report.', neutral: true }
       : pub.dockets?.length
