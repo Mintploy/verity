@@ -214,9 +214,21 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--primary); outline-
 .v-grid-score > *, .v-grid-r2 > *, .v-grid-r3 > * { min-width: 0; }
 
 /* ── His File: the drawer ─────────────────────────────────────────────────
-   A saved man is a folder, not a row. The tab carries his name and sits
-   proud of the body; the stack alternates Chianti and cream and staggers
-   its tabs so a full drawer reads as depth rather than as a list.          */
+   A real file folder: the tab sits above the body and curves into it, the way
+   a cut tab does on card stock. The curve is a box-shadow on a pseudo-element
+   filled in the tab's own colour, so the two read as one piece of paper.
+
+   The reference laid three folders out absolutely at fixed heights. A drawer
+   holds any number of men and each folder is as tall as its contents, so this
+   keeps the look in flow: spare paper at the foot of every folder for the next
+   tab to overlap, and a rising z-index so later folders sit in front.        */
+.v-folder-stack {
+  display: flex;
+  flex-direction: column;
+  /* Room for the first tab, which sits above its own body. */
+  padding-top: 52px;
+}
+
 .v-folder {
   position: relative;
   display: block;
@@ -226,74 +238,143 @@ button:focus, input:focus, a:focus { outline: 2px solid var(--primary); outline-
   padding: 0;
   background: none;
   cursor: pointer;
-  /* Folders overlap slightly, the way they do in a drawer. */
-  margin-bottom: -6px;
-  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), filter 0.18s;
+  transition: transform 0.45s cubic-bezier(.22, 1, .36, 1), filter 0.45s ease;
 }
-.v-folder:last-child { margin-bottom: 0; }
-.v-folder:hover      { transform: translateY(-4px); }
-.v-folder:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 16px; }
+/* The gap the next tab drops into, leaving it overlapping the folder above. */
+.v-folder + .v-folder { margin-top: 30px; }
+.v-folder:hover { transform: translateY(-10px); filter: brightness(1.02); }
+.v-folder:focus-visible { outline: 2px solid var(--primary); outline-offset: 6px; border-radius: 28px; }
+
+/* Tab, fillet and body are all --folder-bg: one piece of card with a tab cut
+   into its top edge, not two pieces butted together. Giving the tab its own
+   shade is what put a hard block on it, because the fillet that joins tab to
+   body has to be the body's colour and the two then meet mid-tab. */
+.v-folder[data-tone='dark'] {
+  --folder-bg: var(--primary);
+  --folder-ink: var(--pearl);
+  --folder-label: var(--blush);
+}
+.v-folder[data-tone='light'] {
+  --folder-bg: var(--pearl);
+  --folder-ink: var(--dark);
+  --folder-label: var(--primary);
+}
 
 .v-folder-tab {
+  position: absolute;
+  top: -52px;
+  z-index: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-width: 150px;
-  max-width: min(72%, 340px);
-  padding: 9px 22px 13px;
-  border-radius: 14px 14px 0 0;
-  /* Tucks behind the body so the two read as one cut piece of card. */
-  margin-bottom: -6px;
-  position: relative;
-  z-index: 0;
+  min-width: 200px;
+  max-width: min(88%, 460px);
+  height: 66px;
+  padding: 0 34px;
+  border-radius: 24px 24px 0 0;
+  background-color: var(--folder-bg);
+  white-space: nowrap;
 }
-.v-folder-body {
-  position: relative;
-  z-index: 1;
-  border-radius: 16px;
-  padding: 18px 22px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  box-shadow: var(--shadow-sm);
-}
-/* A flex item defaults to min-content, so without this the name column
-   refuses to shrink and breaks one word per line in a narrow folder. */
-.v-folder-body > * { min-width: 0; }
-.v-folder:hover .v-folder-body { box-shadow: var(--shadow-md); }
+.v-folder-tab-left  { left: 0; padding-right: 52px; }
+.v-folder-tab-right { right: 0; padding-left: 52px; }
 
-/* Pressed board, not flat fill: a faint fibre so the colour reads as stock. */
-.v-folder-tab, .v-folder-body {
-  background-image:
-    repeating-linear-gradient(94deg, rgba(255,255,255,0.035) 0 2px, rgba(0,0,0,0.012) 2px 4px),
-    repeating-linear-gradient(6deg,  rgba(255,255,255,0.025) 0 3px, rgba(0,0,0,0.010) 3px 6px);
+/* The concave corner where the tab's side runs down into the body. The shadow
+   is offset back over the tab on purpose, to cover the square the radius would
+   otherwise leave; it is the same colour as the tab, so the overlap is
+   invisible and only the curve reads. */
+.v-folder-tab-left::after,
+.v-folder-tab-right::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 40px;
+  height: 40px;
 }
-
-.v-folder[data-tone='dark']  .v-folder-tab,
-.v-folder[data-tone='dark']  .v-folder-body  { background-color: var(--primary); color: var(--pearl); }
-.v-folder[data-tone='light'] .v-folder-tab,
-.v-folder[data-tone='light'] .v-folder-body  { background-color: var(--pearl);  color: var(--dark); }
+.v-folder-tab-left::after {
+  right: -38px;
+  border-bottom-left-radius: 32px;
+  box-shadow: -18px 18px 0 16px var(--folder-bg);
+}
+.v-folder-tab-right::before {
+  left: -38px;
+  border-bottom-right-radius: 32px;
+  box-shadow: 18px 18px 0 16px var(--folder-bg);
+}
 
 .v-folder-label {
   font-family: var(--script);
-  font-size: 22px;
-  line-height: 1;
-  white-space: nowrap;
+  font-size: 28px;
+  /* Roundhand descends a long way; flat leading clips the tails of g and y. */
+  line-height: 1.3;
+  color: var(--folder-label);
+  /* Above the curve's shadow, which is drawn over the tab's inner corner. */
+  position: relative;
+  z-index: 2;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.v-folder[data-tone='dark']  .v-folder-label { color: var(--blush); }
-.v-folder[data-tone='light'] .v-folder-label { color: var(--primary); }
+
+.v-folder-body {
+  position: relative;
+  z-index: 1;
+  border-radius: 28px;
+  /* The foot is spare paper: the next folder's tab overlaps it, never content. */
+  padding: 22px 26px 44px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--folder-ink);
+  background-color: var(--folder-bg);
+  box-shadow:
+    0 10px 30px rgba(50, 30, 20, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.v-folder-body > * { min-width: 0; }
+
+/* Pressed board rather than flat fill. The body only: the fillet that joins tab
+   to body is painted by a box-shadow, which lays down flat colour with no
+   texture over part of the tab. Textured tab against untextured fillet is what
+   drew a hard rectangle on every tab, and no colour change fixes it, only
+   leaving the tab untextured so the two match. */
+.v-folder-body {
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.05) 0, rgba(255,255,255,0) 30%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='.055'/%3E%3C/svg%3E");
+}
+/* A drawn paper edge, so the card has a rim rather than a hard cut. */
+.v-folder-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 1px solid rgba(80, 50, 40, 0.08);
+  box-shadow:
+    inset 0 2px 2px rgba(255,255,255,0.08),
+    inset 0 -2px 4px rgba(70,20,10,0.05);
+}
 
 @media (max-width: 768px) {
-  /* The tab already carries his name in full, so the initials monogram is
-     repeating it — and at this width it is taking room the name needs. */
-  /* !important because the monogram carries an inline display:flex. */
+  .v-folder-stack { padding-top: 42px; }
+  .v-folder + .v-folder { margin-top: 24px; }
+  .v-folder-tab {
+    top: -42px;
+    min-width: 150px;
+    max-width: 86%;
+    height: 54px;
+    padding: 0 24px;
+  }
+  .v-folder-tab-left  { padding-right: 44px; }
+  .v-folder-tab-right { padding-left: 44px;
+    border-radius: 20px 20px 0 0;
+  }
+  .v-folder-label { font-size: 23px; }
+  .v-folder-body { padding: 18px 18px 36px; gap: 12px; }
+  /* The tab already carries his name, and at this width the monogram is taking
+     room the name needs. !important because it carries an inline display. */
   .v-folder-avatar { display: none !important; }
-  .v-folder-tab  { max-width: 78%; padding: 8px 18px 12px; }
-  .v-folder-body { padding: 16px 18px; gap: 12px; }
-  .v-folder-label { font-size: 19px; }
-  /* Least load-bearing of the three meta items; it yields so the date,
-     which was losing its last character, keeps its full width. */
+  /* Least load-bearing of the three meta items; it yields so the date keeps
+     its last character. */
   .v-folder-compat { display: none; }
 }

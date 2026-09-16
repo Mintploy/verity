@@ -2,15 +2,12 @@
 import type { HisFile } from '@/lib/hisfile';
 
 /**
- * One saved man, as a folder.
+ * One saved man, as a paper folder.
  *
- * The tab offset and the tone both come from the row's index rather than from
- * anything about him, so a drawer staggers the way a real one does. Four
- * offsets rather than two, because alternating tabs read as a zigzag; four
- * reads as a drawer someone has been into.
+ * Tabs alternate left and right and the tone alternates with them, both from
+ * the row's index rather than anything about him, so a drawer looks like a
+ * drawer and the order never implies a ranking it does not mean.
  */
-const TAB_OFFSETS = ['0%', '30%', '11%', '48%'];
-
 function scoreDot(s?: string): { dot: string; ring: string; label: string } {
   if (s === 'green') return { dot: 'var(--sage)', ring: 'var(--sage-pale)', label: 'Clear' };
   if (s === 'red') return { dot: 'var(--deeprose)', ring: 'var(--deeprose-pale)', label: 'Flagged' };
@@ -47,6 +44,8 @@ export function FileFolder({
     <div
       className="v-folder"
       data-tone={tone}
+      // Later folders sit in front, so each tab overlaps the folder above it.
+      style={{ zIndex: index + 1 }}
       role="button"
       tabIndex={0}
       onClick={onOpen}
@@ -54,7 +53,7 @@ export function FileFolder({
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); }
       }}
     >
-      <div className="v-folder-tab" style={{ marginLeft: TAB_OFFSETS[index % TAB_OFFSETS.length] }}>
+      <div className={`v-folder-tab ${index % 2 === 0 ? 'v-folder-tab-left' : 'v-folder-tab-right'}`}>
         <span className="v-folder-label">{nick}</span>
       </div>
 

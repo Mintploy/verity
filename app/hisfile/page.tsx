@@ -146,7 +146,7 @@ export default function HisFilePage() {
         )}
 
         {!loading && !error && filtered.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="v-folder-stack">
             {filtered.map((file, i) => {
               const isConfirming = confirmDeleteId === file.id;
               const isDeleting = deletingId === file.id;
