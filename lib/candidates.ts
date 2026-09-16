@@ -30,6 +30,24 @@ export async function signCandidate(c: PersonCandidate, phone: string): Promise<
     .sign(SECRET);
 }
 
+/**
+ * A relative on his report, bound to her own identifier rather than her name.
+ *
+ * Searching a relative by name matched three different women with the same
+ * name and silently picked one, so the report showed a stranger's single
+ * address. Her record carries an identifier; this signs it the same way a
+ * picked candidate is signed, so the client can ask for the relatives we
+ * actually listed and for nobody else. No phone: she was found on his record,
+ * not on a number.
+ */
+export async function signRelative(tahoeId: string): Promise<string> {
+  return new SignJWT({ tahoeId, phone: '', purpose: 'candidate' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('2h')
+    .sign(SECRET);
+}
+
 export async function verifyCandidate(
   token: string,
 ): Promise<{ tahoeId: string; phone: string }> {

@@ -540,7 +540,15 @@ function ReportMain({ report, userSign }: { report: Report; userSign?: StarSign 
       <div className="v-grid-r2" style={{ gap: 24 }}>
         <Section id="sec-4" eyebrow="04" title="Relationships">
           <KVRow label="Status" value={report.relationships.status} />
-          {report.relationships.spouse && <KVRow label="Spouse" value={report.relationships.spouse} />}
+          {report.relationships.spouse && (
+            <>
+              <KVRow label="Possible spouse" value={report.relationships.spouse} />
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--mauve-deep)', lineHeight: 1.5, marginTop: 4 }}>
+                A link in the record, not a marriage certificate. It is drawn from shared surnames and
+                addresses, so it is sometimes a sibling rather than a partner. Treat it as a lead to check.
+              </div>
+            </>
+          )}
           <KVRow label="Prior marriages" value={report.relationships.priors} />
           <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--mauve-deep)', letterSpacing: 0.2, textTransform: 'uppercase' as const, marginTop: 14, marginBottom: 6 }}>Known relatives</div>
           <RelativeSearch relatives={report.relationships.relativesDetail ?? report.relationships.relatives.map(name => ({ name }))} />
@@ -1057,7 +1065,7 @@ async function runLookup(body: Record<string, unknown>): Promise<string> {
  * Relatives she can search in one tap. Every search spends one of her monthly
  * lookups, so the cost is stated, with what she has left, before anything runs.
  */
-function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?: string; state?: string; approxAge?: number }> }) {
+function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?: string; state?: string; approxAge?: number; token?: string }> }) {
   const router = useRouter();
   const [pending, setPending] = useState<(typeof relatives)[number] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1079,8 +1087,13 @@ function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?:
     setBusy(true);
     setError(null);
     try {
+      // Her own identifier where the record gave us one, so this fetches her
+      // rather than the first of several women sharing her name. It is also a
+      // single call instead of a name search followed by a drill-down.
       const loc = [pending.city, pending.state].filter(Boolean).join(', ');
-      const id = await runLookup({ name: pending.name, ...(loc ? { location: loc } : {}) });
+      const id = pending.token
+        ? await runLookup({ candidateToken: pending.token })
+        : await runLookup({ name: pending.name, ...(loc ? { location: loc } : {}) });
       setPending(null);
       router.push(`/report/${id}`);
     } catch (e: any) {

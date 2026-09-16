@@ -39,7 +39,9 @@ export async function POST(req: NextRequest) {
 
     // Phone is the primary lookup, but a search by name, email or address is
     // equally valid, require only that at least one of them is present.
-    if (!phone && !chosenPhone && !name && !email && !address) {
+    // A tahoeId is itself a valid thing to search on. A relative arrives with
+    // one and no phone, so without this the request was rejected as empty.
+    if (!phone && !chosenPhone && !name && !email && !address && !tahoeId) {
       return Response.json(
         { error: 'Enter a phone number, name, email or address to search' },
         { status: 400 },

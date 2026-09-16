@@ -4,6 +4,7 @@ import { lookupEnformion } from './enformion';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { withCallTally, summarize } from './callcount';
+import { signRelative } from '../candidates';
 
 
 /**
@@ -150,6 +151,20 @@ async function buildReport(req: SearchRequest): Promise<Report> {
 
   const publicRecords = buildPublicRecords(pub, fecResult, person);
 
+  // Each relative carries a signed reference to her own record, so tapping her
+  // fetches that exact person. Searching her by name matched three different
+  // women and picked one of them, which is how a stranger's single address
+  // ended up on screen under his ex-wife's name.
+  const relativesDetail = await Promise.all(
+    (person.relativesDetail ?? []).map(async (r: any) => ({
+      name: r.name,
+      city: r.city,
+      state: r.state,
+      approxAge: r.approxAge,
+      token: r.tahoeId ? await signRelative(r.tahoeId) : undefined,
+    })),
+  );
+
   // An email address is not a social handle, and nothing here is confirmed:
   // these are addresses and profiles that appear on the record, which is a
   // weaker claim than "confirmed" and the only one we can actually make.
@@ -283,7 +298,7 @@ async function buildReport(req: SearchRequest): Promise<Report> {
             ? `${person.marriageRecords!.length} marriage records on file: ${person.marriageRecords!.join('; ')}`
             : person.marriageChecked ? 'None on record' : 'Not available',
       relatives: person.relatives ?? [],
-      relativesDetail: person.relativesDetail,
+      relativesDetail,
       associates: person.associates?.length
         ? person.associates
         : person.additionalPhones?.length

@@ -109,7 +109,11 @@ export interface Relationships {
   priors: string;
   relatives: string[];
   associates: string[];
-  relativesDetail?: Array<{ name: string; city?: string; state?: string; approxAge?: number }>;
+  /**
+   * `token` is a signed reference to that relative's own record, so tapping
+   * her looks up the exact person instead of guessing from her name.
+   */
+  relativesDetail?: Array<{ name: string; city?: string; state?: string; approxAge?: number; token?: string }>;
 }
 
 export interface Professional {

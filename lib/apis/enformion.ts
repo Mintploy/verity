@@ -115,6 +115,12 @@ export interface RelativeDetail {
   city?: string;
   state?: string;
   approxAge?: number;
+  /**
+   * Her own identifier on his record. Never sent to the browser as-is: it is a
+   * key into a metered database, so the report signs it into a short-lived
+   * token first, exactly as the candidate picker does.
+   */
+  tahoeId?: string;
 }
 
 export interface EnformionPerson {
@@ -647,9 +653,40 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
 
     // With DateOfBirth include enabled, datesOfBirth may now have actual dates
     const dobRecord = (best.datesOfBirth ?? [])[0];
-    const dobRaw: string | undefined = (best.dob && best.dob !== '')
-      ? best.dob
-      : dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth ?? undefined;
+
+    // dob and datesOfBirth come back empty on every record seen, but
+    // dobFirstSeen and dobLastSeen carry a real M/D/YYYY value, which is where
+    // TruePeopleSearch gets the "Born September 1970" it shows from this same
+    // API. Their names do not prove they are birth dates rather than dates the
+    // record was sighted, so one is accepted only when the age it implies
+    // agrees with the age this same record reports.
+    //
+    // Month and year only. The day in these values is documented as unreliable
+    // ("1/XX/1964"), month and year is all TruePeopleSearch shows, and it is
+    // exactly what the star sign needs to be offered as likely rather than certain.
+    const monthYearOf = (v: unknown): string | undefined => {
+      if (typeof v !== 'string') return undefined;
+      const s = v.trim();
+      const m = s.match(/^(\d{1,2})\D+(?:\d{1,2}|X+)\D+(\d{4})$/i) ?? s.match(/^(\d{1,2})\/(\d{4})$/);
+      if (!m) return undefined;
+      const month = Number(m[1]);
+      const year = Number(m[2]);
+      if (!(month >= 1 && month <= 12) || year < 1900) return undefined;
+      return `${month}/${year}`;
+    };
+    const agreesWithAge = (monthYear: string): boolean => {
+      if (!age) return false;
+      const year = Number(monthYear.split('/')[1]);
+      return Math.abs((new Date().getFullYear() - year) - age) <= 2;
+    };
+    const seenDob = [best.dobFirstSeen, best.dobLastSeen]
+      .map(monthYearOf)
+      .find((my): my is string => !!my && agreesWithAge(my));
+
+    const dobRaw: string | undefined = monthYearOf(best.dob)
+      ?? monthYearOf(dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth)
+      ?? seenDob
+      ?? ((best.dob && best.dob !== '') ? best.dob : undefined);
 
     // DOB comes back empty on every Person drill-down seen so far, even with the
     // DatesOfBirth include. Log the format of each date field with digits and
@@ -657,7 +694,11 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     // writing anyone's birth date to the log.
     const maskFmt = (v: any) => (v == null || v === ''
       ? '-'
-      : typeof v === 'object' ? `{${Object.keys(v).join('|')}}` : String(v).replace(/\d/g, 'N').replace(/[A-Za-z]/g, 'A'));
+      // Letters first, then digits. Masking digits to N and then letters to A
+      // turned the N's into A's as well, so a populated "9/15/1970" logged as
+      // "A/AA/AAAA" and read as though it held letters. The birth date was
+      // sitting in the response all along, disguised by its own log line.
+      : typeof v === 'object' ? `{${Object.keys(v).join('|')}}` : String(v).replace(/[A-Za-z]/g, 'A').replace(/\d/g, 'N'));
     const dobs0 = Array.isArray(best.datesOfBirth) ? best.datesOfBirth : null;
     console.log('ENFORMION_DOB_FORMAT:',
       `dob:${maskFmt(best.dob)}`, `dobFirstSeen:${maskFmt(best.dobFirstSeen)}`, `dobLastSeen:${maskFmt(best.dobLastSeen)}`,
@@ -779,10 +820,15 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       ? `${priorSpouses.length} prior marriage${priorSpouses.length !== 1 ? 's' : ''} on record`
       : undefined;
 
+    // Enformion's spouse link is an inference, not a marriage record: on a
+    // live record it labelled the subject's own brother a spouse, and
+    // TruePeopleSearch, reading the same data, hedges it as "possible spouse"
+    // for that reason. Saying "Married" here would tell a woman something
+    // about a man's life on the strength of a shared surname and address.
     const maritalStatus: string | undefined = spouseName
-      ? 'Married'
+      ? 'Possible spouse on record, not verified'
       : priorSpouses.length > 0
-        ? 'Divorced / previously married'
+        ? 'Possible former spouse on record, not verified'
         : undefined;
 
     // Spouses stay in this list. Filtering them out meant the one person she
@@ -795,6 +841,9 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
         city: typeof r.city === 'string' && r.city ? r.city : undefined,
         state: typeof r.state === 'string' && r.state ? r.state : undefined,
         approxAge: r.dob ? birthYearToApproxAge(r.dob) ?? undefined : undefined,
+        // Carried so tapping her looks up this exact person. Searching her
+        // name matched three different women last time and picked one.
+        tahoeId: typeof r.tahoeId === 'string' && r.tahoeId ? r.tahoeId : undefined,
       }))
       .filter((r: RelativeDetail) => r.name);
     const relatives: string[] = relativesDetail.map(r => (r.approxAge ? `${r.name} (approx. ${r.approxAge})` : r.name));
@@ -956,7 +1005,9 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       person: {
         tahoeId: best.tahoeId,
         fullName,
-        age,
+        // A record carrying no age but a usable birth month still knows how
+        // old he is. Without this the report defaulted to 0 and printed it.
+        age: age ?? (dobRaw ? birthYearToApproxAge(dobRaw) ?? undefined : undefined),
         dob: dobRaw,
         aliases,
         addresses,
