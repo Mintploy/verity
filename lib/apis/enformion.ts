@@ -679,36 +679,35 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       const year = Number(monthYear.split('/')[1]);
       return Math.abs((new Date().getFullYear() - year) - age) <= 2;
     };
+    // dobFirstSeen and dobLastSeen are NOT birth dates, and I had that wrong.
+    // The decision log settled it against a live record: both values parsed,
+    // both disagreed with the age on that same record, and they fell in
+    // different years. That is a first-seen/last-seen sighting range, which is
+    // exactly what the field names say it is.
+    //
+    // They are deliberately not used. Treating them as a birth date would have
+    // printed a fabricated one for any man whose sighting range happened to
+    // land within two years of his age, and inventing a birth date is worse
+    // than showing none.
     const seenCandidates = [best.dobFirstSeen, best.dobLastSeen].map(monthYearOf);
     const [firstSeenMY, lastSeenMY] = seenCandidates;
-
-    // Matching years on both ends is itself evidence of a birth date. A
-    // first-seen and last-seen pair describing when a record was observed
-    // would normally straddle different years; a person has one year of birth.
-    // This is the fallback for records that carry no age to check against,
-    // which is the case that produced a blank birth month on a relative whose
-    // dobFirstSeen was plainly populated.
     const sameYear = !!firstSeenMY && !!lastSeenMY
       && firstSeenMY.split('/')[1] === lastSeenMY.split('/')[1];
 
-    const seenDob = seenCandidates.find((my): my is string => !!my && agreesWithAge(my))
-      ?? (!age && sameYear ? firstSeenMY : undefined);
-
     const dobRaw: string | undefined = monthYearOf(best.dob)
       ?? monthYearOf(dobRecord?.dob ?? dobRecord?.DateOfBirth ?? dobRecord?.dateOfBirth)
-      ?? seenDob
       ?? ((best.dob && best.dob !== '') ? best.dob : undefined);
 
-    // Which branch decided, and why, without writing a birth date to a log.
-    // Booleans and an age-known flag only: logging the age alongside "agrees"
+    // Booleans and an age-known flag only. Logging the age beside "agrees"
     // would give away the birth year, which is the thing worth protecting.
     console.log('ENFORMION_DOB_DECISION:',
       `ageKnown=${!!age}`,
+      `dobField=${best.dob ? 'set' : 'empty'}`,
+      `datesOfBirthArray=${Array.isArray(best.datesOfBirth) ? best.datesOfBirth.length : 'absent'}`,
       `firstSeenParsed=${!!firstSeenMY}`,
-      `firstSeenAgrees=${firstSeenMY ? agreesWithAge(firstSeenMY) : false}`,
       `lastSeenParsed=${!!lastSeenMY}`,
-      `lastSeenAgrees=${lastSeenMY ? agreesWithAge(lastSeenMY) : false}`,
-      `sameYear=${sameYear}`,
+      `seenSameYear=${sameYear}`,
+      `seenAgreesWithAge=${[firstSeenMY, lastSeenMY].some(my => (my ? agreesWithAge(my) : false))}`,
       `resolved=${!!dobRaw}`);
 
     // DOB comes back empty on every Person drill-down seen so far, even with the
@@ -726,6 +725,24 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     console.log('ENFORMION_DOB_FORMAT:',
       `dob:${maskFmt(best.dob)}`, `dobFirstSeen:${maskFmt(best.dobFirstSeen)}`, `dobLastSeen:${maskFmt(best.dobLastSeen)}`,
       `datesOfBirth:${dobs0 ? `${dobs0.length}${dobs0[0] ? maskFmt(dobs0[0]) : ''}` : '-'}`);
+
+    // Every key on the record whose name mentions a birth, with its shape
+    // masked and no value printed. TruePeopleSearch shows "Born September
+    // 1970" from this same API, while our `dob` comes back empty and the
+    // response carries no datesOfBirth array at all even though the
+    // DatesOfBirth include is requested. So either the value arrives under a
+    // key we are not reading, or it is not entitled on this plan. This names
+    // every candidate on the next search without costing a call to ask.
+    console.log('ENFORMION_BIRTH_KEYS:',
+      Object.keys(best).filter((k) => /dob|birth/i.test(k))
+        .map((k) => `${k}=${maskFmt(best[k])}`).join(' ') || 'none',
+      `| includesRequested=${CORE_INCLUDES.join(',')}`);
+
+    // The reverse-phone row carries a tahoePerson object we have never looked
+    // inside. If the birth date is anywhere cheap, it is most likely there.
+    const rpPerson = rpRows[0]?.tahoePerson;
+    console.log('ENFORMION_RP_PERSON_KEYS:',
+      rpPerson && typeof rpPerson === 'object' ? Object.keys(rpPerson).join('|') : 'none');
 
     const phoneNumbers: any[] = best.phoneNumbers ?? [];
 
