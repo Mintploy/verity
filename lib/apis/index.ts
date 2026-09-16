@@ -69,7 +69,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     try {
       return await buildReport(req);
     } finally {
-      console.log('ENFORMION_BILLING:', summarize(tally));
+      console.log('ENFORMION_BILLING[report]:', summarize(tally));
     }
   });
 }

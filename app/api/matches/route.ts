@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { lookupCandidates } from '@/lib/apis/enformion';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { toPublicCandidates } from '@/lib/candidates';
+import { withCallTally, summarize } from '@/lib/apis/callcount';
 
 /**
  * Who is on this number, the picker's data source.
@@ -64,7 +65,19 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Enter a 10-digit US phone number' }, { status: 400 });
     }
 
-    const candidates = await lookupCandidates(digits);
+    // The picker is billed as well as the report. lookupCandidates runs
+    // ReversePhoneSearch, which retries up to three number formats and is
+    // charged for each attempt, so a search that only matches on the third
+    // format has already cost three calls before the report begins. Counting it
+    // here, separately, keeps the true cost of one woman's search visible as
+    // two honest lines rather than one understated one.
+    const candidates = await withCallTally(async (tally) => {
+      try {
+        return await lookupCandidates(digits);
+      } finally {
+        console.log('ENFORMION_BILLING[picker]:', summarize(tally));
+      }
+    });
     return Response.json({ candidates: await toPublicCandidates(candidates, digits) });
   } catch (err: any) {
     console.error('Matches error:', err);
