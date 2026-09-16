@@ -456,9 +456,14 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
   // are requested in a second call keyed on the TahoeId from the first.
   const DETAIL_INCLUDES = ['Criminal', 'Marriage', 'Divorce'];
 
+  // "Jessica Marie Frem" is Jessica Frem with a middle name, not someone
+  // surnamed "Marie Frem". Joining every token after the first into LastName
+  // is what the name search was doing, so it matched nobody and every relative
+  // she tapped returned an empty report after paying for the call. The last
+  // token is the surname, which is what every other endpoint here assumes.
   const nameParts = name?.trim().split(/\s+/) ?? [];
   const firstName = nameParts[0];
-  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : undefined;
 
   // Search variants, tried in order until one returns rows.
   //
@@ -507,7 +512,13 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
     // provided phone number"). Person Search's `Person` type answers 200 with
     // zero rows for a Phone criterion even where data demonstrably exists, so
     // the phone lookup belongs here, not there.
-    const rpRows = cleaned ? await reversePhone(username, password, cleaned) : [];
+    // Skipped when she picked him from the list: the picker has already made
+    // this exact call and we already hold his identifier, so repeating it buys
+    // only a second bill. Carrier and line type come off the person record's
+    // own phoneNumbers instead, which the fallback below already reads.
+    const rpRows = cleaned && !chosenTahoeId
+      ? await reversePhone(username, password, cleaned)
+      : [];
     let results: any[] = rpRows.filter((r: any) => r && (r.tahoeId || r.name || r.fullName));
 
     // Step 2, Re-fetch the match by TahoeId. Includes require a unique
@@ -556,6 +567,20 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       if (got.length) {
         results = got;
         break;
+      }
+    }
+
+    // A variant search comes back bare. Includes are only honoured alongside a
+    // unique identifier, so the name and address paths deliberately ask for
+    // none and the record that returns carries no addresses, relatives or
+    // indicators. The phone path re-fetches by TahoeId for exactly this
+    // reason; the fallback never did, so even a name that matched produced a
+    // report with nothing in it.
+    if (!seed?.tahoeId && results.length) {
+      const fallbackBest = pickBestMatch(results, cleaned);
+      if (fallbackBest?.tahoeId) {
+        const full = await personSearchById(username, password, fallbackBest.tahoeId, CORE_INCLUDES);
+        if (full) results = [full];
       }
     }
 
@@ -696,6 +721,22 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       console.log('ENFORMION_RELATIVE_KEYS:', Object.keys(relativesSummary[0]).join('|'));
     }
 
+    // Counts only, never names. His ex-wife appears in his relatives list, yet
+    // the report showed no marital status, so either no entry is flagged as a
+    // spouse or the flag is spelled differently from what isSpouse() reads.
+    // This says which, without putting anyone's name in a log.
+    if (relativesSummary.length) {
+      const relTypes: Record<string, number> = {};
+      let spouseFlagged = 0;
+      for (const r of relativesSummary) {
+        const t = String(r.relativeType ?? r.RelativeType ?? r.relationship ?? 'unset');
+        relTypes[t] = (relTypes[t] ?? 0) + 1;
+        if (r.spouse || r.oldSpouse || r.isSpouse || r.Spouse || r.OldSpouse) spouseFlagged += 1;
+      }
+      console.log('ENFORMION_RELATIVE_TYPES:', JSON.stringify(relTypes),
+        '| spouse-flagged:', spouseFlagged, 'of', relativesSummary.length);
+    }
+
     // Spouse detection reads relativeType / spouse / oldSpouse, none of which
     // have ever been confirmed against a live row, and marital status is blank
     // on every report. Widened to match case-insensitively and to accept the
@@ -825,9 +866,13 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       hasDivorceRecords && inlineDivorce.length === 0
         ? lookupDivorce(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
-      fullName
-        ? lookupLinkedIn(username, password, fullName).catch(() => null)
-        : Promise.resolve(null),
+      // Disabled, not removed. LinkedIn/Id has answered 400 to every request
+      // we have sent it, so it has never once produced a handle while being
+      // billed on every single search. It stays off until the request shape is
+      // confirmed against the vendor's documentation. Typed as the real call's
+      // return rather than a bare null, so the readers below still compile and
+      // switching it back on is one line.
+      Promise.resolve(null as { url?: string; headline?: string } | null),
       addresses[0]?.addr
         ? lookupCensus(username, password, addresses[0].addr).catch(() => null)
         : Promise.resolve(null),
@@ -854,12 +899,17 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       counts.foreclosures > 0
         ? lookupForeclosures(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false }))
         : Promise.resolve({ items: [] as string[], checked: true }),
-      counts.marriage > 0
-        ? lookupMarriages(
-            username, password, best.tahoeId, fullName,
-            (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
-          ).catch(() => ({ items: [] as string[], checked: false, nameMatched: false }))
-        : Promise.resolve({ items: [] as string[], checked: true, nameMatched: false }),
+      // Deliberately ungated, unlike its neighbours. hasMarriageRecords read 0
+      // for a man his searcher knows for a fact has been married, and the gate
+      // turned that into "No marriage record on file" stated as established
+      // fact. The same record reports hasPropertyRecords 0 while PropertyV2
+      // returns a property, so a zero here is not evidence of absence. Marital
+      // history is too load-bearing for a woman deciding whether to meet him
+      // to be answered from an index we have caught being wrong.
+      lookupMarriages(
+        username, password, best.tahoeId, fullName,
+        (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
+      ).catch(() => ({ items: [] as string[], checked: false, nameMatched: false })),
       counts.business > 0
         ? lookupBusinesses(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false }))
         : Promise.resolve({ items: [] as string[], checked: true }),
