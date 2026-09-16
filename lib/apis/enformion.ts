@@ -8,6 +8,8 @@
 // ENFORMION_HOST at enformion.com or api.enformion.com: those serve the web
 // portal and return an HTML login page, not JSON. The override exists only in
 // case Enformion issues a different API host.
+import { billedFetch } from './callcount';
+
 const HOST = (process.env.ENFORMION_HOST ?? 'https://devapi.enformion.com').replace(/\/+$/, '');
 
 const BASE_URL = `${HOST}/PersonSearch`;
@@ -322,7 +324,7 @@ async function proSearchChecked(
   extractRows?: (data: any) => any[],
 ): Promise<{ rows: any[]; ok: boolean }> {
   try {
-    const res = await fetch(url, {
+    const res = await billedFetch(url, {
       method: 'POST',
       headers: makeHeaders(username, password, searchType),
       body: JSON.stringify(body),
@@ -535,7 +537,7 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       };
 
       console.log(`ENFORMION_TRY[${variant.label}]:`, JSON.stringify(body));
-      const res = await fetch(BASE_URL, {
+      const res = await billedFetch(BASE_URL, {
         method: 'POST',
         headers: makeHeaders(username, password, SEARCH_TYPE_PERSON),
         body: JSON.stringify(body),
@@ -959,7 +961,7 @@ async function lookupPropertyV2(
     body.AddressLine2 = commaIdx > -1 ? currentAddress.slice(commaIdx + 1).trim() : '';
   }
 
-  const res = await fetch(PROPERTY_URL, {
+  const res = await billedFetch(PROPERTY_URL, {
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_PROPERTY),
     body: JSON.stringify(body),
@@ -1657,7 +1659,7 @@ async function lookupLinkedIn(
   const parts = fullName.trim().split(/\s+/);
   if (parts.length < 2) return null;
 
-  const res = await fetch(LINKEDIN_URL, {
+  const res = await billedFetch(LINKEDIN_URL, {
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_LINKEDIN),
     body: JSON.stringify({ FirstName: parts[0], LastName: parts[parts.length - 1] }),
@@ -1691,7 +1693,7 @@ async function lookupCensus(
     ResultsPerPage: 1,
   };
 
-  const res = await fetch(CENSUS_URL, {
+  const res = await billedFetch(CENSUS_URL, {
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_CENSUS),
     body: JSON.stringify(body),
@@ -1729,7 +1731,7 @@ async function lookupDivorce(
     body.LastName = parts.slice(1).join(' ');
   }
 
-  const res = await fetch(DIVORCE_URL, {
+  const res = await billedFetch(DIVORCE_URL, {
     method: 'POST',
     headers: makeHeaders(username, password, SEARCH_TYPE_DIVORCE),
     body: JSON.stringify(body),

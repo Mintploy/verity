@@ -3,6 +3,7 @@ import { SearchRequest, Report, ScoreState } from '../types';
 import { lookupEnformion } from './enformion';
 import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
+import { withCallTally, summarize } from './callcount';
 
 
 /**
@@ -52,7 +53,28 @@ function classifyAddress(
   return { kind: 'unknown' };
 }
 
+/**
+ * One report, with the vendor calls it cost printed when it finishes.
+ *
+ * Enformion bills per call and a report fans out across a dozen endpoints,
+ * most of them behind conditions that only open for certain men, so the price
+ * of a search is not a constant and cannot be read off the code. The tally
+ * makes every search report its own cost, which is what spend planning needs.
+ *
+ * The log runs in a finally: a report that throws half way through has still
+ * spent whatever it spent, and that is exactly the case worth seeing.
+ */
 export async function generateReport(req: SearchRequest): Promise<Report> {
+  return withCallTally(async (tally) => {
+    try {
+      return await buildReport(req);
+    } finally {
+      console.log('ENFORMION_BILLING:', summarize(tally));
+    }
+  });
+}
+
+async function buildReport(req: SearchRequest): Promise<Report> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   const [enResult, publicRecs] = await Promise.allSettled([
