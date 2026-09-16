@@ -67,6 +67,7 @@ export default function HisFileDetail() {
   const [ickDate, setIckDate] = useState<number | ''>('');
   const [ickTopic, setIckTopic] = useState('');
   const [hasDob, setHasDob] = useState<boolean | null>(null);
+  const [quickSaving, setQuickSaving] = useState<number | null>(null);
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => setHasDob(!!d?.profile?.date_of_birth)).catch(() => {});
@@ -131,6 +132,39 @@ export default function HisFileDetail() {
       };
     });
   };
+  /**
+   * An in-the-moment entry, saved on the tap rather than on the Save button.
+   *
+   * She may be logging this standing in a restaurant bathroom with half a
+   * minute and one hand, so it must not depend on her scrolling to the bottom
+   * of the page afterwards. The next state is computed here and posted
+   * directly, because `file` in this closure would be a render behind.
+   */
+  const quickLog = async (number: number, patch: Partial<DateEntry>) => {
+    const next: HisFile = {
+      ...file,
+      dates: datesOf(file).map(d =>
+        d.number === number ? { ...d, ...patch, duringLoggedAt: new Date().toISOString() } : d,
+      ),
+    };
+    setFile(next);
+    if (isNew) return; // Nothing to attach it to until the file is saved once.
+    setQuickSaving(number);
+    try {
+      const res = await fetch(`/api/hisfile/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      const data = await res.json();
+      if (data.file) setFile(data.file);
+    } catch {
+      // Keep her entry on screen. It saves with the rest of the form.
+    } finally {
+      setQuickSaving(null);
+    }
+  };
+
   const addDate = () => setFile(f => {
     const base = datesOf(f);
     return { ...f, dates: [...base, { number: base.length + 1 }] };
@@ -399,6 +433,24 @@ export default function HisFileDetail() {
         {/* Dates */}
         {!isSafety && (
         <Section eyebrow="03" title="Dates">
+          {(() => {
+            // A date still ahead of her is the one she will want to log from,
+            // so say so at the top and point her at the one-tap row below.
+            const today = new Date().toISOString().slice(0, 10);
+            const soon = dates.find(d => d.date && d.date > today);
+            if (!soon) return null;
+            const when = new Date(`${soon.date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            return (
+              <div style={{ padding: '14px 16px', borderRadius: 'var(--r-md)', background: 'var(--primary-mist)', border: '1px solid var(--primary-pale)' }}>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: 15.5, color: 'var(--dark)', lineHeight: 1.5 }}>
+                  Your {ordinal(soon.number).toLowerCase()} date{file.nickname ? ` with ${file.nickname}` : ''} is {when}{soon.location ? `, at ${soon.location}` : ''}.
+                </div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', lineHeight: 1.55, marginTop: 5 }}>
+                  How is it going? Tap a feeling under &ldquo;During the date&rdquo; and it saves the moment you tap, no need to come back down here.
+                </div>
+              </div>
+            );
+          })()}
           {dates.map(d => (
             <div key={d.number} style={{ padding: '16px 18px', borderRadius: 'var(--r-md)', background: 'var(--ivory)', border: '1px solid var(--gold-pale)', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -415,6 +467,47 @@ export default function HisFileDetail() {
                   <input type="date" value={d.date ?? ''} onChange={e => updateDate(d.number, { date: e.target.value })} style={inputStyle} />
                 </Field>
               </TwoCol>
+              {/* Logged in the moment, and saved on the tap. Kept above the
+                  rest of the card because it is the one thing she opens this
+                  page to do while the date is still happening. */}
+              <div style={{ padding: '13px 15px', borderRadius: 'var(--r-md)', background: 'var(--blush-pale)', border: '1px solid var(--primary-pale)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--primary-deep)', letterSpacing: 0.2, textTransform: 'uppercase' }}>
+                    During the date
+                  </span>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)' }}>
+                    {quickSaving === d.number
+                      ? 'Saving...'
+                      : d.duringLoggedAt
+                        ? `Logged ${new Date(d.duringLoggedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                        : 'Saves the moment you tap'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {FEELINGS.map(fe => (
+                    <button
+                      key={fe.value}
+                      onClick={() => quickLog(d.number, { duringFeeling: fe.value })}
+                      style={{
+                        padding: '10px 18px', borderRadius: 'var(--r-pill)',
+                        border: d.duringFeeling === fe.value ? '1.5px solid var(--primary)' : '1.5px solid var(--primary-pale)',
+                        background: d.duringFeeling === fe.value ? 'var(--primary)' : 'var(--pearl)',
+                        color: d.duringFeeling === fe.value ? 'var(--pearl)' : 'var(--dark-soft)',
+                        fontFamily: 'var(--sans)', fontSize: 13.5, cursor: 'pointer',
+                      }}
+                    >
+                      {fe.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={d.duringNote ?? ''}
+                  onChange={e => updateDate(d.number, { duringNote: e.target.value })}
+                  onBlur={e => { if (e.target.value.trim()) quickLog(d.number, { duringNote: e.target.value }); }}
+                  placeholder="One line, just for you..."
+                  style={{ ...inputStyle, marginTop: 10, background: 'var(--pearl)' }}
+                />
+              </div>
               <Field label="Who paid?">
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {(['split', 'he paid', 'i paid', 'neither'] as const).map(opt => (

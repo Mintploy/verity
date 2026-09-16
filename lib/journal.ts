@@ -13,6 +13,15 @@ export interface DateEntry {
   paid?: string;
   /** How she felt afterwards. */
   feeling?: Feeling;
+  /**
+   * How she felt during the date itself, logged in the moment rather than
+   * recalled later. Deliberately separate from `feeling`: the two often
+   * disagree, and the gap between them is the useful part.
+   */
+  duringFeeling?: Feeling;
+  duringNote?: string;
+  /** When the in-the-moment entry was saved, so "during" is provably during. */
+  duringLoggedAt?: string;
   likedMore?: string;
   likedLess?: string;
 }

@@ -666,6 +666,28 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
   const [remindable, setRemindable] = useState(false);
   const [reminderState, setReminderState] = useState<'idle' | 'saving' | 'set'>('idle');
 
+  // Re-running asks the same question that built this report, so she never has
+  // to find his number and type it again to see what has changed. It is a
+  // fresh search and costs a lookup, which the dialog says before it runs.
+  const [rerunOpen, setRerunOpen] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
+  const quota = useQuota();
+
+  const rerun = async () => {
+    setRerunning(true);
+    setRerunError(null);
+    try {
+      const digits = (report.subject.phone ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+      const id = await runLookup(digits ? { phone: digits } : { name: report.subject.name });
+      setRerunOpen(false);
+      router.push(`/report/${id}`);
+    } catch (e: any) {
+      setRerunError(e?.message ?? 'Could not rebuild the report');
+      setRerunning(false);
+    }
+  };
+
   useEffect(() => {
     fetch('/api/profile')
       .then(r => (r.ok ? r.json() : null))
@@ -761,6 +783,22 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
             saving={saving}
             onChoose={saveToHisFile}
             onCancel={() => setChoosing(false)}
+          />
+        )}
+        <ActionButton
+          icon="refresh"
+          label="Re-run report"
+          onClick={() => { setRerunError(null); quota.load(); setRerunOpen(true); }}
+        />
+        {rerunOpen && (
+          <LookupConfirm
+            title={`Re-run ${report.subject.name.split(' ')[0]}'s report?`}
+            quota={quota}
+            busy={rerunning}
+            error={rerunError}
+            confirmLabel="Re-run"
+            onConfirm={rerun}
+            onCancel={() => setRerunOpen(false)}
           />
         )}
         <ActionButton icon="compare" label="Compare with others" onClick={onCompare} />
@@ -933,6 +971,82 @@ function Badge({ tone, title, children }: { tone: 'primary' | 'gold' | 'sage' | 
   );
 }
 
+/** What her monthly allowance looks like right now, read fresh before we spend. */
+function useQuota() {
+  const [state, setState] = useState<{ limit: number; unlimited: boolean; remaining: number | null }>({
+    limit: 15, unlimited: false, remaining: null,
+  });
+  const load = () => {
+    setState(s => ({ ...s, remaining: null }));
+    fetch('/api/quota')
+      .then(res => (res.ok ? res.json() : null))
+      .then(q => {
+        if (!q) return;
+        setState({ limit: q.limit ?? 15, unlimited: !!q.unlimited, remaining: q.unlimited ? null : q.remaining ?? 0 });
+      })
+      .catch(() => {});
+  };
+  return { ...state, load };
+}
+
+/**
+ * The warning shown before anything that spends one of her monthly lookups.
+ * Searching a relative and re-running a report both go through it, so the cost
+ * is always stated in the same words and never merely implied.
+ */
+function LookupConfirm({ title, quota, busy, error, confirmLabel, onConfirm, onCancel }: {
+  title: string;
+  quota: { limit: number; unlimited: boolean; remaining: number | null };
+  busy: boolean;
+  error: string | null;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const spent = !quota.unlimited && quota.remaining === 0;
+  return (
+    <div role="dialog" aria-modal="true" onClick={busy ? undefined : onCancel} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(42,14,18,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: 'var(--pearl)', borderRadius: 'var(--r-lg)', padding: '24px 24px 20px', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--dark)', marginBottom: 8 }}>{title}</div>
+        <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '0 0 18px' }}>
+          {quota.unlimited
+            ? 'This account has unlimited lookups, so nothing is deducted.'
+            : `This uses 1 of your ${quota.limit} monthly lookups.`}
+          {!quota.unlimited && quota.remaining !== null && ` You have ${quota.remaining} left this month.`}
+        </p>
+        {error && (
+          <p style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--deeprose-deep)', lineHeight: 1.5, margin: '0 0 14px' }}>{error}</p>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} disabled={busy} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: 'transparent', color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer' }}>Cancel</button>
+          <button onClick={onConfirm} disabled={busy || spent} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: busy || spent ? 'var(--mauve)' : 'var(--primary)', color: 'var(--pearl)', fontFamily: 'var(--sans)', fontSize: 13, cursor: busy || spent ? 'not-allowed' : 'pointer' }}>
+            {busy ? 'Running...' : spent ? 'No lookups left' : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Runs a search and stores the result the same way every other entry point
+ * does. Going through /search with query parameters meant the work depended on
+ * that page's auto-run effect firing, and when it did not she was left sitting
+ * on a search box with his relative's name typed into it.
+ */
+async function runLookup(body: Record<string, unknown>): Promise<string> {
+  const res = await fetch('/api/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error ?? 'Could not build the report');
+  sessionStorage.setItem(`report-${d.report.searchId}`, JSON.stringify(d.report));
+  if (d.demoMode) sessionStorage.setItem('verity-demo', '1');
+  return d.report.searchId as string;
+}
+
 /**
  * Relatives she can search in one tap. Every search spends one of her monthly
  * lookups, so the cost is stated, with what she has left, before anything runs.
@@ -940,9 +1054,9 @@ function Badge({ tone, title, children }: { tone: 'primary' | 'gold' | 'sage' | 
 function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?: string; state?: string; approxAge?: number }> }) {
   const router = useRouter();
   const [pending, setPending] = useState<(typeof relatives)[number] | null>(null);
-  const [remaining, setRemaining] = useState<number | null>(null);
-  const [limit, setLimit] = useState(15);
-  const [unlimited, setUnlimited] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const quota = useQuota();
 
   if (!relatives.length) {
     return <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)' }}>None on record</span>;
@@ -950,24 +1064,23 @@ function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?:
 
   const open = (r: (typeof relatives)[number]) => {
     setPending(r);
-    setRemaining(null);
-    fetch('/api/quota')
-      .then(res => (res.ok ? res.json() : null))
-      .then(q => {
-        if (!q) return;
-        setLimit(q.limit ?? 15);
-        setUnlimited(!!q.unlimited);
-        setRemaining(q.unlimited ? null : q.remaining ?? 0);
-      })
-      .catch(() => {});
+    setError(null);
+    quota.load();
   };
 
-  const go = () => {
+  const go = async () => {
     if (!pending) return;
-    const q = new URLSearchParams({ name: pending.name, run: '1' });
-    const loc = [pending.city, pending.state].filter(Boolean).join(', ');
-    if (loc) q.set('location', loc);
-    router.push(`/search?${q.toString()}`);
+    setBusy(true);
+    setError(null);
+    try {
+      const loc = [pending.city, pending.state].filter(Boolean).join(', ');
+      const id = await runLookup({ name: pending.name, ...(loc ? { location: loc } : {}) });
+      setPending(null);
+      router.push(`/report/${id}`);
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not build the report');
+      setBusy(false);
+    }
   };
 
   return (
@@ -983,23 +1096,15 @@ function RelativeSearch({ relatives }: { relatives: Array<{ name: string; city?:
         ))}
       </div>
       {pending && (
-        <div role="dialog" aria-modal="true" onClick={() => setPending(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(42,14,18,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: 'var(--pearl)', borderRadius: 'var(--r-lg)', padding: '24px 24px 20px', boxShadow: 'var(--shadow-lg)' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--dark)', marginBottom: 8 }}>Search {pending.name}?</div>
-            <p style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', lineHeight: 1.6, margin: '0 0 18px' }}>
-              {unlimited
-                ? 'This account has unlimited lookups, so nothing is deducted.'
-                : `This uses 1 of your ${limit} monthly lookups.`}
-              {!unlimited && remaining !== null && ` You have ${remaining} left this month.`}
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setPending(null)} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: 'transparent', color: 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={go} disabled={!unlimited && remaining === 0} style={{ padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: !unlimited && remaining === 0 ? 'var(--mauve)' : 'var(--primary)', color: 'var(--pearl)', fontFamily: 'var(--sans)', fontSize: 13, cursor: !unlimited && remaining === 0 ? 'not-allowed' : 'pointer' }}>
-                {!unlimited && remaining === 0 ? 'No lookups left' : unlimited ? 'Search' : 'Use a lookup'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <LookupConfirm
+          title={`Search ${pending.name}?`}
+          quota={quota}
+          busy={busy}
+          error={error}
+          confirmLabel={quota.unlimited ? 'Search' : 'Use a lookup'}
+          onConfirm={go}
+          onCancel={() => setPending(null)}
+        />
       )}
     </>
   );
@@ -1051,6 +1156,7 @@ function ActionButton({ icon, label, onClick }: { icon: string; label: string; o
         {icon === 'compare' && '⊕'}
         {icon === 'dl' && '↓'}
         {icon === 'share' && '↗'}
+        {icon === 'refresh' && '↻'}
         {icon === 'bell' && '◷'}
       </span>
       <span>{label}</span>

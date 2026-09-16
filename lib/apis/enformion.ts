@@ -838,13 +838,29 @@ export async function lookupEnformion(query: EnformionQuery): Promise<EnformionR
       counts.workplace > 0
         ? lookupWorkplace(username, password, best.tahoeId, fullName).catch(() => null)
         : Promise.resolve(null),
-      lookupEvictions(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
-      lookupForeclosures(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
-      lookupMarriages(
-        username, password, best.tahoeId, fullName,
-        (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
-      ).catch(() => ({ items: [] as string[], checked: false, nameMatched: false })),
-      lookupBusinesses(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false })),
+      // These four are gated on the indicator counts that came back with the
+      // person record we have already paid for. A count of zero is the vendor
+      // telling us there are no records of that kind, so the follow-up call
+      // buys nothing and is billed all the same. `checked: true` is therefore
+      // honest here: we did get an answer, from the search above. That is the
+      // same footing bankruptcy, judgments and liens have always been reported
+      // on, and it keeps a real answer distinct from a search that failed,
+      // which must never render as clear.
+      counts.evictions > 0
+        ? lookupEvictions(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false }))
+        : Promise.resolve({ items: [] as string[], checked: true }),
+      counts.foreclosures > 0
+        ? lookupForeclosures(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false }))
+        : Promise.resolve({ items: [] as string[], checked: true }),
+      counts.marriage > 0
+        ? lookupMarriages(
+            username, password, best.tahoeId, fullName,
+            (best.addresses ?? []).map((a: any) => a.state).filter(Boolean),
+          ).catch(() => ({ items: [] as string[], checked: false, nameMatched: false }))
+        : Promise.resolve({ items: [] as string[], checked: true, nameMatched: false }),
+      counts.business > 0
+        ? lookupBusinesses(username, password, best.tahoeId).catch(() => ({ items: [] as string[], checked: false }))
+        : Promise.resolve({ items: [] as string[], checked: true }),
     ]);
 
     // Property details for his current address, whoever owns it. The TahoeId

@@ -215,7 +215,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
     searchId,
     score,
     headline: getHeadline(score),
-    summary: getSummary(score),
+    summary: getSummary(score, flags),
     confidence: person.fullName ? 96 : 88,
     sources: person.fullName ? 4 : 3,
     generatedAt: new Date().toISOString(),
@@ -305,10 +305,42 @@ function getHeadline(score: ScoreState): string {
   return 'We\'d pause here.';
 }
 
-function getSummary(score: ScoreState): string {
-  if (score === 'green') return 'The record is clean across all sources. Identity is verified, public records are clear, and the social footprint is consistent. You can proceed with confidence.';
-  if (score === 'yellow') return 'The file isn\'t spotless. There are a few items worth a conversation, nothing that requires walking away, but enough to go in with eyes open and ask the right questions.';
-  return 'There are significant flags in the public record that we think warrant serious attention before you proceed. Review the details below carefully.';
+// What each flag actually is, in the words the score was decided on. The score
+// is computed from this exact list, so the summary can name the real reason
+// rather than describing a generic one. It used to offer examples the code
+// never checks, such as an address history contradicting what he told her,
+// which is not something Verity looks at.
+const FLAG_REASONS: Record<string, string> = {
+  voip: 'his number is a VoIP line rather than a normal carrier mobile',
+  public: 'an open federal court docket matches his name',
+  bankruptcy: 'a bankruptcy filing is on his record',
+  evictions: 'an eviction record is on file',
+  financial: 'a judgment, lien or foreclosure is on file',
+  criminal: 'a criminal record has been corroborated as his',
+  sanctions: 'he appears on a sanctions or watchlist',
+  soregistry: 'he appears on a sex offender registry',
+};
+
+function reasonList(flags: string[]): string {
+  const parts = flags.map(f => FLAG_REASONS[f]).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+function getSummary(score: ScoreState, flags: string[] = []): string {
+  if (score === 'green') {
+    return 'Nothing adverse surfaced in any of the checks that completed. That means the record is clean, not that he is, so keep your usual rules for a first meeting.';
+  }
+  const reasons = reasonList(flags);
+  if (score === 'yellow') {
+    return reasons
+      ? `This came back yellow because ${reasons}. Nothing here forces a walk-away, but go in with eyes open and ask about it.`
+      : 'Something surfaced that is worth a conversation before you meet. The detail is below.';
+  }
+  return reasons
+    ? `This came back red because ${reasons}. That stands on its own, it is not averaged away against everything that came back clean.`
+    : 'There are significant flags in the public record. Review the detail below carefully before you proceed.';
 }
 
 // Enformion's indicators are record counts, so report the count when we have

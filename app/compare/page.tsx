@@ -10,6 +10,13 @@ import { Report } from '@/lib/types';
 
 interface CompareEntry {
   id: string;
+  /**
+   * Who he is, as opposed to which search this was. Every run mints a fresh
+   * searchId, so keying the list on that put the same man on screen once per
+   * time she looked him up.
+   */
+  personKey: string;
+  generatedAt: string;
   name: string;
   initials: string;
   age: number;
@@ -53,8 +60,16 @@ function reportToEntry(report: Report): CompareEntry {
   const publicClears = report.publicRecords.filter(r => r.good).map(r => r.label + ': clear');
   const currentAddr = report.addresses.find(a => a.current)?.addr ?? report.addresses[0]?.addr ?? '';
 
+  // Phone is the identifier the search was actually run on. A file saved by
+  // hand may have none, so those fall back to the name, which is deliberately
+  // narrow: showing one man twice beats merging two different men into one.
+  const digits = (report.subject.phone ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  const personKey = digits || report.subject.name.trim().toLowerCase().replace(/\s+/g, ' ');
+
   return {
     id: report.searchId,
+    personKey,
+    generatedAt: report.generatedAt ?? '',
     name: report.subject.name,
     initials,
     age: report.subject.age,
@@ -105,8 +120,22 @@ export default function ComparePage() {
     // to invented men when it found fewer than two, which put fabricated
     // employers and fabricated civil filings on screen under real headings.
     // An empty comparison is honest; a populated fake one is not.
+    //
+    // Keyed by the man, not by the search. Running someone a second time is a
+    // new report with a new searchId but the same person, and keying on the id
+    // listed him once per run. The newest report of each man wins, so a re-run
+    // replaces what it refreshed instead of sitting beside it.
     const seen = new Map<string, CompareEntry>();
-    for (const e of loadSessionReports()) seen.set(e.id, e);
+    const at = (e: CompareEntry) => {
+      const t = new Date(e.generatedAt).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+    const keep = (e: CompareEntry) => {
+      const prev = seen.get(e.personKey);
+      if (!prev || at(e) > at(prev)) seen.set(e.personKey, e);
+    };
+
+    for (const e of loadSessionReports()) keep(e);
 
     fetch('/api/hisfile')
       .then(r => (r.ok ? r.json() : null))
@@ -114,8 +143,7 @@ export default function ComparePage() {
         for (const f of d?.files ?? []) {
           if (!f.report_data) continue;
           try {
-            const entry = reportToEntry(f.report_data);
-            if (!seen.has(entry.id)) seen.set(entry.id, entry);
+            keep(reportToEntry(f.report_data));
           } catch { /* a malformed stored report is simply skipped */ }
         }
       })
