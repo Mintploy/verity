@@ -5,6 +5,7 @@ import { lookupPublicRecords } from './pacer';
 import { lookupDonations } from './fec';
 import { withCallTally, summarize } from './callcount';
 import { signRelative } from '../candidates';
+import { isMinor } from '../lookups';
 
 
 /**
@@ -65,7 +66,17 @@ function classifyAddress(
  * The log runs in a finally: a report that throws half way through has still
  * spent whatever it spent, and that is exactly the case worth seeing.
  */
-export async function generateReport(req: SearchRequest): Promise<Report> {
+export interface GeneratedReport {
+  report: Report;
+  /**
+   * Enformion's identifier for the person the report resolved to, when it
+   * resolved to one. Stays on the server: the audit log stores a keyed hash of
+   * it, and the browser never sees it.
+   */
+  subjectId?: string;
+}
+
+export async function generateReport(req: SearchRequest): Promise<GeneratedReport> {
   return withCallTally(async (tally) => {
     try {
       return await buildReport(req);
@@ -75,7 +86,7 @@ export async function generateReport(req: SearchRequest): Promise<Report> {
   });
 }
 
-async function buildReport(req: SearchRequest): Promise<Report> {
+async function buildReport(req: SearchRequest): Promise<GeneratedReport> {
   const searchId = `VR-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   const [enResult, publicRecs] = await Promise.allSettled([
@@ -161,7 +172,9 @@ async function buildReport(req: SearchRequest): Promise<Report> {
       city: r.city,
       state: r.state,
       approxAge: r.approxAge,
-      token: r.tahoeId ? await signRelative(r.tahoeId) : undefined,
+      // A child on his record is listed by name but is not searchable: no
+      // token, so the report route can never be asked for her.
+      token: r.tahoeId && !isMinor(r.approxAge) ? await signRelative(r.tahoeId) : undefined,
     })),
   );
 
@@ -334,7 +347,7 @@ async function buildReport(req: SearchRequest): Promise<Report> {
     nextSteps: getNextSteps(score, flags),
   };
 
-  return report;
+  return { report, subjectId: person.tahoeId };
 }
 
 function getHeadline(score: ScoreState): string {

@@ -16,7 +16,13 @@ export async function DELETE(req: NextRequest) {
   const sb = getServiceSupabase();
   const userId = session.email;
 
-  // Delete all user data in order
+  // Delete all user data in order.
+  //
+  // lookup_audit and account_flags are left in place on purpose: they exist
+  // to investigate abuse, and an account that deletes itself after a run of
+  // lookups is exactly the one they are for. They hold keyed hashes of what
+  // was searched, not the searches, and no journal content.
+  await sb.from('search_reminders').delete().eq('user_id', userId);
   await sb.from('his_files').delete().eq('user_id', userId);
   await sb.from('verity_wrapped').delete().eq('user_id', userId);
   await sb.from('user_profiles').delete().eq('user_id', userId);

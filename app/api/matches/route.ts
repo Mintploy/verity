@@ -3,6 +3,10 @@ import { lookupCandidates } from '@/lib/apis/enformion';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { toPublicCandidates } from '@/lib/candidates';
 import { withCallTally, summarize } from '@/lib/apis/callcount';
+import {
+  DAILY_PICKER_CAP, LookupConfigError, activeFlag, getClientIp, hashLookupKey,
+  isMinor, normalizePhoneDigits, pickerCallsLast24h, recordLookup,
+} from '@/lib/lookups';
 
 /**
  * Who is on this number, the picker's data source.
@@ -15,55 +19,51 @@ import { withCallTally, summarize } from '@/lib/apis/callcount';
  * It still answers with the least that lets her recognise him, a name, an
  * approximate age, a city. The aliases, relatives and address history are the
  * report, and the report is a separate, quota-counted call.
+ *
+ * Every call is written to the audit log and capped per account per 24 hours
+ * from that log, which holds across serverless instances where an in-memory
+ * counter did not. A flagged account gets nothing here either. Anyone under
+ * 18 on the number is left off the list, so she cannot pick a child.
  */
-
-// Per-member throttle. In-memory means per-instance, so it is a backstop
-// against a runaway client rather than a quota, the real spend limit is
-// consumeSearch on the report itself.
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 5;
-const hits = new Map<string, number[]>();
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  hits.set(ip, recent);
-
-  // Bound the map so a spray of unique IPs cannot grow it without limit.
-  if (hits.size > 5000) {
-    for (const [k, v] of hits) {
-      if (v.every((t) => now - t >= WINDOW_MS)) hits.delete(k);
-    }
-  }
-  return recent.length > MAX_PER_WINDOW;
-}
-
 export async function POST(req: NextRequest) {
+  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
+  const session = sessionToken
+    ? await verifySessionToken(sessionToken).catch(() => null)
+    : null;
+  if (!session) {
+    return Response.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  const userId = session.email;
+
   try {
-    const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
-    const session = sessionToken
-      ? await verifySessionToken(sessionToken).catch(() => null)
-      : null;
-    if (!session) {
-      return Response.json({ error: 'Authentication required' }, { status: 401 });
+    const { phone } = await req.json();
+    const digits = normalizePhoneDigits(phone ?? '');
+    if (digits.length !== 10) {
+      return Response.json({ error: 'Enter a 10-digit US phone number' }, { status: 400 });
     }
 
-    // Throttled per member now rather than per IP, but kept: a picker refresh
-    // loop would otherwise bill us once per render.
-    const ip = session.email;
-    if (rateLimited(ip)) {
+    if (await activeFlag(userId)) {
       return Response.json(
-        { error: 'Too many searches. Wait a moment and try again.' },
+        { error: 'Lookups on this account are paused while we review recent activity. Email verity@mintploy.com if you think this is a mistake.' },
+        { status: 403 },
+      );
+    }
+
+    if ((await pickerCallsLast24h(userId)) >= DAILY_PICKER_CAP) {
+      return Response.json(
+        { error: 'Too many number checks today. Please come back tomorrow.' },
         { status: 429 },
       );
     }
 
-    const { phone } = await req.json();
-    const digits = (phone ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
-    if (digits.length !== 10) {
-      return Response.json({ error: 'Enter a 10-digit US phone number' }, { status: 400 });
-    }
+    await recordLookup({
+      userId,
+      inputHash: hashLookupKey('phone', digits),
+      inputKind: 'picker',
+      ip: getClientIp(req),
+      consumed: false,
+      outcome: 'picker',
+    });
 
     // The picker is billed as well as the report. lookupCandidates runs
     // ReversePhoneSearch, which retries up to three number formats and is
@@ -78,8 +78,13 @@ export async function POST(req: NextRequest) {
         console.log('ENFORMION_BILLING[picker]:', summarize(tally));
       }
     });
-    return Response.json({ candidates: await toPublicCandidates(candidates, digits) });
-  } catch (err: any) {
+    const adults = candidates.filter((c) => !isMinor(c.age));
+    return Response.json({ candidates: await toPublicCandidates(adults, digits) });
+  } catch (err) {
+    if (err instanceof LookupConfigError) {
+      console.error('[config] Lookups are unavailable:', err.message);
+      return Response.json({ error: 'Search is temporarily unavailable. Please try again shortly.' }, { status: 503 });
+    }
     console.error('Matches error:', err);
     return Response.json({ error: 'Search failed. Try again.' }, { status: 500 });
   }
