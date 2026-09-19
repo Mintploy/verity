@@ -124,3 +124,31 @@ export async function sendSearchReminder(email: string, subjectName?: string | n
     `),
   });
 }
+
+/** "Remind me after the date." Sent the next morning; links to his file, where the next step waits. */
+export async function sendAfterDateReminder(email: string, subjectName?: string | null, fileId?: string | null) {
+  const who = subjectName ? subjectName.split(' ')[0] : null;
+  const link = fileId ? `${BASE}/hisfile/${encodeURIComponent(fileId)}` : `${BASE}/hisfile`;
+  await getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: who ? `Your notes on ${who} are saved` : 'Your notes are saved',
+    text: [
+      who ? `Last night you tagged something on ${who} that a report can answer.` : 'Last night you tagged something a report can answer.',
+      'Nothing to do unless you want to. His file has the next step when you are ready.',
+      link,
+    ].join('\n'),
+    html: wrap(`
+      <h1 style="font-size:34px;font-weight:400;line-height:1.1;margin:0 0 16px;letter-spacing:-0.4px">
+        ${who ? `Your notes on ${who} are saved.` : 'Your notes are saved.'}
+      </h1>
+      <p style="font-family:-apple-system,sans-serif;font-size:15px;line-height:1.65;color:#5E3A40;margin:0 0 28px;font-weight:300">
+        Last night you tagged something a report can answer. Nothing to do unless you want to.
+        His file has the next step when you are ready.
+      </p>
+      <a href="${link}" style="display:inline-block;padding:16px 32px;background:#551212;color:#F5EDEC;text-decoration:none;border-radius:9999px;font-size:17px;font-weight:500;letter-spacing:0.2px">
+        Open his file
+      </a>
+    `),
+  });
+}

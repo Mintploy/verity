@@ -105,13 +105,18 @@ export default function CheckoutPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [verified, setVerified] = useState<boolean | null>(null);
+  const [creditUntil, setCreditUntil] = useState<string | null>(null);
 
   useEffect(() => {
     // Signed in: she pays as herself. Signed out: pricing still shows, and
     // the button sends her to a free account first.
     fetch('/api/auth/me').then(r => r.json()).then(me => {
       if (me?.authenticated && me.email) { setEmail(me.email); setSignedIn(true); setCurrentPlan(me.plan ?? null); setVerified(me.identityVerified === true); }
+      if (me?.membershipCredit?.until) setCreditUntil(me.membershipCredit.until);
     }).catch(() => {});
+    // ?plan=monthly from a flag sheet or the credit offer preselects that plan.
+    const wanted = new URLSearchParams(window.location.search).get('plan');
+    if (wanted === 'monthly' || wanted === 'annual' || wanted === 'single' || wanted === 'founding') queueMicrotask(() => setSelectedPlan(wanted));
 
     fetch('/api/stripe/checkout')
       .then(r => r.json())
@@ -194,7 +199,8 @@ export default function CheckoutPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-            <PlanCard plan="monthly" selected={selectedPlan === 'monthly'} onSelect={() => setSelectedPlan('monthly')} current={currentPlan === 'monthly'} />
+            <PlanCard plan="monthly" selected={selectedPlan === 'monthly'} onSelect={() => setSelectedPlan('monthly')} current={currentPlan === 'monthly'}
+              sub={creditUntil ? `Your $19 report is credited: first month $20, until ${new Date(creditUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.` : undefined} />
             <PlanCard plan="annual" selected={selectedPlan === 'annual'} onSelect={() => setSelectedPlan('annual')} current={currentPlan === 'annual'} />
             {(foundingAvailable || currentPlan === 'founding') && (
               <PlanCard

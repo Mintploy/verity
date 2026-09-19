@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { readSession } from '@/lib/access';
 import { getHisFile, saveHisFile, deleteHisFile } from '@/lib/hisfile';
+import { offerAfterSave, readTriggerContext } from '@/lib/upsell';
 
 // Any signed-in member: the journal is free. Shared with every journal page.
 const auth = readSession;
@@ -24,8 +25,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   try {
     const body = await req.json();
+    const ctx = readTriggerContext(body);
+    const before = ctx || Array.isArray(body?.dates) ? await getHisFile(session.email, id).catch(() => null) : null;
     const { file } = await saveHisFile(session.email, { ...body, id });
-    return Response.json({ file });
+    // A flag she just logged may be one a lookup can answer. Decided here,
+    // after the save, with the limits in the database (lib/triggers.ts).
+    let offer = null;
+    try { if (file) offer = await offerAfterSave(session.email, file, ctx, before); }
+    catch (e) { console.error('[upsell] offer evaluation failed:', e); }
+    return Response.json({ file, offer });
   } catch (e: any) {
     return Response.json({ error: e.message ?? 'Failed' }, { status: 500 });
   }

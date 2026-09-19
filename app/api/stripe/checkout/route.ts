@@ -3,6 +3,7 @@ import { readSession, getAccess, rememberOnProfile } from '@/lib/access';
 import { createCheckoutSession, findOrCreateCustomer, isPaidPlan } from '@/lib/stripe';
 import { getFoundingCount, FOUNDING_MEMBER_CAP } from '@/lib/quota';
 import { getServiceSupabase } from '@/lib/supabase';
+import { CREDIT_COUPON, membershipCredit } from '@/lib/upsell';
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: unknown; returnUrl?: string };
+    const { email: rawEmail, plan, returnUrl, upsell } = body as { email?: string; plan?: unknown; returnUrl?: string; upsell?: { tier?: unknown; stage?: unknown } };
     // A signed-in member pays as herself; the body's email is only for the
     // pre-account funnel. Either way it is stored canonically.
     // Checkout belongs to an account. The free account comes first, then the
@@ -66,10 +67,28 @@ export async function POST(req: NextRequest) {
       if (!access.stripeCustomerId) await rememberOnProfile(session.email, { stripe_customer_id: customerId });
     }
 
+    // Came from a flag sheet: tier and stage ride along so the webhook can
+    // log the purchase. Never the flag, never the man.
+    const metadata: Record<string, string> = {};
+    const tier = upsell?.tier, stage = upsell?.stage;
+    if ((tier === 'strong' || tier === 'stacked' || tier === 'safety') && (stage === 'before' || stage === 'during' || stage === 'after')) {
+      metadata.upsell_tier = tier;
+      metadata.upsell_stage = stage;
+    }
+
+    // Her $19 report counts toward a monthly membership for 7 days, once.
+    let coupon: string | undefined;
+    if (plan === 'monthly' && (await membershipCredit(email))) {
+      coupon = CREDIT_COUPON;
+      metadata.credit_applied = '1';
+    }
+
     const checkout = await createCheckoutSession({
       customerId,
       email: customerId ? undefined : email,
       plan,
+      coupon,
+      metadata,
       successUrl: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: returnUrl ?? baseUrl,
     });

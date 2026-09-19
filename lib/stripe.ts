@@ -33,12 +33,17 @@ export async function createCheckoutSession({
   cancelUrl,
   email,
   plan,
+  coupon,
+  metadata: extra = {},
 }: {
   customerId?: string;
   successUrl: string;
   cancelUrl: string;
   email?: string;
   plan: PaidPlan;
+  /** A Stripe coupon id applied to this checkout. Excludes promotion codes, which Stripe does not allow alongside it. */
+  coupon?: string;
+  metadata?: Record<string, string>;
 }) {
   const priceMap: Record<PaidPlan, string> = {
     founding: STRIPE_PRICE_FOUNDING,
@@ -55,11 +60,11 @@ export async function createCheckoutSession({
     line_items: [{ price: priceMap[plan], quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    allow_promotion_codes: true,
+    ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
     ...(customerId ? { customer: customerId } : {}),
     ...(email ? { customer_email: email } : {}),
     ...(isSubscription ? { subscription_data: { metadata: { app: 'verity', plan } } } : {}),
-    metadata: { app: 'verity', plan },
+    metadata: { app: 'verity', plan, ...extra },
   });
   return session;
 }

@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { readSession, getAccess } from '@/lib/access';
+import { membershipCredit } from '@/lib/upsell';
 
 /** Who she is and what she can do. Plan and lookups are read from the profile, not the cookie. */
 export async function GET(req: NextRequest) {
@@ -7,7 +8,9 @@ export async function GET(req: NextRequest) {
   if (!session) return Response.json({ authenticated: false });
   try {
     const access = await getAccess(session.email);
+    const credit = await membershipCredit(session.email).catch(() => null);
     return Response.json({
+      membershipCredit: credit,
       authenticated: true,
       email: session.email,
       userId: session.email,

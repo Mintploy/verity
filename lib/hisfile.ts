@@ -51,6 +51,8 @@ export interface HisFile {
   i_noticed?: string[];
   /** What she must not forget before seeing him again. */
   dont_forget?: string[];
+  /** "Don't suggest this for him": no lookup offers on this file, ever. */
+  no_offers?: boolean;
   accurate_salary?: string;
   generosity_rating?: string;
   his_finsta?: string;
@@ -137,7 +139,7 @@ export const MEMBER_EDITABLE_FIELDS = [
   'where_we_met', 'meetup_location', 'met_on_app', 'met_date',
   'first_date_location', 'first_date_date', 'first_date_paid',
   'gifts', 'icks', 'dates', 'milestones', 'he_loves', 'i_noticed', 'dont_forget',
-  'accurate_salary', 'generosity_rating', 'his_finsta', 'notes',
+  'accurate_salary', 'generosity_rating', 'his_finsta', 'notes', 'no_offers',
 ] as const satisfies readonly (keyof HisFile)[];
 
 // ---------------------------------------------------------------------------

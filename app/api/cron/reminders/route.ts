@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { sendSearchReminder } from '@/lib/email';
+import { sendAfterDateReminder, sendSearchReminder } from '@/lib/email';
 import { getDataKey } from '@/lib/hisfile';
 import { decryptFields } from '@/lib/crypto';
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase();
   const { data: due, error } = await sb
     .from('search_reminders')
-    .select('id, user_id, subject_name, report_id')
+    .select('id, user_id, subject_name, report_id, kind, file_id')
     .is('sent_at', null)
     .lte('due_at', new Date().toISOString())
     .limit(100);
@@ -46,7 +46,8 @@ export async function GET(req: NextRequest) {
       const plain = key ? decryptFields(key, { subject_name: row.subject_name }, ['subject_name']) : { subject_name: row.subject_name };
       const name = typeof plain.subject_name === 'string' ? plain.subject_name : null;
 
-      await sendSearchReminder(row.user_id, name, row.report_id ?? null);
+      if (row.kind === 'after_date') await sendAfterDateReminder(row.user_id, name, row.file_id ?? null);
+      else await sendSearchReminder(row.user_id, name, row.report_id ?? null);
       await sb.from('search_reminders').update({ sent_at: new Date().toISOString() }).eq('id', row.id);
       sent += 1;
     } catch (e) {

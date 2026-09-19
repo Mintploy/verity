@@ -10,6 +10,9 @@ import type { HisFile, FileType } from '@/lib/hisfile';
 import { ickText, type DateEntry, type Feeling, type IckEntry, type Milestone } from '@/lib/journal';
 import { allFlagsOn, flagKind, normalizeDateFlags, parseFlagId, type FlagPhase } from '@/lib/signals';
 import { FlagRows } from '@/components/hisfile/FlagRows';
+import { OfferSheet } from '@/components/hisfile/OfferSheet';
+import { SafetySheet } from '@/components/hisfile/SafetySheet';
+import type { OfferPayload } from '@/lib/upsell';
 import { MILESTONE_SUGGESTIONS, daysBetween, describeGap, describeSince } from '@/lib/milestones';
 import { BEFORE_MOODS } from '@/lib/flags';
 import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionItem } from '@/lib/reflection';
@@ -84,6 +87,18 @@ export default function HisFileDetail() {
   const [quickSaving, setQuickSaving] = useState<number | null>(null);
   // How often she has tapped each flag across every file. Orders the chip rows.
   const [flagUsage, setFlagUsage] = useState<Record<string, number>>({});
+  // A flag she logged that a lookup can answer (lib/triggers.ts). The safety
+  // sheet opens once per date per visit; the server decides the rest.
+  const [offer, setOffer] = useState<OfferPayload | null>(null);
+  const [safetyShown, setSafetyShown] = useState<number[]>([]);
+  const takeOffer = (o: OfferPayload | null | undefined) => {
+    if (!o) return;
+    if (o.tier === 'safety') {
+      if (safetyShown.includes(o.dateNumber)) return;
+      setSafetyShown(s => [...s, o.dateNumber]);
+    }
+    setOffer(o);
+  };
   // Which of Before / During / After is open on each date card. Unset means
   // "whatever the date's timing suggests", see phaseDefaults.
   const [openPhases, setOpenPhases] = useState<Record<string, boolean>>({});
@@ -126,6 +141,7 @@ export default function HisFileDetail() {
       const data = await res.json();
       if (data.file) {
         setFile(withFlagIds(data.file));
+        takeOffer(data.offer);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         if (isNew) router.replace(`/hisfile/${data.file.id}`);
@@ -206,10 +222,11 @@ export default function HisFileDetail() {
       const res = await fetch(`/api/hisfile/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
+        body: JSON.stringify({ ...next, trigger_context: { dateNumber: number, phase } }),
       });
       const data = await res.json();
       if (data.file) setFile(withFlagIds(data.file));
+      takeOffer(data.offer);
     } catch {
       // Keep her entry on screen. It saves with the rest of the form.
     } finally {
@@ -250,6 +267,19 @@ export default function HisFileDetail() {
   const removeFrom = (field: ListField, text: string) =>
     setFile(f => ({ ...f, [field]: (f[field] ?? []).filter(x => x !== text) }));
 
+  /** The offer sheet's two writes, both plain PATCHes on his file. */
+  const savePhoneForOffer = async (digits: string) => {
+    const res = await fetch(`/api/hisfile/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: digits }) });
+    const data = await res.json();
+    if (!data.file) throw new Error('save failed');
+    setFile(withFlagIds(data.file));
+  };
+  const noOffersForHim = async () => {
+    const res = await fetch(`/api/hisfile/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ no_offers: true }) });
+    const data = await res.json().catch(() => ({}));
+    if (data.file) setFile(withFlagIds(data.file));
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--ivory)' }}>
@@ -276,6 +306,12 @@ export default function HisFileDetail() {
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
       <Nav />
+      {offer?.tier === 'safety' && (
+        <SafetySheet stage={offer.stage} file={file} dateNumber={offer.dateNumber} onClose={() => setOffer(null)} />
+      )}
+      {offer && offer.tier !== 'safety' && (
+        <OfferSheet offer={offer} file={file} onClose={() => setOffer(null)} onSavePhone={savePhoneForOffer} onNoOffers={noOffersForHim} />
+      )}
       <div style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(24px, 4vw, 48px) clamp(16px, 4vw, 32px)' }}>
 
         {/* Header */}

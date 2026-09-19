@@ -3,6 +3,7 @@ import { stripe, isPaidPlan } from '@/lib/stripe';
 import { createMagicLinkToken, normalizeEmail } from '@/lib/auth';
 import { sendWelcomeEmail } from '@/lib/email';
 import { getServiceSupabase } from '@/lib/supabase';
+import { logUpsellEvent } from '@/lib/upsell';
 import type Stripe from 'stripe';
 
 export async function POST(req: NextRequest) {
@@ -53,6 +54,22 @@ export async function POST(req: NextRequest) {
             if (slot === null || slot === undefined) {
               console.error(`[founding] payment received but no slot could be confirmed for a founding checkout (customer ${customerId})`);
             }
+          }
+
+          // The $19 credit: a single report opens a 7-day window; a monthly
+          // checkout that used it closes the window for good.
+          const stamps: Record<string, string> = {};
+          if (plan === 'single') stamps.single_purchased_at = new Date().toISOString();
+          if (plan === 'monthly' && session.metadata?.credit_applied === '1') stamps.credit_offer_used_at = new Date().toISOString();
+          if (Object.keys(stamps).length) {
+            const { error: stampErr } = await sb.from('user_profiles').update(stamps).eq('user_id', normalizeEmail(email));
+            if (stampErr) console.error('[credit] could not stamp profile:', stampErr.message);
+          }
+
+          // From a flag sheet: tier and stage only.
+          const ut = session.metadata?.upsell_tier, us = session.metadata?.upsell_stage;
+          if ((ut === 'strong' || ut === 'stacked' || ut === 'safety') && (us === 'before' || us === 'during' || us === 'after')) {
+            await logUpsellEvent(normalizeEmail(email), ut, us, 'purchased', plan);
           }
 
           const token = await createMagicLinkToken(email);
