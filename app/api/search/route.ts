@@ -20,9 +20,9 @@ import {
  * re-checked against the resolved subject for next time.
  *
  * Spending the quota after the report rather than before means a report that
- * fails mid-way costs her nothing, at the price of a narrow race where two
- * simultaneous requests could both pass the quota read. The 24-hour cap is
- * counted from the audit log, which is written per request, so it holds.
+ * fails mid-way costs her nothing. consume_search() is atomic in Postgres, so
+ * two simultaneous requests cannot both take the last lookup; the earlier
+ * getQuota read is only there to refuse before spending on Enformion.
  */
 export async function POST(req: NextRequest) {
   const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
@@ -74,7 +74,10 @@ export async function POST(req: NextRequest) {
         subjectHash: knownSubjectHash, ...extra,
       });
 
-    const pre = await preflightLookup(userId, [inputHash, ...(knownSubjectHash ? [knownSubjectHash] : [])]);
+    const pre = await preflightLookup(userId, {
+      hashes: [inputHash, ...(knownSubjectHash ? [knownSubjectHash] : [])],
+      phoneDigits: input.kind === 'phone' ? input.value : chosen?.phone || null,
+    });
     if (!pre.ok) {
       await audit({ outcome: pre.outcome });
       return Response.json({ error: pre.error }, { status: pre.status });
@@ -113,9 +116,14 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Monthly search limit reached', remaining: 0 }, { status: 429 });
     }
 
-    await audit({ outcome: 'completed', consumed: true, subjectHash });
+    // Logged as its own outcome so it is visible how often the under-18 guard
+    // had nothing to check: no age and no date of birth on the record.
+    const ageUnknown = !(report.subject.age > 0) && !report.subject.dob;
+    await audit({ outcome: ageUnknown ? 'completed_unknown_age' : 'completed', consumed: true, subjectHash });
     // Flags for next time; this lookup has already been made.
-    await evaluatePatterns(userId, subjectHash).catch((e) => console.error('Pattern check failed:', e));
+    await evaluatePatterns(userId, subjectHash, {
+      phoneDigits: input.kind === 'phone' ? input.value : chosen?.phone || null,
+    }).catch((e) => console.error('Pattern check failed:', e));
 
     return Response.json({ report, searchId: report.searchId, demoMode: process.env.ALLOW_LIVE_LOOKUPS !== 'true' });
   } catch (err) {

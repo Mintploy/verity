@@ -1,4 +1,4 @@
-import { getServiceSupabase } from './supabase';
+import { getAnonSupabase, getUserSupabase } from './supabase';
 
 export const MONTHLY_SEARCH_LIMIT = 15;
 export const SINGLE_SEARCH_LIMIT = 1;
@@ -12,13 +12,15 @@ function limitForPlan(plan: string | null): number {
   return plan === 'single' ? SINGLE_SEARCH_LIMIT : MONTHLY_SEARCH_LIMIT;
 }
 
+/**
+ * How many founding memberships exist. A definer function in Postgres returns
+ * the one integer; nothing here needs the service role.
+ */
 export async function getFoundingCount(): Promise<number> {
-  const sb = getServiceSupabase();
-  const { count } = await sb
-    .from('user_profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('plan', 'founding');
-  return count ?? 0;
+  const sb = getAnonSupabase();
+  const { data, error } = await sb.rpc('founding_count');
+  if (error) throw error;
+  return typeof data === 'number' ? data : 0;
 }
 
 const UNLIMITED_EMAILS = (process.env.UNLIMITED_TEST_EMAILS ?? '')
@@ -36,7 +38,7 @@ export async function getQuota(userId: string): Promise<{ limit: number; used: n
   if (UNLIMITED_EMAILS.includes(userId.toLowerCase())) {
     return { limit: MONTHLY_SEARCH_LIMIT, used: 0, remaining: MONTHLY_SEARCH_LIMIT, unlimited: true, plan: 'annual' };
   }
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
   const { data: profile } = await sb
     .from('user_profiles')
     .select('plan, searches_this_month, searches_reset_at')
@@ -53,47 +55,19 @@ export async function getQuota(userId: string): Promise<{ limit: number; used: n
   return { limit, used, remaining: Math.max(0, limit - used), unlimited: false, plan };
 }
 
-// Checks quota and, if allowed, atomically increments and returns the result.
-// Returns { allowed: false } if quota is exhausted or no profile exists.
-// Single-report plan is capped at 1 search total (no monthly reset).
+/**
+ * Spends one lookup. The work is a SECURITY DEFINER function in Postgres,
+ * consume_search(), which reads the member from the JWT claim rather than an
+ * argument and does the check and the increment in one statement. The billing
+ * columns it writes are not grantable to members directly.
+ */
 export async function consumeSearch(userId: string): Promise<{ allowed: boolean; remaining: number; plan: string | null }> {
   if (UNLIMITED_EMAILS.includes(userId.toLowerCase())) {
     return { allowed: true, remaining: 9999, plan: 'annual' };
   }
-  const sb = getServiceSupabase();
-  const now = new Date();
-
-  const { data: profile, error } = await sb
-    .from('user_profiles')
-    .select('plan, searches_this_month, searches_reset_at')
-    .eq('user_id', userId)
-    .maybeSingle();
-
+  const sb = await getUserSupabase(userId);
+  const { data, error } = await sb.rpc('consume_search');
   if (error) throw error;
-  if (!profile) return { allowed: false, remaining: 0, plan: null };
-
-  const plan = profile.plan as string | null;
-  const limit = limitForPlan(plan);
-  const resetAt = new Date(profile.searches_reset_at);
-  let used = profile.searches_this_month ?? 0;
-
-  // Single-report plan: never resets, lifetime cap of 1
-  if (plan !== 'single' && !isSameMonth(resetAt, now)) {
-    await sb
-      .from('user_profiles')
-      .update({ searches_this_month: 1, searches_reset_at: now.toISOString() })
-      .eq('user_id', userId);
-    return { allowed: true, remaining: limit - 1, plan };
-  }
-
-  if (used >= limit) {
-    return { allowed: false, remaining: 0, plan };
-  }
-
-  await sb
-    .from('user_profiles')
-    .update({ searches_this_month: used + 1 })
-    .eq('user_id', userId);
-
-  return { allowed: true, remaining: limit - used - 1, plan };
+  const r = (data ?? {}) as { allowed?: boolean; remaining?: number; plan?: string | null };
+  return { allowed: r.allowed === true, remaining: r.remaining ?? 0, plan: r.plan ?? null };
 }

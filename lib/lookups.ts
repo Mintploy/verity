@@ -17,16 +17,16 @@ import { getServiceSupabase } from './supabase';
 
 export const DAILY_LOOKUP_CAP = 3;            // consumed report lookups per rolling 24h
 export const DAILY_PICKER_CAP = 10;           // "who is on this number" calls per rolling 24h
-export const REPEAT_SUBJECT_THRESHOLD = 3;    // same person within 30 days
-export const DISTINCT_SUBJECT_THRESHOLD = 8;  // more than this many people within 7 days
+export const REPEAT_SUBJECT_THRESHOLD = 3;    // same person within 30 days: soft flag, review only
+export const DISTINCT_SUBJECT_THRESHOLD = 8;  // more than this many people within 7 days: hard block
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type InputKind = 'phone' | 'name' | 'email' | 'address' | 'candidate' | 'relative' | 'picker';
 
 export type LookupOutcome =
-  | 'completed' | 'picker' | 'quota' | 'daily_cap' | 'flagged'
-  | 'minor' | 'repeat_subject' | 'distinct_subjects' | 'error';
+  | 'completed' | 'completed_unknown_age' | 'picker' | 'quota' | 'daily_cap' | 'flagged'
+  | 'minor' | 'distinct_subjects' | 'error';
 
 export type FlagReason = 'repeat_subject' | 'distinct_subjects' | 'minor_subject' | 'manual';
 
@@ -123,12 +123,14 @@ export async function recordLookup(row: {
   if (error) throw new Error(`lookup_audit insert failed: ${error.message}`);
 }
 
+/** The oldest open blocking flag, if any. Soft flags never block. */
 export async function activeFlag(userId: string): Promise<{ reason: FlagReason; created_at: string } | null> {
   const sb = getServiceSupabase();
   const { data, error } = await sb
     .from('account_flags')
     .select('reason, created_at')
     .eq('user_id', userId)
+    .eq('blocking', true)
     .is('cleared_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -137,7 +139,12 @@ export async function activeFlag(userId: string): Promise<{ reason: FlagReason; 
   return (data as { reason: FlagReason; created_at: string } | null) ?? null;
 }
 
-export async function flagAccount(userId: string, reason: FlagReason, details: Record<string, unknown>): Promise<void> {
+export async function flagAccount(
+  userId: string,
+  reason: FlagReason,
+  details: Record<string, unknown>,
+  opts: { blocking: boolean } = { blocking: true },
+): Promise<void> {
   const sb = getServiceSupabase();
   // One open flag per reason. A second identical flag adds nothing to review.
   const { data: existing } = await sb
@@ -148,9 +155,9 @@ export async function flagAccount(userId: string, reason: FlagReason, details: R
     .is('cleared_at', null)
     .limit(1);
   if (existing?.length) return;
-  const { error } = await sb.from('account_flags').insert({ user_id: userId, reason, details });
+  const { error } = await sb.from('account_flags').insert({ user_id: userId, reason, details, blocking: opts.blocking });
   if (error) throw error;
-  console.warn(`[flags] account flagged: reason=${reason}`);
+  console.warn(`[flags] account flagged: reason=${reason} blocking=${opts.blocking}`);
 }
 
 interface CountFilter {
@@ -211,6 +218,28 @@ export async function distinctSubjectsLast7d(userId: string): Promise<Set<string
   return new Set((data ?? []).map((r: { input_hash: string; subject_hash: string | null }) => r.subject_hash ?? r.input_hash));
 }
 
+/**
+ * Whether she has a journal relationship with the man on this number: a His
+ * File for it with at least one logged date. Repeat lookups on him are normal
+ * and are not a signal. Only a phone links a lookup to a file, so a lookup by
+ * name, email, address or relative token has no relationship and counts.
+ *
+ * Reads date_count, a plaintext column kept in step with the encrypted
+ * `dates` array, so nothing is decrypted to answer this.
+ */
+export async function hasJournalRelationship(userId: string, phoneDigits: string | null): Promise<boolean> {
+  if (!phoneDigits || phoneDigits.length !== 10) return false;
+  const sb = getServiceSupabase();
+  const { count, error } = await sb
+    .from('his_files')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('phone_normalized', phoneDigits)
+    .gte('date_count', 1);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
 export type Preflight =
   | { ok: true }
   | { ok: false; status: number; error: string; outcome: LookupOutcome };
@@ -218,15 +247,33 @@ export type Preflight =
 const FLAGGED_MESSAGE =
   'Lookups on this account are paused while we review recent activity. Email verity@mintploy.com if you think this is a mistake.';
 
+export interface SubjectContext {
+  /** Keyed hashes that identify the subject as far as we know him so far. */
+  hashes: string[];
+  /** The number the lookup is on, when it is on one. Links to her His File. */
+  phoneDigits: string | null;
+}
+
+/**
+ * Same-subject repetition. A soft flag: it is written for review and never
+ * blocks, and it is not written at all when she has a journal relationship
+ * with him. `count` is the number of consumed lookups including this one.
+ */
+async function noteRepeatSubject(userId: string, count: number, ctx: SubjectContext): Promise<void> {
+  if (count < REPEAT_SUBJECT_THRESHOLD) return;
+  if (await hasJournalRelationship(userId, ctx.phoneDigits)) return;
+  await flagAccount(userId, 'repeat_subject', { lookups_30d: count, linked_by_phone: !!ctx.phoneDigits }, { blocking: false });
+}
+
 /**
  * Everything that can refuse a lookup before any money is spent on it.
  *
- * Order matters: a flagged account is refused before its patterns are counted,
+ * Order matters: a blocking flag is refused before its patterns are counted,
  * and the pattern checks use what we know about the subject before resolution
  * (the record id behind a token, or the input itself). The same checks run
  * again after resolution in evaluatePatterns, which can flag but not refund.
  */
-export async function preflightLookup(userId: string, subjectHashes: string[]): Promise<Preflight> {
+export async function preflightLookup(userId: string, ctx: SubjectContext): Promise<Preflight> {
   if (await activeFlag(userId)) {
     return { ok: false, status: 403, error: FLAGGED_MESSAGE, outcome: 'flagged' };
   }
@@ -238,18 +285,16 @@ export async function preflightLookup(userId: string, subjectHashes: string[]): 
     };
   }
 
-  const prior = await priorLookupsOfSubject(userId, subjectHashes);
-  if (prior + 1 >= REPEAT_SUBJECT_THRESHOLD) {
-    await flagAccount(userId, 'repeat_subject', { prior_lookups_30d: prior + 1 });
-    return { ok: false, status: 403, error: FLAGGED_MESSAGE, outcome: 'repeat_subject' };
-  }
-
   const seen = await distinctSubjectsLast7d(userId);
-  const isNew = !subjectHashes.some((h) => seen.has(h));
+  const isNew = !ctx.hashes.some((h) => seen.has(h));
   if (isNew && seen.size + 1 > DISTINCT_SUBJECT_THRESHOLD) {
     await flagAccount(userId, 'distinct_subjects', { distinct_7d: seen.size + 1 });
     return { ok: false, status: 403, error: FLAGGED_MESSAGE, outcome: 'distinct_subjects' };
   }
+
+  // Soft. Noted for review, the lookup goes ahead.
+  const prior = await priorLookupsOfSubject(userId, ctx.hashes);
+  await noteRepeatSubject(userId, prior + 1, ctx);
 
   return { ok: true };
 }
@@ -259,12 +304,15 @@ export async function preflightLookup(userId: string, subjectHashes: string[]): 
  * to. A phone search does not know who it will find until it has paid to find
  * out, so this can only flag the account for its next lookup.
  */
-export async function evaluatePatterns(userId: string, subjectHash: string | null): Promise<void> {
+export async function evaluatePatterns(
+  userId: string,
+  subjectHash: string | null,
+  ctx: { phoneDigits: string | null },
+): Promise<void> {
   const keys = subjectHash ? [subjectHash] : [];
   const prior = await priorLookupsOfSubject(userId, keys);
-  if (prior >= REPEAT_SUBJECT_THRESHOLD) {
-    await flagAccount(userId, 'repeat_subject', { prior_lookups_30d: prior });
-  }
+  await noteRepeatSubject(userId, prior, { hashes: keys, phoneDigits: ctx.phoneDigits });
+
   const seen = await distinctSubjectsLast7d(userId);
   if (seen.size > DISTINCT_SUBJECT_THRESHOLD) {
     await flagAccount(userId, 'distinct_subjects', { distinct_7d: seen.size });

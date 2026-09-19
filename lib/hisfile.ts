@@ -1,6 +1,10 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ickText, type DateEntry, type IckEntry } from './journal';
-import { getServiceSupabase } from './supabase';
+import { getUserSupabase } from './supabase';
 import { getStarSign, getCompatibility, StarSign } from './starsigns';
+import {
+  decryptFields, encryptFields, generateDataKey, unwrapDataKey, wrapDataKey,
+} from './crypto';
 
 /** Why the file was opened. Decides which questionnaire the entry shows. */
 export type FileType = 'dating' | 'safety';
@@ -33,6 +37,8 @@ export interface HisFile {
   icks?: Array<string | IckEntry>;
   /** Every date, with how she felt. Date 1 is mirrored in first_date_*. */
   dates?: DateEntry[];
+  /** Plaintext count of `dates`, maintained on save. See rls_owner_policies.sql. */
+  date_count?: number;
   accurate_salary?: string;
   generosity_rating?: string;
   his_finsta?: string;
@@ -69,32 +75,127 @@ export interface VerityWrapped {
   is_public?: boolean;
 }
 
+/**
+ * Journal fields held as ciphertext at rest. The whole `dates` array is one
+ * value, which covers likedMore, likedLess, duringNote and both feelings.
+ * phone, full_name and star_sign stay plaintext: dedupe and compatibility
+ * depend on them. report_data is not in this list yet; see docs.
+ */
+export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts'] as const;
+
+/** Columns the API must never hand to the browser. */
+const PROFILE_PRIVATE_COLUMNS = ['data_key_enc'] as const;
+
+// ---------------------------------------------------------------------------
+// Data key
+// ---------------------------------------------------------------------------
+
+/**
+ * Her data key, unwrapped, for this request only.
+ *
+ * Created on first use. Two first writes racing would each mint a key and the
+ * loser's ciphertext would be unreadable, so the write is conditional on the
+ * column still being null and the loser re-reads the winner's key.
+ */
+async function getDataKey(sb: SupabaseClient, userId: string, opts: { create: boolean }): Promise<Buffer | null> {
+  const { data, error } = await sb
+    .from('user_profiles')
+    .select('data_key_enc')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (data?.data_key_enc) return unwrapDataKey(data.data_key_enc, userId);
+  if (!opts.create) return null;
+
+  const fresh = generateDataKey();
+  const wrapped = wrapDataKey(fresh, userId);
+
+  if (data) {
+    const { data: won, error: upErr } = await sb
+      .from('user_profiles')
+      .update({ data_key_enc: wrapped })
+      .eq('user_id', userId)
+      .is('data_key_enc', null)
+      .select('data_key_enc');
+    if (upErr) throw upErr;
+    if (won?.length) return fresh;
+  } else {
+    // No profile row yet (a test account, or a member the webhook missed).
+    const { error: insErr } = await sb
+      .from('user_profiles')
+      .insert({ user_id: userId, email: userId, data_key_enc: wrapped });
+    if (!insErr) return fresh;
+    if (insErr.code !== '23505') throw insErr; // anything but "already exists"
+  }
+
+  // Lost the race: read the key that won.
+  const { data: again, error: reErr } = await sb
+    .from('user_profiles')
+    .select('data_key_enc')
+    .eq('user_id', userId)
+    .single();
+  if (reErr) throw reErr;
+  if (!again?.data_key_enc) throw new Error('Data key missing after conditional write');
+  return unwrapDataKey(again.data_key_enc, userId);
+}
+
+function decryptFile(key: Buffer | null, row: HisFile): HisFile {
+  return key ? decryptFields(key, row, ENCRYPTED_FIELDS) : row;
+}
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
   const { data, error } = await sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
   if (error) throw error;
-  return data ?? null;
+  if (!data) return null;
+  for (const c of PROFILE_PRIVATE_COLUMNS) delete data[c];
+  return data;
 }
+
+/**
+ * Only the fields a member may set about herself. The billing columns are
+ * refused by column grants at the database as well; this keeps the request
+ * body from ever naming them.
+ */
+const PROFILE_EDITABLE: (keyof UserProfile)[] = ['date_of_birth'];
 
 export async function upsertUserProfile(userId: string, email: string, updates: Partial<UserProfile>): Promise<UserProfile | null> {
-  const sb = getServiceSupabase();
-  const starSign = updates.date_of_birth ? getStarSign(updates.date_of_birth) : undefined;
-  const row = { user_id: userId, email, ...updates, ...(starSign ? { star_sign: starSign } : {}) };
+  const sb = await getUserSupabase(userId);
+  const allowed: Partial<UserProfile> = {};
+  for (const k of PROFILE_EDITABLE) {
+    if (updates[k] !== undefined) (allowed as Record<string, unknown>)[k] = updates[k];
+  }
+  const starSign = allowed.date_of_birth ? getStarSign(allowed.date_of_birth) : undefined;
+  const row = { user_id: userId, email, ...allowed, ...(starSign ? { star_sign: starSign } : {}) };
   const { data, error } = await sb.from('user_profiles').upsert(row, { onConflict: 'user_id' }).select().single();
   if (error) throw error;
+  if (data) for (const c of PROFILE_PRIVATE_COLUMNS) delete data[c];
   return data ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// His Files
+// ---------------------------------------------------------------------------
+
 export async function getHisFiles(userId: string): Promise<HisFile[]> {
-  const sb = getServiceSupabase();
-  const { data } = await sb.from('his_files').select('*').eq('user_id', userId).order('researched_at', { ascending: false });
-  return data ?? [];
+  const sb = await getUserSupabase(userId);
+  const { data, error } = await sb.from('his_files').select('*').eq('user_id', userId).order('researched_at', { ascending: false });
+  if (error) throw error;
+  if (!data?.length) return [];
+  const key = await getDataKey(sb, userId, { create: false });
+  return data.map((row: HisFile) => decryptFile(key, row));
 }
 
 export async function getHisFile(userId: string, id: string): Promise<HisFile | null> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
   const { data } = await sb.from('his_files').select('*').eq('user_id', userId).eq('id', id).single();
-  return data ?? null;
+  if (!data) return null;
+  const key = await getDataKey(sb, userId, { create: false });
+  return decryptFile(key, data);
 }
 
 /**
@@ -114,13 +215,15 @@ function normalizeName(name?: string | null): string {
 }
 
 /**
- * The same man saved twice is one file, not two. Phone is the reliable key 
+ * The same man saved twice is one file, not two. Phone is the reliable key,
  * it is what the search was run on. Entries created by hand may have no phone,
  * so those fall back to an exact name match, which is deliberately narrow:
  * merging two different people is worse than showing one entry twice.
+ *
+ * Matching touches only plaintext columns, so this never needs the data key.
+ * The row it returns is raw; saveHisFile decrypts it before comparing fields.
  */
-export async function findDuplicateHisFile(userId: string, file: HisFile): Promise<HisFile | null> {
-  const sb = getServiceSupabase();
+async function findDuplicateRaw(sb: SupabaseClient, userId: string, file: HisFile): Promise<HisFile | null> {
   const phone = normalizePhone(file.phone);
 
   if (phone) {
@@ -149,8 +252,15 @@ export async function findDuplicateHisFile(userId: string, file: HisFile): Promi
   ) ?? null;
 }
 
+export async function findDuplicateHisFile(userId: string, file: HisFile): Promise<HisFile | null> {
+  const sb = await getUserSupabase(userId);
+  const raw = await findDuplicateRaw(sb, userId, file);
+  if (!raw) return null;
+  return decryptFile(await getDataKey(sb, userId, { create: false }), raw);
+}
+
 /** Fields a re-save may fill in but must never overwrite once the user has set them. */
-const USER_OWNED_FIELDS: (keyof HisFile)[] = ['dates', 
+const USER_OWNED_FIELDS: (keyof HisFile)[] = ['dates',
   'nickname', 'full_name', 'phone', 'date_of_birth', 'status', 'his_finsta', 'notes',
   'where_we_met', 'meetup_location', 'met_on_app', 'met_date',
   'first_date_location', 'first_date_date', 'first_date_paid',
@@ -179,7 +289,7 @@ export async function getReportByReportId(
   userId: string,
   reportId: string,
 ): Promise<Record<string, unknown> | null> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
   const { data } = await sb
     .from('his_files')
     .select('report_data')
@@ -189,8 +299,17 @@ export async function getReportByReportId(
   return (data?.report_data as Record<string, unknown> | undefined) ?? null;
 }
 
+/** Everything the client may not set directly. */
+function stripServerColumns(row: Record<string, unknown>): void {
+  delete row.phone_normalized; // generated column, Postgres rejects writes
+  delete row.date_count;       // derived below
+  delete row.user_id;          // set from the session, never the body
+}
+
 export async function saveHisFile(userId: string, file: HisFile): Promise<SaveResult> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
+  const key = await getDataKey(sb, userId, { create: true });
+  if (!key) throw new Error('Could not obtain a data key');
 
   const starSign = file.date_of_birth ? getStarSign(file.date_of_birth) : undefined;
 
@@ -208,24 +327,27 @@ export async function saveHisFile(userId: string, file: HisFile): Promise<SaveRe
 
   const row: Record<string, unknown> = {
     ...file,
-    user_id: userId,
     ...(starSign ? { star_sign: starSign } : {}),
     ...(compatScore !== undefined ? { compatibility_score: compatScore, compatibility_summary: compatSummary } : {}),
     researched_at: file.researched_at ?? new Date().toISOString(),
   };
+  stripServerColumns(row);
+  row.user_id = userId;
+  if (Array.isArray(file.dates)) row.date_count = file.dates.length;
 
-  // Generated column, Postgres rejects any attempt to write it.
-  delete row.phone_normalized;
+  const seal = (r: Record<string, unknown>) => encryptFields(key, r, ENCRYPTED_FIELDS);
 
   if (file.id) {
-    const { data, error } = await sb.from('his_files').update(row).eq('id', file.id).eq('user_id', userId).select().single();
+    const { data, error } = await sb.from('his_files')
+      .update(seal(row)).eq('id', file.id).eq('user_id', userId).select().single();
     if (error) throw error;
-    return { file: data ?? null, merged: false };
+    return { file: data ? decryptFile(key, data) : null, merged: false };
   }
 
-  const existing = await findDuplicateHisFile(userId, file);
+  const existingRaw = await findDuplicateRaw(sb, userId, file);
 
-  if (existing) {
+  if (existingRaw) {
+    const existing = decryptFile(key, existingRaw);
     // Saving the same man again refreshes the report he is attached to and
     // fills the blanks. It does not undo anything the user has typed since.
     const patch: Record<string, unknown> = {
@@ -241,27 +363,28 @@ export async function saveHisFile(userId: string, file: HisFile): Promise<SaveRe
     for (const field of USER_OWNED_FIELDS) {
       if (isEmpty(existing[field]) && !isEmpty(file[field])) patch[field] = file[field];
     }
+    if (Array.isArray(patch.dates)) patch.date_count = (patch.dates as unknown[]).length;
 
     const { data, error } = await sb.from('his_files')
-      .update(patch).eq('id', existing.id!).eq('user_id', userId).select().single();
+      .update(seal(patch)).eq('id', existing.id!).eq('user_id', userId).select().single();
     if (error) throw error;
-    return { file: data ?? null, merged: true };
+    return { file: data ? decryptFile(key, data) : null, merged: true };
   }
 
   delete row.id;
-  const { data, error } = await sb.from('his_files').insert(row).select().single();
+  const { data, error } = await sb.from('his_files').insert(seal(row)).select().single();
   if (error) throw error;
-  return { file: data ?? null, merged: false };
+  return { file: data ? decryptFile(key, data) : null, merged: false };
 }
 
 export async function deleteHisFile(userId: string, id: string): Promise<boolean> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
   const { error } = await sb.from('his_files').delete().eq('id', id).eq('user_id', userId);
   return !error;
 }
 
 export async function backfillCompatibility(userId: string, userSign: StarSign): Promise<void> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
   const { data: files } = await sb.from('his_files').select('id, star_sign').eq('user_id', userId);
   if (!files?.length) return;
   for (const file of files) {
@@ -274,27 +397,35 @@ export async function backfillCompatibility(userId: string, userSign: StarSign):
   }
 }
 
+// ---------------------------------------------------------------------------
+// Wrapped
+// ---------------------------------------------------------------------------
+
 export async function generateWrapped(userId: string, year: number): Promise<VerityWrapped | null> {
-  const sb = getServiceSupabase();
+  const sb = await getUserSupabase(userId);
 
   const startOf = `${year}-01-01T00:00:00.000Z`;
   const endOf = `${year + 1}-01-01T00:00:00.000Z`;
 
-  const { data: files } = await sb
+  const { data: rows } = await sb
     .from('his_files')
     .select('*')
     .eq('user_id', userId)
     .gte('researched_at', startOf)
     .lt('researched_at', endOf);
 
-  if (!files || files.length === 0) return null;
+  if (!rows || rows.length === 0) return null;
 
-  const green = files.filter((f: HisFile) => f.safety_score === 'green').length;
-  const yellow = files.filter((f: HisFile) => f.safety_score === 'yellow').length;
-  const red = files.filter((f: HisFile) => f.safety_score === 'red').length;
+  // Icks are ciphertext at rest; the aggregate needs the words.
+  const key = await getDataKey(sb, userId, { create: false });
+  const files: HisFile[] = rows.map((r: HisFile) => decryptFile(key, r));
+
+  const green = files.filter((f) => f.safety_score === 'green').length;
+  const yellow = files.filter((f) => f.safety_score === 'yellow').length;
+  const red = files.filter((f) => f.safety_score === 'red').length;
 
   const monthCounts: Record<string, number> = {};
-  files.forEach((f: HisFile) => {
+  files.forEach((f) => {
     if (f.researched_at) {
       const m = new Date(f.researched_at).toLocaleString('en-US', { month: 'long' });
       monthCounts[m] = (monthCounts[m] ?? 0) + 1;
@@ -305,16 +436,16 @@ export async function generateWrapped(userId: string, year: number): Promise<Ver
   // Dating-only metrics. A marketplace safety check has no app, no icks and no
   // one who picked up the bill, so counting those files would drag every
   // average toward nothing.
-  const datingFiles = files.filter((f: HisFile) => (f.file_type ?? 'dating') === 'dating');
+  const datingFiles = files.filter((f) => (f.file_type ?? 'dating') === 'dating');
 
   const appCounts: Record<string, number> = {};
-  datingFiles.forEach((f: HisFile) => {
+  datingFiles.forEach((f) => {
     if (f.met_on_app) appCounts[f.met_on_app] = (appCounts[f.met_on_app] ?? 0) + 1;
   });
   const mostCommonApp = Object.entries(appCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   const ickCounts: Record<string, number> = {};
-  datingFiles.forEach((f: HisFile) => {
+  datingFiles.forEach((f) => {
     (f.icks ?? []).forEach((ick) => {
       const text = ickText(ick);
       ickCounts[text] = (ickCounts[text] ?? 0) + 1;
@@ -323,28 +454,29 @@ export async function generateWrapped(userId: string, year: number): Promise<Ver
   const mostCommonIck = Object.entries(ickCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   const genOrder = ['cheap', 'average', 'generous', 'spoils me'];
-  const genFiles = datingFiles.filter((f: HisFile) => f.generosity_rating);
+  const genFiles = datingFiles.filter((f) => f.generosity_rating);
   const avgGenScore = genFiles.length
-    ? Math.round(genFiles.reduce((s: number, f: HisFile) => s + (genOrder.indexOf(f.generosity_rating!) + 1), 0) / genFiles.length)
+    ? Math.round(genFiles.reduce((s: number, f) => s + (genOrder.indexOf(f.generosity_rating!) + 1), 0) / genFiles.length)
     : 0;
   const avgGenerosity = avgGenScore > 0 ? genOrder[avgGenScore - 1] : null;
 
   const signCounts: Record<string, number> = {};
-  files.forEach((f: HisFile) => {
+  files.forEach((f) => {
     if (f.star_sign) signCounts[f.star_sign] = (signCounts[f.star_sign] ?? 0) + 1;
   });
 
   const statusCounts: Record<string, number> = {};
-  files.forEach((f: HisFile) => {
+  files.forEach((f) => {
     if (f.status) statusCounts[f.status] = (statusCounts[f.status] ?? 0) + 1;
   });
 
   const topDomain = red > green && red > yellow ? 'caution' : green > yellow ? 'well' : 'mixed results';
   const headline = `You researched ${files.length} men in ${year} and came out with ${topDomain}.`;
 
-  const shareToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-  const wrapped: VerityWrapped = {
+  // The stored row carries only the counts. most_common_ick is journal content
+  // and is returned to her but never persisted in plaintext; share_token is a
+  // database default. The row's own (user_id, year) key is the conflict target.
+  const stored: Omit<VerityWrapped, 'most_common_ick' | 'share_token'> = {
     user_id: userId,
     year,
     total_searches: files.length,
@@ -354,15 +486,15 @@ export async function generateWrapped(userId: string, year: number): Promise<Ver
     red_count: red,
     most_active_month: mostActiveMonth ?? undefined,
     most_common_app: mostCommonApp ?? undefined,
-    most_common_ick: mostCommonIck ?? undefined,
     average_generosity: avgGenerosity ?? undefined,
     star_sign_breakdown: signCounts,
     status_breakdown: statusCounts,
     headline,
-    share_token: shareToken,
     is_public: false,
   };
 
-  const { data } = await sb.from('verity_wrapped').upsert(wrapped, { onConflict: 'user_id,year' }).select().single();
-  return data ?? wrapped;
+  const { data } = await sb.from('verity_wrapped').upsert(stored, { onConflict: 'user_id,year' }).select().single();
+  const out: VerityWrapped = { ...(data ?? stored), most_common_ick: mostCommonIck ?? undefined };
+  delete out.share_token;
+  return out;
 }

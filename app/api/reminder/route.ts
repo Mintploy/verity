@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getUserSupabase } from '@/lib/supabase';
 
 /**
  * "Remind me in 30 days."
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const { report_id, subject_name, phone } = await req.json();
     const dueAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const sb = getServiceSupabase();
+    const sb = await getUserSupabase(session.email);
     const { error } = await sb.from('search_reminders').upsert(
       {
         user_id: session.email,
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     return Response.json({ ok: true, dueAt });
-  } catch (e: any) {
+  } catch (e) {
     console.error('Reminder error:', e);
     return Response.json({ error: 'Could not set the reminder' }, { status: 500 });
   }
