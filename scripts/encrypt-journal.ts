@@ -1,13 +1,21 @@
 /**
  * Encrypts, or decrypts, the journal fields of every his_files row in place.
  *
- *   npx tsx scripts/encrypt-journal.ts --dry-run
- *   npx tsx scripts/encrypt-journal.ts --apply
- *   npx tsx scripts/encrypt-journal.ts --rollback
- *   ... [--user someone@example.com]   limit to one member
+ *   npm run journal:encrypt -- --dry-run
+ *   npm run journal:encrypt -- --apply    --user you@example.com
+ *   npm run journal:encrypt -- --apply
+ *   npm run journal:encrypt -- --rollback [--user you@example.com]
+ *
+ * --user limits the run to one member. Encrypt your own account first, check
+ * His Files, a saved report and Compare in the browser, then run for all.
  *
  * Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and
  * VERITY_MASTER_KEY in the environment. Run it locally, not on Vercel.
+ *
+ * Before --apply or --rollback touches a row it calls his_files_snapshot(),
+ * which copies the whole table to his_files_snapshot_<timestamp>, reachable
+ * only by the service role. That is the restore point. Drop it once the run
+ * has been verified; it holds whatever the table held before the rewrite.
  *
  * This is a script rather than a SQL migration because pgcrypto has no
  * AES-GCM. It is idempotent: a value that is already ciphertext is skipped on
@@ -58,6 +66,12 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   required('VERITY_MASTER_KEY');
+
+  if (mode !== 'dry-run') {
+    const { data: snap, error: snapErr } = await sb.rpc('his_files_snapshot');
+    if (snapErr) throw new Error(`snapshot failed, nothing changed: ${snapErr.message}`);
+    console.log(`restore point: public.${snap}  (drop it after verifying)`);
+  }
 
   // Every row, paged, grouped by member.
   const byUser = new Map<string, Row[]>();

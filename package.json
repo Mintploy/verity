@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "journal:encrypt": "tsx scripts/encrypt-journal.ts",
+    "keys:rotate": "tsx scripts/rotate-master-key.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
@@ -29,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "4.23.13",
     "typescript": "^5"
   }
 }

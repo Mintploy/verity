@@ -76,12 +76,16 @@ export interface VerityWrapped {
 }
 
 /**
- * Journal fields held as ciphertext at rest. The whole `dates` array is one
- * value, which covers likedMore, likedLess, duringNote and both feelings.
+ * Fields held as ciphertext at rest. The whole `dates` array is one value,
+ * which covers likedMore, likedLess, duringNote and both feelings.
+ * report_data is the stored report about him: addresses, relatives, records.
  * phone, full_name and star_sign stay plaintext: dedupe and compatibility
- * depend on them. report_data is not in this list yet; see docs.
+ * depend on them.
  */
-export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts'] as const;
+export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts', 'report_data'] as const;
+
+/** The subset Wrapped reads. It never opens a report. */
+const WRAPPED_FIELDS = ['icks'] as const;
 
 /** Columns the API must never hand to the browser. */
 const PROFILE_PRIVATE_COLUMNS = ['data_key_enc'] as const;
@@ -139,8 +143,8 @@ async function getDataKey(sb: SupabaseClient, userId: string, opts: { create: bo
   return unwrapDataKey(again.data_key_enc, userId);
 }
 
-function decryptFile(key: Buffer | null, row: HisFile): HisFile {
-  return key ? decryptFields(key, row, ENCRYPTED_FIELDS) : row;
+function decryptFile(key: Buffer | null, row: HisFile, fields: readonly string[] = ENCRYPTED_FIELDS): HisFile {
+  return key ? decryptFields(key, row, fields) : row;
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +300,10 @@ export async function getReportByReportId(
     .eq('user_id', userId)
     .eq('report_id', reportId)
     .maybeSingle();
-  return (data?.report_data as Record<string, unknown> | undefined) ?? null;
+  if (!data?.report_data) return null;
+  const key = await getDataKey(sb, userId, { create: false });
+  const row = decryptFile(key, data as HisFile, ['report_data']);
+  return (row.report_data as Record<string, unknown> | undefined) ?? null;
 }
 
 /** Everything the client may not set directly. */
@@ -418,7 +425,7 @@ export async function generateWrapped(userId: string, year: number): Promise<Ver
 
   // Icks are ciphertext at rest; the aggregate needs the words.
   const key = await getDataKey(sb, userId, { create: false });
-  const files: HisFile[] = rows.map((r: HisFile) => decryptFile(key, r));
+  const files: HisFile[] = rows.map((r: HisFile) => decryptFile(key, r, WRAPPED_FIELDS));
 
   const green = files.filter((f) => f.safety_score === 'green').length;
   const yellow = files.filter((f) => f.safety_score === 'yellow').length;

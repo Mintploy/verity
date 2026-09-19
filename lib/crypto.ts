@@ -31,14 +31,30 @@ const KEY_BYTES = 32;
 /** Thrown when the master key is missing or malformed. Routes turn this into a 503. */
 export class CryptoConfigError extends Error {}
 
+function parseKey(name: string, raw: string): Buffer {
+  const key = /^[0-9a-f]{64}$/i.test(raw) ? Buffer.from(raw, 'hex') : Buffer.from(raw, 'base64');
+  if (key.length !== KEY_BYTES) {
+    throw new CryptoConfigError(`${name} must be 32 bytes, as 64 hex chars or base64`);
+  }
+  return key;
+}
+
+/** The key new wraps are made with. */
 export function masterKey(): Buffer {
   const raw = process.env.VERITY_MASTER_KEY?.trim();
   if (!raw) throw new CryptoConfigError('VERITY_MASTER_KEY is not set');
-  const key = /^[0-9a-f]{64}$/i.test(raw) ? Buffer.from(raw, 'hex') : Buffer.from(raw, 'base64');
-  if (key.length !== KEY_BYTES) {
-    throw new CryptoConfigError('VERITY_MASTER_KEY must be 32 bytes, as 64 hex chars or base64');
-  }
-  return key;
+  return parseKey('VERITY_MASTER_KEY', raw);
+}
+
+/**
+ * The key being rotated out, if a rotation is in progress. Unwrap tries the
+ * current key first and this one second, so the app keeps reading while
+ * scripts/rotate-master-key.ts re-wraps every data key. Unset it once the
+ * rotation script reports nothing left to do.
+ */
+export function previousMasterKey(): Buffer | null {
+  const raw = process.env.VERITY_MASTER_KEY_PREVIOUS?.trim();
+  return raw ? parseKey('VERITY_MASTER_KEY_PREVIOUS', raw) : null;
 }
 
 export function generateDataKey(): Buffer {
@@ -83,9 +99,22 @@ export function wrapDataKey(dataKey: Buffer, userId: string): string {
 }
 
 export function unwrapDataKey(wrapped: string, userId: string): Buffer {
-  const key = decryptBytes(masterKey(), wrapped, `dk:${userId}`);
+  const aad = `dk:${userId}`;
+  let key: Buffer;
+  try {
+    key = decryptBytes(masterKey(), wrapped, aad);
+  } catch (err) {
+    const previous = previousMasterKey();
+    if (!previous) throw err;
+    key = decryptBytes(previous, wrapped, aad);
+  }
   if (key.length !== KEY_BYTES) throw new Error('Unwrapped data key has the wrong length');
   return key;
+}
+
+/** True when this wrap was made with the current master key. */
+export function isWrappedWithCurrentKey(wrapped: string, userId: string): boolean {
+  try { decryptBytes(masterKey(), wrapped, `dk:${userId}`); return true; } catch { return false; }
 }
 
 /**

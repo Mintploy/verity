@@ -20,6 +20,7 @@ Environment variables involved:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | scoped and anon clients | Sent as the apikey header; the minted JWT is the Authorization header. |
 | `SUPABASE_SERVICE_ROLE_KEY` | `getServiceSupabase()` | Bypasses RLS. Call sites listed below. |
 | `VERITY_MASTER_KEY` | `lib/crypto.ts` | 32 bytes, hex or base64. Wraps per-member data keys. Unrelated to Supabase auth but lives in the same secret store. |
+| `VERITY_MASTER_KEY_PREVIOUS` | `lib/crypto.ts` | Set only during a rotation; see `scripts/rotate-master-key.ts`. |
 | `LOOKUP_HASH_SECRET` | `lib/lookups.ts` | HMAC key for the audit log. |
 
 ## Service role call sites
@@ -30,7 +31,8 @@ These are every place the service role is used. Add to this list before adding a
 |---|---|
 | `app/api/stripe/webhooks/route.ts` | Stripe is the caller; there is no member session. Creates or updates `user_profiles` billing columns. |
 | `app/api/cron/reminders/route.ts` | Reads every member's due reminders. |
-| `lib/lookups.ts` (all functions) | `lookup_audit` and `account_flags` are written about an account, never by it, and have no policies by design. `hasJournalRelationship` reads a plaintext count from `his_files` for the flag rule. |
+| `lib/lookups.ts` (all functions) | `lookup_audit` and `account_flags` are written about an account, never by it, and have no policies by design. `hasJournalRelationship` reads a plaintext count from `his_files` for the flag rule. `anonymizeAuditTrail`, called last by account deletion, re-keys those rows from her email to a `deleted:` hash. |
+| `scripts/encrypt-journal.ts`, `scripts/rotate-master-key.ts` | Run locally, never on Vercel. Rewrite every member's rows, and call `his_files_snapshot()`. |
 
 Everything else runs as the member: `lib/hisfile.ts`, `lib/quota.ts` (via `consume_search()` and `founding_count()`), the reminder, profile, hisfile, wrapped, report and account-delete routes.
 

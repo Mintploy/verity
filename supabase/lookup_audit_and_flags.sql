@@ -76,23 +76,7 @@ create index if not exists idx_account_flags_active
 alter table account_flags enable row level security;
 revoke all on account_flags from anon, authenticated;
 
--- Retention. The trigger above blocks DELETE for every role, the service role
--- included, so nothing can purge this table today. To apply a retention
--- period, replace the trigger function with one that lets a DELETE through
--- only for rows older than the period and still refuses every UPDATE:
---
---   create or replace function lookup_audit_immutable() returns trigger
---   language plpgsql set search_path = '' as $$
---   begin
---     if tg_op = 'DELETE' and old.created_at < now() - interval '24 months' then
---       return old;
---     end if;
---     raise exception 'lookup_audit is append-only';
---   end $$;
---
--- then schedule `delete from lookup_audit where created_at < now() - interval
--- '24 months'` (pg_cron, or the existing Vercel cron with the service role).
--- The interval is a placeholder until the retention period is decided.
+-- Retention and the narrowed trigger live in lookup_audit_retention_and_snapshot.sql.
 
 -- Rollback:
 --   drop trigger if exists lookup_audit_no_update on lookup_audit;

@@ -43,8 +43,32 @@ function hashSecret(): Buffer {
  * Keyed hash of a lookup input. Namespaced by kind so a phone and a record id
  * that happen to share digits never collide.
  */
-export function hashLookupKey(kind: InputKind | 'subject', value: string): string {
+export function hashLookupKey(kind: InputKind | 'subject' | 'user', value: string): string {
   return createHmac('sha256', hashSecret()).update(`${kind}:${value}`).digest('hex');
+}
+
+/**
+ * What a deleted account is called in the audit log and flags. The readable
+ * email is replaced by a keyed hash of it, so the rows stay linkable to the
+ * same address (with the key) and readable to nobody without it.
+ */
+export function deletedUserId(email: string): string {
+  return `deleted:${hashLookupKey('user', email.trim().toLowerCase())}`;
+}
+
+/**
+ * Account deletion calls this last. lookup_audit's trigger permits exactly
+ * this transition (plaintext user_id to a `deleted:` id, nothing else changed)
+ * and no other update.
+ */
+export async function anonymizeAuditTrail(email: string): Promise<{ audit: number; flags: number }> {
+  const sb = getServiceSupabase();
+  const to = deletedUserId(email);
+  const a = await sb.from('lookup_audit').update({ user_id: to }).eq('user_id', email).select('id');
+  if (a.error) throw a.error;
+  const f = await sb.from('account_flags').update({ user_id: to }).eq('user_id', email).select('id');
+  if (f.error) throw f.error;
+  return { audit: a.data?.length ?? 0, flags: f.data?.length ?? 0 };
 }
 
 export function normalizePhoneDigits(phone: string): string {
@@ -123,13 +147,18 @@ export async function recordLookup(row: {
   if (error) throw new Error(`lookup_audit insert failed: ${error.message}`);
 }
 
-/** The oldest open blocking flag, if any. Soft flags never block. */
+/**
+ * The oldest open blocking flag, if any. Soft flags never block.
+ *
+ * Also checks the anonymized id: a flagged account that deletes itself and
+ * signs up again with the same address is still flagged.
+ */
 export async function activeFlag(userId: string): Promise<{ reason: FlagReason; created_at: string } | null> {
   const sb = getServiceSupabase();
   const { data, error } = await sb
     .from('account_flags')
     .select('reason, created_at')
-    .eq('user_id', userId)
+    .in('user_id', [userId, deletedUserId(userId)])
     .eq('blocking', true)
     .is('cleared_at', null)
     .order('created_at', { ascending: true })
