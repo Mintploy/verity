@@ -7,9 +7,25 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? 'sk_placeholde
 
 export const STRIPE_PRICE_FOUNDING = process.env.STRIPE_PRICE_FOUNDING!;
 export const STRIPE_PRICE_ANNUAL = process.env.STRIPE_PRICE_ANNUAL!;
+export const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY!;
 export const STRIPE_PRICE_SINGLE = process.env.STRIPE_PRICE_SINGLE!;
 
-export type Plan = 'founding' | 'annual' | 'single';
+/**
+ * free      $0          journal only, no lookups
+ * single    $19 once    1 lookup, never expires
+ * monthly   $39/month   10 lookups a month, no rollover
+ * annual    $349/year   10 lookups a month
+ * founding  $199/year   10 lookups a month, first 100 only, price locked
+ *                       for as long as the subscription stays active
+ */
+export type Plan = 'free' | 'single' | 'monthly' | 'annual' | 'founding';
+export type PaidPlan = Exclude<Plan, 'free'>;
+export const PAID_PLANS: readonly PaidPlan[] = ['single', 'monthly', 'annual', 'founding'];
+export const SUBSCRIPTION_PLANS: readonly PaidPlan[] = ['monthly', 'annual', 'founding'];
+
+export function isPaidPlan(v: unknown): v is PaidPlan {
+  return typeof v === 'string' && (PAID_PLANS as readonly string[]).includes(v);
+}
 
 export async function createCheckoutSession({
   customerId,
@@ -22,11 +38,12 @@ export async function createCheckoutSession({
   successUrl: string;
   cancelUrl: string;
   email?: string;
-  plan: Plan;
+  plan: PaidPlan;
 }) {
-  const priceMap: Record<Plan, string> = {
+  const priceMap: Record<PaidPlan, string> = {
     founding: STRIPE_PRICE_FOUNDING,
     annual: STRIPE_PRICE_ANNUAL,
+    monthly: STRIPE_PRICE_MONTHLY,
     single: STRIPE_PRICE_SINGLE,
   };
   const isSubscription = plan !== 'single';
@@ -85,6 +102,36 @@ export async function hasVerifiedIdentity(
   return true;
 }
 
+/**
+ * Whether this address has completed Stripe Identity, with or without a
+ * customer. Customer metadata is the fast path when a customer is known;
+ * otherwise the recent verified sessions are matched by the email in their
+ * metadata. The caller caches a true answer on user_profiles.
+ */
+export async function hasVerifiedIdentityForEmail(email: string, customerId?: string | null): Promise<boolean> {
+  if (customerId) {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer.deleted && customer.metadata?.identity_verified === 'true') return true;
+  }
+  const wanted = normalizeEmail(email);
+  const sessions = await stripe.identity.verificationSessions.list({ limit: 100 });
+  return sessions.data.some(
+    (s) => s.status === 'verified' && s.metadata?.email && normalizeEmail(s.metadata.email) === wanted,
+  );
+}
+
+/**
+ * Her Stripe customer, created at first checkout and not before. A free
+ * account never has one.
+ */
+export async function findOrCreateCustomer(email: string, knownId?: string | null): Promise<string> {
+  if (knownId) return knownId;
+  const found = await stripe.customers.list({ email: normalizeEmail(email), limit: 1 });
+  if (found.data[0]) return found.data[0].id;
+  const created = await stripe.customers.create({ email: normalizeEmail(email), metadata: { app: 'verity' } });
+  return created.id;
+}
+
 // Record a completed verification against the customer, if one exists yet.
 // Returns false when there is no customer to write to, not an error: the
 // customer is created later at checkout, and the login fallback covers it.
@@ -129,57 +176,4 @@ export async function createIdentityVerificationSession({
     return_url: returnUrl,
   });
   return session;
-}
-
-/**
- * Steps a founding membership up to the standard rate after its first year.
- *
- * The founding price is a flat recurring $199, so on its own it would renew at
- * $199 forever, which is not the offer: $199 covers her first year and $297
- * applies after. A plain price cannot express that, so the subscription is
- * converted to a schedule with two phases.
- *
- * end_behavior 'release' matters. When the second phase ends the schedule lets
- * go and the subscription carries on renewing at the standard price, rather
- * than cancelling her membership the moment the schedule runs out.
- *
- * Best-effort by design. A failure here must not fail the webhook, because
- * Stripe would retry it and she would receive a second welcome email; the
- * membership is already paid for and valid either way. It logs loudly instead,
- * since a silent miss means someone is billed $199 next year.
- */
-export async function scheduleFoundingStepUp(subscriptionId: string): Promise<boolean> {
-  if (!STRIPE_PRICE_FOUNDING || !STRIPE_PRICE_ANNUAL) {
-    console.error('[stripe] Cannot schedule step-up: founding or annual price env var is unset.');
-    return false;
-  }
-
-  try {
-    const schedule = await stripe.subscriptionSchedules.create({ from_subscription: subscriptionId });
-    const current = schedule.phases[0];
-
-    await stripe.subscriptionSchedules.update(schedule.id, {
-      end_behavior: 'release',
-      phases: [
-        // This API version expresses phase length as `duration`, not the
-        // `iterations` the older docs use.
-        {
-          items: [{ price: STRIPE_PRICE_FOUNDING, quantity: 1 }],
-          start_date: current.start_date,
-          duration: { interval: 'year', interval_count: 1 },
-        },
-        {
-          items: [{ price: STRIPE_PRICE_ANNUAL, quantity: 1 }],
-          duration: { interval: 'year', interval_count: 1 },
-        },
-      ],
-      metadata: { app: 'verity', step_up: 'founding_to_annual' },
-    });
-
-    console.log(`[stripe] Founding step-up scheduled for ${subscriptionId} (schedule ${schedule.id})`);
-    return true;
-  } catch (err: any) {
-    console.error(`[stripe] Founding step-up FAILED for ${subscriptionId}:`, err?.message ?? err);
-    return false;
-  }
 }

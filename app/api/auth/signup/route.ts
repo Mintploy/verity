@@ -6,17 +6,14 @@ import { asEmail, requestMagicLink } from '@/lib/magic';
 const REQUIRED = ['RESEND_API_KEY', 'MAGIC_LINK_SECRET', 'SESSION_SECRET'];
 
 /**
- * Sign-in. Anyone with a profile, paid or not, and anyone without one, gets
- * the same answer: if that address has an account, a link is on its way.
- * The verify route creates a profile for an address that has none, so this
- * is the same path as sign-up; the separate route exists so the two forms
- * can say different things.
+ * Free sign-up: an email and nothing else. The link that comes back creates
+ * her profile when she clicks it. No Stripe customer, no plan; those come
+ * at her first checkout, if she ever has one.
  *
- * No Stripe here. Whether she can run a lookup is decided per request by
- * lib/access.ts, not at the door.
+ * The response never says whether the address already had an account.
  */
 export async function POST(req: NextRequest) {
-  const misconfigured = configErrorResponse(REQUIRED, 'Magic-link sign-in');
+  const misconfigured = configErrorResponse(REQUIRED, 'Sign-up');
   if (misconfigured) return misconfigured;
 
   const body = await req.json().catch(() => ({}));
@@ -26,7 +23,7 @@ export async function POST(req: NextRequest) {
   try {
     await requestMagicLink(email, getClientIp(req));
   } catch (err) {
-    console.error('Magic link error:', err);
+    console.error('Sign-up magic link error:', err);
   }
   return Response.json({ sent: true });
 }

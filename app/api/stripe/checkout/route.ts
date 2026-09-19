@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { normalizeEmail } from '@/lib/auth';
-import { createCheckoutSession, type Plan } from '@/lib/stripe';
+import { readSession, getAccess, rememberOnProfile } from '@/lib/access';
+import { createCheckoutSession, findOrCreateCustomer, isPaidPlan } from '@/lib/stripe';
 import { getFoundingCount, FOUNDING_MEMBER_CAP } from '@/lib/quota';
+import { getServiceSupabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -17,31 +19,52 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: Plan; returnUrl?: string };
-    // Store the customer canonically so sign-in can find her later.
-    const email = rawEmail ? normalizeEmail(rawEmail) : undefined;
+    const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: unknown; returnUrl?: string };
+    // A signed-in member pays as herself; the body's email is only for the
+    // pre-account funnel. Either way it is stored canonically.
+    const session = await readSession(req);
+    const email = session?.email ?? (rawEmail ? normalizeEmail(rawEmail) : undefined);
 
-    if (!plan || !['founding', 'annual', 'single'].includes(plan)) {
+    if (!isPaidPlan(plan)) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 });
     }
+    if (!email) {
+      return Response.json({ error: 'Sign in or enter your email first' }, { status: 400 });
+    }
 
+    // The founding cap is a table of 100 numbered slots. Claiming one takes a
+    // lock, so two checkouts started in the same second cannot both get the
+    // last place. The hold lasts 30 minutes; the webhook confirms it on
+    // payment, and an abandoned checkout gives the place back.
     if (plan === 'founding') {
-      const count = await getFoundingCount();
-      if (count >= FOUNDING_MEMBER_CAP) {
-        return Response.json({ error: 'Founding member slots are full', code: 'founding_full' }, { status: 409 });
+      const { data: slot, error: slotErr } = await getServiceSupabase().rpc('claim_founding_slot', { p_user_id: email });
+      if (slotErr) throw slotErr;
+      if (slot === null || slot === undefined) {
+        return Response.json({ error: 'All founding places are taken', code: 'founding_full' }, { status: 409 });
       }
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
 
-    const session = await createCheckoutSession({
-      email,
+    // The Stripe customer is created here, at first checkout, never at
+    // sign-up. Reused on every later checkout so payment mode (the single
+    // report) has a customer for the webhook to key on.
+    let customerId: string | undefined;
+    if (session) {
+      const access = await getAccess(session.email);
+      customerId = await findOrCreateCustomer(session.email, access.stripeCustomerId);
+      if (!access.stripeCustomerId) await rememberOnProfile(session.email, { stripe_customer_id: customerId });
+    }
+
+    const checkout = await createCheckoutSession({
+      customerId,
+      email: customerId ? undefined : email,
       plan,
       successUrl: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: returnUrl ?? baseUrl,
     });
 
-    return Response.json({ url: session.url, sessionId: session.id });
+    return Response.json({ url: checkout.url, sessionId: checkout.id });
   } catch (err: any) {
     console.error('Stripe checkout error:', err);
     return Response.json({ error: err.message }, { status: 500 });

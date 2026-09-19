@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { requireJournal } from '@/lib/access';
 import { getReportByReportId } from '@/lib/hisfile';
 
 /** The stored report behind a saved man, for when sessionStorage has lost it. */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const session = token ? await verifySessionToken(token).catch(() => null) : null;
-  if (!session) return Response.json({ error: 'Authentication required' }, { status: 401 });
+  const gate = await requireJournal(req);
+  if ('response' in gate) return gate.response;
+  const { session } = gate;
 
   const { id } = await ctx.params;
   try {

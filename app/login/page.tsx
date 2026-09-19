@@ -19,10 +19,10 @@ export default function LoginPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      setError(data.error);
+      setError(data.error ?? 'Something went wrong.');
       setStep('error');
     } else {
       setStep('sent');
@@ -43,7 +43,7 @@ export default function LoginPage() {
                 Welcome back.
               </h1>
               <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', margin: '0 0 32px', fontWeight: 300, lineHeight: 1.6 }}>
-                We'll send a sign-in link to your email. No password needed.
+                If your email has an account, we&rsquo;ll send it a sign-in link. No password needed.
               </p>
               <input
                 type="email" value={email}
@@ -78,7 +78,7 @@ export default function LoginPage() {
               <div style={{ textAlign: 'center', marginTop: 24 }}>
                 <span style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)' }}>
                   New here?{' '}
-                  <Link href="/verify" style={{ color: 'var(--rose)', textDecoration: 'underline' }}>Start verification</Link>
+                  <Link href="/signup" style={{ color: 'var(--rose)', textDecoration: 'underline' }}>Create a free account</Link>
                 </span>
               </div>
             </>
@@ -93,7 +93,7 @@ export default function LoginPage() {
               </div>
               <h2 style={{ fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 400, color: 'var(--dark)', margin: '0 0 12px' }}>Check your inbox.</h2>
               <p style={{ fontFamily: 'var(--sans)', fontSize: 15, color: 'var(--dark-soft)', lineHeight: 1.6, fontWeight: 300, margin: 0 }}>
-                We sent a sign-in link to <strong style={{ color: 'var(--dark)' }}>{email}</strong>.<br />Expires in 15 minutes.
+                If <strong style={{ color: 'var(--dark)' }}>{email}</strong> has an account, a sign-in link is on its way.<br />It expires in 15 minutes. New here? <Link href="/signup" style={{ color: 'var(--rose)' }}>Create a free account</Link>.
               </p>
             </div>
           )}

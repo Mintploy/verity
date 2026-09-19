@@ -707,7 +707,7 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         const plan = d?.profile?.plan;
-        setRemindable(plan !== 'annual' && plan !== 'founding');
+        setRemindable(!['annual', 'founding', 'monthly'].includes(plan));
       })
       .catch(() => setRemindable(false));
   }, []);
@@ -1053,6 +1053,7 @@ async function runLookup(body: Record<string, unknown>): Promise<string> {
     body: JSON.stringify(body),
   });
   const d = await res.json();
+  if (res.status === 402) { window.location.assign(d.redirect ?? '/checkout'); throw new Error('This needs a plan with lookups.'); }
   if (!res.ok) throw new Error(d.error ?? 'Could not build the report');
   sessionStorage.setItem(`report-${d.report.searchId}`, JSON.stringify(d.report));
   if (d.demoMode) sessionStorage.setItem('verity-demo', '1');

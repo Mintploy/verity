@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMagicLinkToken, createSessionToken, SESSION_COOKIE } from '@/lib/auth';
-import { stripe, hasVerifiedIdentity } from '@/lib/stripe';
+import { getServiceSupabase } from '@/lib/supabase';
 
+/**
+ * The magic link lands here. It proves the address; that is all a session is.
+ *
+ * An address with no profile gets one, with no plan: a free account. Where
+ * she lands depends on what she can do: a plan sends her to search, no plan
+ * sends her to her journal. Nothing here asks Stripe.
+ */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
 
@@ -10,33 +17,24 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { email, stripeCustomerId } = await verifyMagicLinkToken(token);
+    const { email } = await verifyMagicLinkToken(token);
 
-    // Confirm subscription is still active
-    const subscriptions = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
-      status: 'active',
-      limit: 1,
-    });
+    // Service role: she has no session yet, and the row must exist before a
+    // member-scoped client can see anything.
+    const sb = getServiceSupabase();
+    const { data: existing, error: readErr } = await sb
+      .from('user_profiles').select('plan').eq('user_id', email).maybeSingle();
+    if (readErr) throw readErr;
 
-    if (subscriptions.data.length === 0) {
-      return NextResponse.redirect(new URL('/checkout?reason=no-subscription', req.url));
+    let plan: string | null = (existing?.plan as string | null) ?? null;
+    if (!existing) {
+      const { error: insErr } = await sb.from('user_profiles').insert({ user_id: email, email });
+      if (insErr && insErr.code !== '23505') throw insErr;
+      plan = null;
     }
 
-    // "Verified women only" is the product promise, enforce it rather than
-    // asserting it. Fails closed: any doubt sends her back through ID check.
-    const identityVerified = await hasVerifiedIdentity(email, stripeCustomerId);
-    if (!identityVerified) {
-      return NextResponse.redirect(new URL('/verify?reason=identity-required', req.url));
-    }
-
-    const sessionToken = await createSessionToken({
-      email,
-      stripeCustomerId,
-      identityVerified,
-    });
-
-    const res = NextResponse.redirect(new URL('/search', req.url));
+    const sessionToken = await createSessionToken({ email });
+    const res = NextResponse.redirect(new URL(plan ? '/search' : '/hisfile', req.url));
     res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -44,9 +42,9 @@ export async function GET(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
       path: '/',
     });
-
     return res;
-  } catch {
+  } catch (err) {
+    console.error('Magic link verify error:', err);
     return NextResponse.redirect(new URL('/login?error=expired', req.url));
   }
 }

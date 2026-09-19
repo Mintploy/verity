@@ -47,8 +47,17 @@ export async function sendMagicLink(email: string, token: string) {
   });
 }
 
-export async function sendWelcomeEmail(email: string, token: string) {
+const PLAN_LINE: Record<string, string> = {
+  founding: 'Founding membership: 10 lookups a month, your price locked for as long as you stay.',
+  annual: 'Annual membership: 10 lookups a month for the year.',
+  monthly: 'Monthly membership: 10 lookups a month, cancel any time.',
+  single: 'One lookup, yours whenever you want to use it.',
+};
+
+export async function sendWelcomeEmail(email: string, token: string, plan: string = 'annual') {
   const link = `${BASE}/auth/verify?token=${token}`;
+  const planLine = PLAN_LINE[plan] ?? PLAN_LINE.annual;
+  const renews = plan === 'single' ? 'No subscription.' : plan === 'monthly' ? 'Renews monthly until you cancel.' : 'Renews yearly until you cancel.';
   await getResend().emails.send({
     from: FROM,
     to: email,
@@ -60,7 +69,8 @@ export async function sendWelcomeEmail(email: string, token: string) {
       'drop in a phone number and get the full picture in seconds.',
       link,
       '',
-      'Membership active for 12 months. Renews only if you choose.',
+      planLine,
+      renews,
       'This link expires in 15 minutes, bookmark the site after signing in.',
     ].join('\n'),
     html: wrap(`
@@ -77,7 +87,8 @@ export async function sendWelcomeEmail(email: string, token: string) {
         Start searching →
       </a>
       <p style="font-family:-apple-system,sans-serif;font-size:13px;color:#C8A6B4;margin:32px 0 0;line-height:1.65">
-        Membership active for 12 months · Renews only if you choose<br>
+        ${planLine}<br>
+        ${renews}<br>
         This link expires in 15 minutes, bookmark the site after signing in.
       </p>
     `),

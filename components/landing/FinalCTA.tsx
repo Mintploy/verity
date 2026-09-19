@@ -33,10 +33,9 @@ export function FinalCTA() {
             fontFamily: 'var(--sans)', fontSize: 17, opacity: 0.85, lineHeight: 1.6,
             margin: '24px auto 0', maxWidth: 540, fontWeight: 300,
           }}>
-            One verified account, 15 safety lookups a month. $199 for your first year as a
-            founding member, one of the first 100 women, then $297 a year. It renews
-            automatically, and you can cancel any time before it does. Just want to check
-            one man? A single report is $19.
+            Your journal is free, always. When you want to know who he is, lookups start at $39
+            a month for 10 a month, or $19 for a single one. The first 100 women can take a
+            founding membership at $199 a year, a price that never goes up while they stay.
           </p>
           <Link href="/verify" style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,

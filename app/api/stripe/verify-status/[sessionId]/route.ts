@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { stripe, recordVerifiedIdentity } from '@/lib/stripe';
+import { readSession, rememberOnProfile } from '@/lib/access';
 
 export async function GET(
   req: NextRequest,
@@ -23,6 +24,12 @@ export async function GET(
       } catch (err) {
         // Never fail her verification because the bookkeeping write failed.
         console.error('Could not record verified identity:', err);
+      }
+      // Signed in as the same address: remember it on her profile so the
+      // lookup gate never has to ask Stripe again.
+      const signedIn = await readSession(req);
+      if (signedIn && signedIn.email === email.trim().toLowerCase()) {
+        await rememberOnProfile(signedIn.email, { identity_verified: true });
       }
     }
 
