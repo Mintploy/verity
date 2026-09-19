@@ -11,6 +11,23 @@ export interface DateEntry {
   date?: string;
   location?: string;
   paid?: string;
+  /**
+   * Before she goes. Logged while the date is still ahead of her, one tap.
+   * `beforeLoggedAt` is stamped on the first save and never moved.
+   */
+  beforeFeeling?: Feeling;
+  beforeNote?: string;
+  beforeLoggedAt?: string;
+  /**
+   * Her answers to the before and after questions, 1 to 5, keyed by item id
+   * from lib/reflection.ts. Optional; a date with none is still a date.
+   */
+  beforeAnswers?: Record<string, number>;
+  afterAnswers?: Record<string, number>;
+  /** Which REFLECTION_ITEMS version the answer ids belong to. */
+  reflectionVersion?: number;
+  /** When the after section was first filled in. */
+  afterLoggedAt?: string;
   /** How she felt afterwards. */
   feeling?: Feeling;
   /**
