@@ -20,10 +20,14 @@ export interface DateEntry {
   beforeNote?: string;
   beforeLoggedAt?: string;
   /**
-   * What she noticed while there, as green and red flags, each stamped when
-   * tapped. A red one is also added to the file's icks for that date.
+   * Flags she tagged at each stage, as flag ids (lib/signals.ts): her own
+   * personal flags and Verity signals. Rows saved before ids existed hold
+   * `{ text, kind, at }` objects in duringFlags; read them through
+   * normalizeFlagIds, which maps them to her personal flags.
    */
-  duringFlags?: DuringFlag[];
+  beforeFlags?: string[];
+  duringFlags?: string[];
+  afterFlags?: string[];
   /**
    * Her answers to the before and after questions, 1 to 5, keyed by item id
    * from lib/reflection.ts. Optional; a date with none is still a date.
@@ -64,12 +68,10 @@ export interface Milestone {
   dateNumber?: number;
 }
 
-export type FlagKind = 'green' | 'red';
-
-export interface DuringFlag {
+/** The shape duringFlags held before flag ids. Kept for reading old rows. */
+export interface LegacyDuringFlag {
   text: string;
-  kind: FlagKind;
-  /** When she tapped it. */
+  kind: 'green' | 'red';
   at: string;
 }
 

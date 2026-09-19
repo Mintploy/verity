@@ -7,9 +7,11 @@ import { ChipListEditor } from '@/components/hisfile/ChipListEditor';
 import { LovesTable } from '@/components/hisfile/LovesTable';
 import { HighlightsCard } from '@/components/hisfile/HighlightsCard';
 import type { HisFile, FileType } from '@/lib/hisfile';
-import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry, type Milestone } from '@/lib/journal';
+import { ickText, type DateEntry, type Feeling, type IckEntry, type Milestone } from '@/lib/journal';
+import { allFlagsOn, flagKind, normalizeDateFlags, parseFlagId, type FlagPhase } from '@/lib/signals';
+import { FlagRows } from '@/components/hisfile/FlagRows';
 import { MILESTONE_SUGGESTIONS, daysBetween, describeGap, describeSince } from '@/lib/milestones';
-import { BEFORE_MOODS, DEFAULT_GREEN_FLAGS, DEFAULT_RED_FLAGS, mergeFlags } from '@/lib/flags';
+import { BEFORE_MOODS } from '@/lib/flags';
 import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionItem } from '@/lib/reflection';
 
 const APPS = ['Hinge', 'Tinder', 'Bumble', 'Raya', 'Coffee Meets Bagel', 'The League', 'Feeld', 'IRL', 'Instagram', 'Other'];
@@ -80,6 +82,8 @@ export default function HisFileDetail() {
   // Her own green and red flags, from Settings. They lead the During chips.
   const [myFlags, setMyFlags] = useState<{ green: string[]; red: string[] }>({ green: [], red: [] });
   const [quickSaving, setQuickSaving] = useState<number | null>(null);
+  // How often she has tapped each flag across every file. Orders the chip rows.
+  const [flagUsage, setFlagUsage] = useState<Record<string, number>>({});
   // Which of Before / During / After is open on each date card. Unset means
   // "whatever the date's timing suggests", see phaseDefaults.
   const [openPhases, setOpenPhases] = useState<Record<string, boolean>>({});
@@ -102,8 +106,15 @@ export default function HisFileDetail() {
         if (r.status === 404) { router.push('/hisfile'); return null; }
         return r.json();
       })
-      .then(d => { if (d?.file) setFile(d.file); })
+      .then(d => { if (d?.file) setFile(withFlagIds(d.file)); })
       .finally(() => setLoading(false));
+    fetch('/api/hisfile').then(r => r.json()).then(d => {
+      const counts: Record<string, number> = {};
+      for (const f of (d?.files ?? []) as HisFile[]) {
+        for (const de of f.dates ?? []) for (const fid of allFlagsOn(de)) counts[fid] = (counts[fid] ?? 0) + 1;
+      }
+      setFlagUsage(counts);
+    }).catch(() => {});
   }, [id, isNew, router]);
 
   const save = async () => {
@@ -114,7 +125,7 @@ export default function HisFileDetail() {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(file) });
       const data = await res.json();
       if (data.file) {
-        setFile(data.file);
+        setFile(withFlagIds(data.file));
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         if (isNew) router.replace(`/hisfile/${data.file.id}`);
@@ -198,7 +209,7 @@ export default function HisFileDetail() {
         body: JSON.stringify(next),
       });
       const data = await res.json();
-      if (data.file) setFile(data.file);
+      if (data.file) setFile(withFlagIds(data.file));
     } catch {
       // Keep her entry on screen. It saves with the rest of the form.
     } finally {
@@ -347,7 +358,7 @@ export default function HisFileDetail() {
                   Add your birthday to see compatibility.
                 </div>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 3, opacity: 0.75 }}>
-                  We'll calculate how your star sign lines up with {file.nickname || 'this person'}.
+                  We&rsquo;ll calculate how your star sign lines up with {file.nickname || 'this person'}.
                 </div>
               </div>
               <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--primary-deep)', fontWeight: 500, flexShrink: 0 }}>
@@ -361,7 +372,7 @@ export default function HisFileDetail() {
             {compatBar(file.compatibility_score)}
             {file.compatibility_summary && (
               <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--dark)', lineHeight: 1.6, margin: '12px 0 0' }}>
-                "{file.compatibility_summary}"
+                &ldquo;{file.compatibility_summary}&rdquo;
               </p>
             )}
           </div>
@@ -545,21 +556,25 @@ export default function HisFileDetail() {
                   quickLog(d.number, { beforeAnswers: { ...(d.beforeAnswers ?? {}), [id]: value } }, 'before');
                 const setAfter = (id: string, value: number) =>
                   updateAfter(d.number, { afterAnswers: { ...(d.afterAnswers ?? {}), [id]: value } });
-                // A red flag is also an ick on this date, so the Icks section
-                // and Wrapped see it. Un-tapping removes only the ick it added.
-                const toggleFlag = (text: string, kind: FlagKind) => {
-                  const cur = d.duringFlags ?? [];
-                  const has = cur.some(f => f.text === text && f.kind === kind);
-                  const nextFlags: DuringFlag[] = has
-                    ? cur.filter(f => !(f.text === text && f.kind === kind))
-                    : [...cur, { text, kind, at: new Date().toISOString() }];
+                // One tap per flag, per stage. Before and During save on the
+                // tap; After saves with the form. One of her own red flags,
+                // tapped during, is also an ick on this date so the Icks
+                // section and Wrapped see it; un-tapping removes only that ick.
+                const toggleFlagIn = (phase: FlagPhase, fid: string) => {
+                  const field = phase === 'before' ? 'beforeFlags' : phase === 'during' ? 'duringFlags' : 'afterFlags';
+                  const cur = d[field] ?? [];
+                  const has = cur.includes(fid);
+                  const nextFlags = has ? cur.filter(x => x !== fid) : [...cur, fid];
+                  if (phase === 'after') { updateAfter(d.number, { afterFlags: nextFlags }); return; }
                   let icks = file.icks ?? [];
-                  if (kind === 'red') {
+                  const parsed = parseFlagId(fid);
+                  if (phase === 'during' && parsed?.source === 'personal' && parsed.kind === 'red') {
+                    const text = parsed.text;
                     const mine = (i: string | IckEntry) => typeof i !== 'string' && i.text === text && i.dateNumber === d.number;
                     if (has) icks = icks.filter(i => !mine(i));
                     else if (!icks.some(i => ickText(i) === text)) icks = [...icks, { text, dateNumber: d.number }];
                   }
-                  quickLog(d.number, { duringFlags: nextFlags }, 'during', { icks });
+                  quickLog(d.number, { [field]: nextFlags }, phase, phase === 'during' ? { icks } : {});
                 };
                 return (
                   <>
@@ -569,7 +584,7 @@ export default function HisFileDetail() {
                       title="Before"
                       hint={passed ? undefined : 'Saves the moment you tap'}
                       status={quickSaving === d.number ? 'Saving...' : d.beforeLoggedAt ? `Logged ${stamp(d.beforeLoggedAt)}` : undefined}
-                      summary={[moodLabels(d.beforeMoods), answered(d.beforeAnswers, beforeItems) ? `${answered(d.beforeAnswers, beforeItems)} of ${beforeItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
+                      summary={[moodLabels(d.beforeMoods), flagSummary(d.beforeFlags), answered(d.beforeAnswers, beforeItems) ? `${answered(d.beforeAnswers, beforeItems)} of ${beforeItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
                       open={isOpen('before')}
                       onToggle={() => togglePhase(d.number, 'before', defaults.before)}
                       tone="soft"
@@ -587,6 +602,13 @@ export default function HisFileDetail() {
                         onBlur={e => { if (e.target.value.trim()) quickLog(d.number, { beforeNote: e.target.value }, 'before'); }}
                         placeholder={(d.beforeMoods ?? []).includes('have-questions') ? 'What do you want to ask him?' : 'Questions to ask him, or anything on your mind...'}
                         style={{ ...inputStyle, background: 'var(--pearl)' }}
+                      />
+                      <FlagRows
+                        chosen={d.beforeFlags ?? []}
+                        onToggle={fid => toggleFlagIn('before', fid)}
+                        personal={myFlags}
+                        usage={flagUsage}
+                        reportId={file.report_id}
                       />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                         {beforeItems.map(it => (
@@ -616,25 +638,13 @@ export default function HisFileDetail() {
                           You wanted to ask: {d.beforeNote.trim()}
                         </div>
                       )}
-                      <FlagChips
-                        label="Green"
-                        kind="green"
-                        items={mergeFlags(myFlags.green, DEFAULT_GREEN_FLAGS)}
+                      <FlagRows
                         chosen={d.duringFlags ?? []}
-                        onToggle={t => toggleFlag(t, 'green')}
+                        onToggle={fid => toggleFlagIn('during', fid)}
+                        personal={myFlags}
+                        usage={flagUsage}
+                        reportId={file.report_id}
                       />
-                      <FlagChips
-                        label="Red"
-                        kind="red"
-                        items={mergeFlags(myFlags.red, DEFAULT_RED_FLAGS)}
-                        chosen={d.duringFlags ?? []}
-                        onToggle={t => toggleFlag(t, 'red')}
-                      />
-                      {myFlags.green.length + myFlags.red.length === 0 && (
-                        <Link href="/settings" style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--primary-deep)', textDecoration: 'underline' }}>
-                          Add your own flags in Settings, and they show up here.
-                        </Link>
-                      )}
                       {d.duringFeeling && (
                         <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)' }}>
                           Felt: {feelingLabel(d.duringFeeling)}
@@ -653,7 +663,7 @@ export default function HisFileDetail() {
                     <DatePhase
                       title="After"
                       status={d.afterLoggedAt ? `Started ${stamp(d.afterLoggedAt)}` : undefined}
-                      summary={[feelingLabel(d.feeling), d.paid ? `${d.paid}` : null, answered(d.afterAnswers, afterItems) ? `${answered(d.afterAnswers, afterItems)} of ${afterItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
+                      summary={[feelingLabel(d.feeling), flagSummary(d.afterFlags), d.paid ? `${d.paid}` : null, answered(d.afterAnswers, afterItems) ? `${answered(d.afterAnswers, afterItems)} of ${afterItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
                       open={isOpen('after')}
                       onToggle={() => togglePhase(d.number, 'after', defaults.after)}
                       tone="plain"
@@ -661,6 +671,13 @@ export default function HisFileDetail() {
                       <Field label="How did you feel afterwards?">
                         <FeelingRow value={d.feeling} onPick={v => updateAfter(d.number, { feeling: v })} />
                       </Field>
+                      <FlagRows
+                        chosen={d.afterFlags ?? []}
+                        onToggle={fid => toggleFlagIn('after', fid)}
+                        personal={myFlags}
+                        usage={flagUsage}
+                        reportId={file.report_id}
+                      />
                       <Field label="Who paid?">
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {(['split', 'he paid', 'i paid', 'neither'] as const).map(opt => (
@@ -922,12 +939,16 @@ const stamp = (iso: string) =>
 const moodLabels = (values?: string[]) =>
   (values ?? []).map(v => BEFORE_MOODS.find(m => m.value === v)?.label ?? v).join(', ') || undefined;
 
-const flagSummary = (flags?: DuringFlag[]) => {
+const flagSummary = (flags?: string[]) => {
   if (!flags?.length) return undefined;
-  const g = flags.filter(f => f.kind === 'green').length;
-  const r = flags.filter(f => f.kind === 'red').length;
-  return [g ? `${g} green` : null, r ? `${r} red` : null].filter(Boolean).join(' · ');
+  const kinds = flags.map(flagKind);
+  const g = kinds.filter(k => k === 'green').length;
+  const r = kinds.filter(k => k === 'red' || k === 'safety').length;
+  return [g ? `${g} green` : null, r ? `${r} red` : null].filter(Boolean).join(' · ') || undefined;
 };
+
+/** Her file with every date's flag fields as ids, whatever shape they were stored in. */
+const withFlagIds = (f: HisFile): HisFile => (f.dates ? { ...f, dates: f.dates.map(normalizeDateFlags) } : f);
 
 /** Before she goes: several can be true at once, so these toggle. */
 function MoodRow({ value, onToggle }: { value: string[]; onToggle: (v: string) => void }) {
@@ -938,33 +959,6 @@ function MoodRow({ value, onToggle }: { value: string[]; onToggle: (v: string) =
           {m.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-/** Green or red flag chips for During. Hers first, then defaults. Save on the tap. */
-function FlagChips({ label, kind, items, chosen, onToggle }: {
-  label: string;
-  kind: FlagKind;
-  items: string[];
-  chosen: DuringFlag[];
-  onToggle: (text: string) => void;
-}) {
-  const has = (t: string) => chosen.some(f => f.kind === kind && f.text === t);
-  const on = kind === 'green'
-    ? { border: '1.5px solid var(--sage-deep)', background: 'var(--sage-pale)', color: 'var(--sage-deep)' }
-    : { border: '1.5px solid var(--deeprose-deep)', background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)' };
-  const off = { border: '1.5px solid var(--primary-pale)', background: 'var(--pearl)', color: 'var(--dark-soft)' };
-  return (
-    <div>
-      <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: kind === 'green' ? 'var(--sage-deep)' : 'var(--deeprose-deep)', letterSpacing: 0.2, textTransform: 'uppercase', marginBottom: 8 }}>{label}</div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {items.map(t => (
-          <button key={t} onClick={() => onToggle(t)} style={{ ...(has(t) ? on : off), padding: '10px 16px', borderRadius: 'var(--r-pill)', fontFamily: 'var(--sans)', fontSize: 13.5, cursor: 'pointer' }}>
-            {has(t) ? '✓ ' : ''}{t}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import type { HisFile } from '@/lib/hisfile';
 import { ickText, lovesText, type DateEntry, type Feeling } from '@/lib/journal';
+import { UNSAFE_FLAG, allFlagsOn, flagKind, flagLabel } from '@/lib/signals';
 
 /**
  * What she reads in fifteen seconds before walking in.
@@ -53,6 +54,13 @@ export function HighlightsCard({ file, focus = false }: { file: HisFile; focus?:
   const icks = [...(file.icks ?? [])].reverse().slice(0, 2).map(ickText);
   const score = file.report_id && file.safety_score ? SCORE[file.safety_score] : null;
 
+  // What she has tagged on him, most recent date first, each flag once.
+  const tagged: string[] = [];
+  for (const d of [...dates].reverse()) for (const id of allFlagsOn(d)) if (!tagged.includes(id)) tagged.push(id);
+  const unsafe = tagged.includes(UNSAFE_FLAG);
+  const redFlags = tagged.filter(id => flagKind(id) === 'red').slice(0, 3).map(flagLabel);
+  const greenFlags = tagged.filter(id => flagKind(id) === 'green').slice(0, 3).map(flagLabel);
+
   const line: React.CSSProperties = { fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark)', lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
   const eyebrow: React.CSSProperties = { fontFamily: 'var(--sans)', fontSize: 10.5, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--gold-deep)', marginBottom: 4 };
 
@@ -78,7 +86,7 @@ export function HighlightsCard({ file, focus = false }: { file: HisFile; focus?:
             ].filter(Boolean).join(' · ')}
           </div>
         </div>
-        {/* 6. The badge, and nothing else from the report */}
+        {/* 7. The badge, and nothing else from the report */}
         {score && (
           <span style={{ flexShrink: 0, padding: '5px 11px', borderRadius: 'var(--r-pill)', background: score.bg, color: score.fg, fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
             {score.label}
@@ -111,7 +119,17 @@ export function HighlightsCard({ file, focus = false }: { file: HisFile; focus?:
         </div>
       )}
 
-      {/* 5. Two latest icks */}
+      {/* 5. Flags she tagged on him, her own and Verity's, her taps either way */}
+      {(redFlags.length > 0 || greenFlags.length > 0 || unsafe) && (
+        <div>
+          <div style={eyebrow}>Flags</div>
+          {unsafe && <div style={{ ...line, color: 'var(--deeprose-deep)', fontWeight: 500 }}>You logged feeling unsafe with him.</div>}
+          {redFlags.length > 0 && <div style={{ ...line, color: 'var(--deeprose-deep)' }}>{redFlags.join(' · ')}</div>}
+          {greenFlags.length > 0 && <div style={{ ...line, color: 'var(--sage-deep)' }}>{greenFlags.join(' · ')}</div>}
+        </div>
+      )}
+
+      {/* 6. Two latest icks */}
       {icks.length > 0 && (
         <div>
           <div style={{ ...eyebrow, color: 'var(--deeprose-deep)' }}>Latest icks</div>
@@ -119,7 +137,7 @@ export function HighlightsCard({ file, focus = false }: { file: HisFile; focus?:
         </div>
       )}
 
-      {forget.length + loves.length + icks.length === 0 && !last?.feeling && (
+      {forget.length + loves.length + icks.length + redFlags.length + greenFlags.length === 0 && !last?.feeling && !unsafe && (
         <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', fontWeight: 300, lineHeight: 1.5 }}>
           Nothing here yet. Add what he loves and what not to forget below, and this card fills itself in.
         </div>
