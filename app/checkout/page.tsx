@@ -7,15 +7,11 @@ import type { PaidPlan } from '@/lib/stripe';
 
 /**
  * Pricing. The journal is free for everyone and says so first; lookups are
- * what a plan buys. Monthly is the default. Founding shows how many of the
- * 100 places remain and disappears when they are gone.
+ * what a plan buys. Monthly is the default. Founding is shown while places
+ * remain and never says how many: that number is confidential.
+ *
+ * Order for a new member: free account, ID check, then payment.
  */
-
-function getEmailFromCookie(): string | undefined {
-  if (typeof document === 'undefined') return undefined;
-  const match = document.cookie.match(/verity-pending-email=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : undefined;
-}
 
 const CHECK_SVG = (
   <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
@@ -34,36 +30,38 @@ function CheckItem({ text }: { text: string }) {
   );
 }
 
-const LOOKUP_FEATURES = [
-  'Full background report on any man',
-  'Phone intelligence on any number',
-  'Compare men side by side',
-  'Every search stays confidential',
-];
+const JOURNAL_LINE = 'Unlimited dating journal, His File on every match, Verity Wrapped, your year in review';
+const RESET_LINE = "Lookup credits reset monthly and don't carry over";
 
 const PLAN_COPY: Record<PaidPlan, { title: string; price: string; per: string; sub: string; features: string[]; accent: string; badge?: string }> = {
   monthly: {
     title: 'Monthly', price: '$39', per: '/month',
-    sub: '10 lookups a month · cancel any time',
-    features: ['10 lookups every month', ...LOOKUP_FEATURES],
+    sub: 'Billed monthly. Cancel any time.',
+    features: ['10 safety lookups/month', JOURNAL_LINE, RESET_LINE],
     accent: 'var(--primary-mist)', badge: 'Most popular',
   },
   annual: {
     title: 'Annual', price: '$349', per: '/year',
-    sub: '10 lookups a month · two months free',
-    features: ['10 lookups every month, all year', ...LOOKUP_FEATURES],
+    sub: 'Billed annually. Save 25% vs monthly.',
+    features: ['10 safety lookups/month', `Access to ${JOURNAL_LINE.charAt(0).toLowerCase()}${JOURNAL_LINE.slice(1)}`, RESET_LINE],
     accent: 'var(--blush-pale)',
   },
   founding: {
     title: 'Founding', price: '$199', per: '/year',
-    sub: '', // filled in with places remaining
-    features: ['10 lookups every month', 'Your price never goes up while you stay', 'One of the first 100 women on Verity', ...LOOKUP_FEATURES],
+    sub: 'Reserved for our first 100 founding members.',
+    features: [
+      '$199/year guaranteed for every year you stay subscribed',
+      'Save 43% on our regular price',
+      '10 safety lookups every month',
+      JOURNAL_LINE,
+      RESET_LINE,
+    ],
     accent: 'var(--honey-pale, var(--blush-pale))', badge: 'First 100 only',
   },
   single: {
-    title: 'Single lookup', price: '$19', per: ' once',
-    sub: '1 lookup · never expires · no subscription',
-    features: ['One complete background report', 'Use it whenever you want', 'Every search stays confidential'],
+    title: 'Single lookup', price: '$19', per: ' one-time',
+    sub: 'No subscription.',
+    features: ['1 safety lookup, never expires', JOURNAL_LINE],
     accent: 'var(--sage-pale)',
   },
 };
@@ -103,25 +101,22 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [foundingAvailable, setFoundingAvailable] = useState(false);
-  const [slotsLeft, setSlotsLeft] = useState(0);
   const [email, setEmail] = useState<string | undefined>(undefined);
   const [signedIn, setSignedIn] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [verified, setVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Signed in: she pays as herself. Not signed in: the pre-account funnel
-    // may have left her email in a cookie. Neither: pricing still shows; the
-    // button sends her to a free account first.
+    // Signed in: she pays as herself. Signed out: pricing still shows, and
+    // the button sends her to a free account first.
     fetch('/api/auth/me').then(r => r.json()).then(me => {
-      if (me?.authenticated && me.email) { setEmail(me.email); setSignedIn(true); setCurrentPlan(me.plan ?? null); return; }
-      setEmail(getEmailFromCookie());
-    }).catch(() => setEmail(getEmailFromCookie()));
+      if (me?.authenticated && me.email) { setEmail(me.email); setSignedIn(true); setCurrentPlan(me.plan ?? null); setVerified(me.identityVerified === true); }
+    }).catch(() => {});
 
     fetch('/api/stripe/checkout')
       .then(r => r.json())
       .then(d => {
         setFoundingAvailable(d.foundingAvailable ?? false);
-        setSlotsLeft(d.slotsLeft ?? 0);
       })
       .catch(() => {})
       .finally(() => setReady(true));
@@ -131,6 +126,8 @@ export default function CheckoutPage() {
 
   const startCheckout = async () => {
     if (!email) { window.location.href = '/signup'; return; }
+    // Women only. The ID check comes before any payment.
+    if (signedIn && verified === false) { window.location.href = '/verify'; return; }
     setLoading(true);
     setError(null);
     try {
@@ -141,9 +138,9 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === 'verify' || data.code === 'signup') { window.location.href = data.redirect ?? '/signup'; return; }
         if (data.code === 'founding_full') {
           setFoundingAvailable(false);
-          setSlotsLeft(0);
           setSelectedPlan('monthly');
           throw new Error('The last founding place was just taken. Monthly is selected instead.');
         }
@@ -157,7 +154,11 @@ export default function CheckoutPage() {
   };
 
   const c = PLAN_COPY[selectedPlan];
-  const cta = email ? `Continue with ${c.title}, ${c.price}${c.per.trim()} →` : 'Create a free account first →';
+  const cta = !email
+    ? 'Create a free account first →'
+    : signedIn && verified === false
+      ? "Verify it's you, then continue →"
+      : `Continue with ${c.title}, ${c.price}${c.per.trim()} →`;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
@@ -200,7 +201,6 @@ export default function CheckoutPage() {
                 plan="founding"
                 selected={selectedPlan === 'founding'}
                 onSelect={() => setSelectedPlan('founding')}
-                sub={`10 lookups a month · ${slotsLeft} of 100 places left · price locked while you stay`}
                 current={currentPlan === 'founding'}
               />
             )}

@@ -49,7 +49,7 @@ const faqs = [
     items: [
       {
         q: 'What does membership include?',
-        a: "The journal is free for everyone: His Files, dates, flags and patterns, with no card. Lookups come with a plan: $39 a month or $349 a year for 10 lookups a month, or $19 for a single lookup that never expires. The first 100 members can take a founding membership at $199 a year for 10 lookups a month, with that price locked for as long as the membership stays active. Every plan includes phone intelligence on any number, Compare, PDF export and 30-day re-run reminders.",
+        a: "Free: unlimited dating journal, His File on every match, Verity Wrapped, your year in review. No card. Monthly: $39/month, 10 safety lookups/month. Annual: $349/year billed annually, save 25% vs monthly, 10 safety lookups/month. Founding: reserved for our first 100 founding members, $199/year guaranteed for every year you stay subscribed, save 43% on our regular price, 10 safety lookups every month. Single: $19 one-time, 1 safety lookup that never expires. On every plan, lookup credits reset monthly and don't carry over.",
       },
       {
         q: 'Can I cancel?',

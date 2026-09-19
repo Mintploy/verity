@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
 import type { HisFile, FileType } from '@/lib/hisfile';
-import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry } from '@/lib/journal';
+import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry, type Milestone } from '@/lib/journal';
+import { MILESTONE_SUGGESTIONS, daysBetween, describeGap, describeSince } from '@/lib/milestones';
 import { BEFORE_MOODS, DEFAULT_GREEN_FLAGS, DEFAULT_RED_FLAGS, mergeFlags } from '@/lib/flags';
 import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionItem } from '@/lib/reflection';
 
@@ -752,6 +753,19 @@ export default function HisFileDetail() {
         </Section>
         )}
 
+        {/* Milestones: the dates that matter, in her words. Inside Verity
+            only; nothing here touches her real calendar. */}
+        {!isSafety && (
+        <Section eyebrow="06" title="Milestones">
+          <MilestonesEditor
+            milestones={file.milestones ?? []}
+            dates={dates}
+            firstDateDate={dates.find(d => d.number === 1)?.date}
+            onChange={ms => setFile(f => ({ ...f, milestones: ms }))}
+          />
+        </Section>
+        )}
+
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -999,5 +1013,114 @@ function AnswerSlider({ item, value, onChange, onCommit }: {
         <span>5 · {item.high}</span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Add, list and remove milestones. Suggestions are shortcuts into the label
+ * box, not a fixed list. Timeline is oldest first, with how long ago each was
+ * and the gap from the one before.
+ */
+function MilestonesEditor({ milestones, dates, firstDateDate, onChange }: {
+  milestones: Milestone[];
+  dates: DateEntry[];
+  firstDateDate?: string;
+  onChange: (next: Milestone[]) => void;
+}) {
+  const [label, setLabel] = useState('');
+  const [date, setDate] = useState('');
+  const [note, setNote] = useState('');
+  const [dateNumber, setDateNumber] = useState<number | ''>('');
+
+  const sorted = [...milestones].sort((a, b) => a.date.localeCompare(b.date));
+  const hasFirstDate = milestones.some(m => m.label.trim().toLowerCase() === 'first date');
+  const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+  const add = () => {
+    const l = label.trim().replace(/\s+/g, ' ');
+    if (!l || !date) return;
+    const m: Milestone = { id: newId(), label: l, date, ...(note.trim() ? { note: note.trim() } : {}), ...(dateNumber !== '' ? { dateNumber: Number(dateNumber) } : {}) };
+    onChange([...milestones, m]);
+    setLabel(''); setDate(''); setNote(''); setDateNumber('');
+  };
+  const remove = (id: string) => onChange(milestones.filter(m => m.id !== id));
+  const addFirstDate = () => {
+    if (!firstDateDate) return;
+    onChange([...milestones, { id: newId(), label: 'First date', date: firstDateDate, dateNumber: 1 }]);
+  };
+
+  return (
+    <>
+      {firstDateDate && !hasFirstDate && (
+        <div style={{ padding: '12px 15px', borderRadius: 'var(--r-md)', background: 'var(--primary-mist)', border: '1px solid var(--primary-pale)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--serif)', fontSize: 14.5, color: 'var(--dark)' }}>
+            Your first date was {new Date(`${firstDateDate}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. Mark it?
+          </span>
+          <button onClick={addFirstDate} style={{ padding: '8px 14px', borderRadius: 'var(--r-pill)', border: '1.5px solid var(--primary)', background: 'transparent', color: 'var(--primary)', fontFamily: 'var(--sans)', fontSize: 12.5, cursor: 'pointer' }}>Add “First date”</button>
+        </div>
+      )}
+
+      {sorted.length > 0 ? (
+        <div style={{ position: 'relative', paddingLeft: 22 }}>
+          <div style={{ position: 'absolute', left: 6, top: 6, bottom: 6, width: 2, background: 'var(--gold-pale)' }} />
+          {sorted.map((m, i) => {
+            const prev = sorted[i - 1];
+            return (
+              <div key={m.id} style={{ position: 'relative', paddingBottom: i === sorted.length - 1 ? 0 : 18 }}>
+                <div style={{ position: 'absolute', left: -20, top: 5, width: 10, height: 10, borderRadius: '50%', background: 'var(--primary)', border: '2px solid var(--pearl)' }} />
+                {prev && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', marginBottom: 6 }}>{describeGap(daysBetween(prev.date, m.date))} later</div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                  <div>
+                    <span style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)' }}>{m.label}</span>
+                    {m.dateNumber ? <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', marginLeft: 8 }}>{ordinal(m.dateNumber)} date</span> : null}
+                  </div>
+                  <button onClick={() => remove(m.id)} aria-label={`Remove ${m.label}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mauve-deep)', fontSize: 14 }}>×</button>
+                </div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 2 }}>
+                  {new Date(`${m.date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · {describeSince(m.date)}
+                </div>
+                {m.note && <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--dark-soft)', marginTop: 4, lineHeight: 1.45 }}>{m.note}</div>}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p style={{ margin: 0, fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', fontWeight: 300 }}>
+          Nothing marked yet. The first kiss, the first time he cooked, the day you said it was exclusive: whatever mattered.
+        </p>
+      )}
+
+      <div style={{ padding: '14px 16px', borderRadius: 'var(--r-md)', background: 'var(--ivory)', border: '1px solid var(--gold-pale)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {MILESTONE_SUGGESTIONS.map(sg => (
+            <button key={sg} onClick={() => setLabel(sg)} style={{ padding: '5px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: label === sg ? 'var(--primary-mist)' : 'var(--pearl)', color: label === sg ? 'var(--primary-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer' }}>{sg}</button>
+          ))}
+        </div>
+        <TwoCol>
+          <Field label="What happened">
+            <input value={label} onChange={e => setLabel(e.target.value)} placeholder="In your words..." maxLength={80} style={inputStyle} />
+          </Field>
+          <Field label="When">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+          </Field>
+        </TwoCol>
+        <TwoCol>
+          <Field label="Note (optional)">
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Anything you want to remember" maxLength={280} style={inputStyle} />
+          </Field>
+          <Field label="Which date? (optional)">
+            <select value={dateNumber} onChange={e => setDateNumber(e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle}>
+              <option value="">Not tied to a date</option>
+              {dates.map(d => <option key={d.number} value={d.number}>{ordinal(d.number)} date</option>)}
+            </select>
+          </Field>
+        </TwoCol>
+        <button onClick={add} disabled={!label.trim() || !date} style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: label.trim() && date ? 'var(--primary)' : 'var(--mauve)', color: 'var(--ivory)', fontFamily: 'var(--sans)', fontSize: 13, cursor: label.trim() && date ? 'pointer' : 'not-allowed' }}>
+          Add milestone
+        </button>
+      </div>
+    </>
   );
 }

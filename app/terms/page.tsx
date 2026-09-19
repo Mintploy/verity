@@ -40,7 +40,7 @@ export default function TermsPage() {
             },
             {
               title: '6. Membership and payment',
-              body: 'A free account includes the journal and costs nothing. Lookups are sold as a monthly membership ($39 per month), an annual membership ($349 per year), a founding membership ($199 per year, limited to the first 100 members, at a price that does not increase for as long as the membership remains active), or a single lookup ($19, one-time). Memberships renew automatically at the end of each billing period unless you cancel. You may cancel at any time; cancellation takes effect at the end of the current billing period. All payments are final and non-refundable except as required by law.',
+              body: 'A free account includes the unlimited dating journal, His File, and Verity Wrapped, and costs nothing. Safety lookups are sold as a monthly membership ($39 per month, 10 lookups per month), an annual membership ($349 per year billed annually, 10 lookups per month), a founding membership (reserved for the first 100 founding members, $199 per year guaranteed for every year the subscription stays active, 10 lookups per month), or a single lookup ($19 one-time, never expires). Lookup credits reset monthly and do not carry over. Memberships renew automatically at the end of each billing period unless you cancel. You may cancel at any time; cancellation takes effect at the end of the current billing period. All payments are final and non-refundable except as required by law.',
             },
             {
               title: '7. Privacy',

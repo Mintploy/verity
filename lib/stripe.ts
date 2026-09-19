@@ -114,10 +114,12 @@ export async function hasVerifiedIdentityForEmail(email: string, customerId?: st
     if (!customer.deleted && customer.metadata?.identity_verified === 'true') return true;
   }
   const wanted = normalizeEmail(email);
-  const sessions = await stripe.identity.verificationSessions.list({ limit: 100 });
-  return sessions.data.some(
-    (s) => s.status === 'verified' && s.metadata?.email && normalizeEmail(s.metadata.email) === wanted,
-  );
+  const sessions = await stripe.identity.verificationSessions.list({ limit: 100, expand: ['data.verified_outputs'] });
+  return sessions.data.some((s) => {
+    if (s.status !== 'verified' || !s.metadata?.email || normalizeEmail(s.metadata.email) !== wanted) return false;
+    const sex = (s.verified_outputs as ({ sex?: string | null } | null))?.sex ?? null;
+    return sex !== 'male';
+  });
 }
 
 /**

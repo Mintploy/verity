@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ickText, type DateEntry, type IckEntry } from './journal';
+import { ickText, type DateEntry, type IckEntry, type Milestone } from './journal';
 import { getUserSupabase } from './supabase';
 import { getStarSign, getCompatibility, StarSign } from './starsigns';
 import {
@@ -43,6 +43,8 @@ export interface HisFile {
   dates?: DateEntry[];
   /** Plaintext count of `dates`, maintained on save. See rls_owner_policies.sql. */
   date_count?: number;
+  /** Dates that matter, in her words. Encrypted like the journal. */
+  milestones?: Milestone[];
   accurate_salary?: string;
   generosity_rating?: string;
   his_finsta?: string;
@@ -87,7 +89,7 @@ export interface VerityWrapped {
  * array is one value, which covers likedMore, likedLess, duringNote and both
  * feelings. report_data is the stored report about him.
  */
-export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts', 'report_data'] as const;
+export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts', 'milestones', 'report_data'] as const;
 
 /**
  * His identity. Encrypted on write only once HISFILE_IDENTITY_ENCRYPTION=on,
@@ -118,7 +120,7 @@ export const MEMBER_EDITABLE_FIELDS = [
   'file_type', 'nickname', 'full_name', 'phone', 'date_of_birth', 'status',
   'where_we_met', 'meetup_location', 'met_on_app', 'met_date',
   'first_date_location', 'first_date_date', 'first_date_paid',
-  'gifts', 'icks', 'dates', 'accurate_salary', 'generosity_rating', 'his_finsta', 'notes',
+  'gifts', 'icks', 'dates', 'milestones', 'accurate_salary', 'generosity_rating', 'his_finsta', 'notes',
 ] as const satisfies readonly (keyof HisFile)[];
 
 // ---------------------------------------------------------------------------

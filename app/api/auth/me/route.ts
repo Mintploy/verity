@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
       email: session.email,
       userId: session.email,
       plan: access.plan,
+      identityVerified: access.identityVerified,
       lookups: access.lookups.allowed
         ? { allowed: true, remaining: access.lookups.remaining }
         : { allowed: false, reason: access.lookups.reason },
