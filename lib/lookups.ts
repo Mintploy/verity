@@ -71,6 +71,17 @@ export async function anonymizeAuditTrail(email: string): Promise<{ audit: numbe
   return { audit: a.data?.length ?? 0, flags: f.data?.length ?? 0 };
 }
 
+/**
+ * Keyed hash for a His File identity field. Same secret as the audit log,
+ * different namespace, so a his_files.phone_hmac and a lookup_audit
+ * input_hash for the same number are different strings and the two tables
+ * cannot be joined directly. hasJournalRelationship computes whichever form
+ * it needs at lookup time.
+ */
+export function hmacHisFile(kind: 'phone' | 'name', value: string): string {
+  return createHmac('sha256', hashSecret()).update(`hisfile-${kind}:${value}`).digest('hex');
+}
+
 export function normalizePhoneDigits(phone: string): string {
   return (phone ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
 }
@@ -254,7 +265,9 @@ export async function distinctSubjectsLast7d(userId: string): Promise<Set<string
  * name, email, address or relative token has no relationship and counts.
  *
  * Reads date_count, a plaintext column kept in step with the encrypted
- * `dates` array, so nothing is decrypted to answer this.
+ * `dates` array, and matches the number by its HMAC, so nothing is decrypted
+ * to answer this. A file written before the HMAC backfill will not match
+ * until scripts/encrypt-identity.ts --backfill has run.
  */
 export async function hasJournalRelationship(userId: string, phoneDigits: string | null): Promise<boolean> {
   if (!phoneDigits || phoneDigits.length !== 10) return false;
@@ -263,7 +276,7 @@ export async function hasJournalRelationship(userId: string, phoneDigits: string
     .from('his_files')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('phone_normalized', phoneDigits)
+    .eq('phone_hmac', hmacHisFile('phone', phoneDigits))
     .gte('date_count', 1);
   if (error) throw error;
   return (count ?? 0) > 0;

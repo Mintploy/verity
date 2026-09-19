@@ -3,6 +3,7 @@ import { generateReport } from '@/lib/apis/index';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { verifyCandidate } from '@/lib/candidates';
 import { consumeSearch, getQuota } from '@/lib/quota';
+import { saveSearchReport } from '@/lib/hisfile';
 import {
   LookupConfigError, describeInput, evaluatePatterns, flagAccount, getClientIp,
   hashLookupKey, isMinor, preflightLookup, recordLookup,
@@ -121,6 +122,11 @@ export async function POST(req: NextRequest) {
     const ageUnknown = !(report.subject.age > 0) && !report.subject.dob;
     await audit({ outcome: ageUnknown ? 'completed_unknown_age' : 'completed', consumed: true, subjectHash });
     // Flags for next time; this lookup has already been made.
+    // The server's own copy, encrypted under her key. "Save to His File"
+    // attaches the report from here rather than from the browser.
+    await saveSearchReport(userId, report as unknown as Parameters<typeof saveSearchReport>[1])
+      .catch((e) => console.error('Could not store the search report:', e));
+
     await evaluatePatterns(userId, subjectHash, {
       phoneDigits: input.kind === 'phone' ? input.value : chosen?.phone || null,
     }).catch((e) => console.error('Pattern check failed:', e));

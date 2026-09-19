@@ -11,6 +11,9 @@
  *
  * Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and
  * VERITY_MASTER_KEY in the environment. Run it locally, not on Vercel.
+ * Refuses to run unless VERITY_MASTER_KEY opens every data key the deployed
+ * app has already written, so a key that does not match Vercel fails here
+ * instead of producing ciphertext production cannot read.
  *
  * Before --apply or --rollback touches a row it calls his_files_snapshot(),
  * which copies the whole table to his_files_snapshot_<timestamp>, reachable
@@ -32,6 +35,7 @@ import {
   decryptFields, encryptFields, generateDataKey, isCiphertext, unwrapDataKey, wrapDataKey,
 } from '../lib/crypto';
 import { ENCRYPTED_FIELDS } from '../lib/hisfile';
+import { assertMasterKeyMatchesProduction } from './lib/keycheck';
 
 type Mode = 'dry-run' | 'apply' | 'rollback';
 
@@ -66,6 +70,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   required('VERITY_MASTER_KEY');
+  await assertMasterKeyMatchesProduction(sb);
 
   if (mode !== 'dry-run') {
     const { data: snap, error: snapErr } = await sb.rpc('his_files_snapshot');
