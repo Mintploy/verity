@@ -1,12 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ickText, type DateEntry, type IckEntry, type Milestone } from './journal';
+import { ickText, type DateEntry, type IckEntry, type LovesEntry, type Milestone } from './journal';
 import { getUserSupabase } from './supabase';
 import { getStarSign, getCompatibility, StarSign } from './starsigns';
 import {
-  decryptFields, encryptFields, encryptValue, generateDataKey, unwrapDataKey, wrapDataKey,
+  decryptFields, decryptValue, encryptFields, encryptValue, generateDataKey, isCiphertext, unwrapDataKey, wrapDataKey,
 } from './crypto';
 import { hmacHisFile } from './lookups';
-import { cleanFlagList } from './flags';
+import { cleanFlagList, cleanPersonalFlags, type PersonalFlags } from './flags';
 
 /** Why the file was opened. Decides which questionnaire the entry shows. */
 export type FileType = 'dating' | 'safety';
@@ -45,8 +45,8 @@ export interface HisFile {
   date_count?: number;
   /** Dates that matter, in her words. Encrypted like the journal. */
   milestones?: Milestone[];
-  /** Things he likes: his team, his dog's name, his coffee order. */
-  he_loves?: string[];
+  /** Things he likes, as label and value: "His coffee order", "black". Older rows hold plain strings. */
+  he_loves?: Array<string | LovesEntry>;
   /** Observations she wants on record. */
   i_noticed?: string[];
   /** What she must not forget before seeing him again. */
@@ -65,10 +65,20 @@ export interface UserProfile {
   email: string;
   date_of_birth?: string;
   star_sign?: string;
-  /** What she watches for on a date. Seeds the one-tap chips. See lib/flags.ts. */
+  /**
+   * Her personal standards, decrypted for the response. See lib/flags.ts.
+   * Seeds the one-tap chips on a date and the Patterns page's suggestions.
+   */
+  personal_flags?: PersonalFlags | null;
+  /** When she finished or skipped the welcome flow. Null means not yet. */
+  onboarded_at?: string | null;
+  /** Plaintext lists from before personal_flags existed. Read as a fallback, never returned. */
   green_flags?: string[];
   red_flags?: string[];
 }
+
+/** Profile columns held as ciphertext under her data key. */
+export const PROFILE_ENCRYPTED_FIELDS = ['personal_flags'] as const;
 
 export interface VerityWrapped {
   id?: string;
@@ -199,31 +209,69 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const { data, error } = await sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  for (const c of PROFILE_PRIVATE_COLUMNS) delete data[c];
-  return data;
+  return presentProfile(sb, userId, data as UserProfile & Record<string, unknown>);
+}
+
+/**
+ * A profile row as the browser sees it: private columns gone, personal_flags
+ * opened with her data key, and the plaintext lists from before
+ * personal_flags existed folded into it when it is still empty, so nothing
+ * she set earlier disappears.
+ */
+async function presentProfile(sb: SupabaseClient, userId: string, row: UserProfile & Record<string, unknown>): Promise<UserProfile> {
+  const out = { ...row } as UserProfile & Record<string, unknown>;
+  for (const c of PROFILE_PRIVATE_COLUMNS) delete out[c];
+  if (isCiphertext(out.personal_flags)) {
+    const key = await getDataKey(sb, userId, { create: false });
+    out.personal_flags = key ? cleanPersonalFlags(decryptValue(key, out.personal_flags)) : null;
+  } else if (out.personal_flags && typeof out.personal_flags === 'object') {
+    out.personal_flags = cleanPersonalFlags(out.personal_flags);
+  } else {
+    out.personal_flags = null;
+  }
+  if (!out.personal_flags) {
+    const green = cleanFlagList(out.green_flags), red = cleanFlagList(out.red_flags);
+    if (green.length || red.length) out.personal_flags = cleanPersonalFlags({ green, red });
+  }
+  delete out.green_flags;
+  delete out.red_flags;
+  return out;
+}
+
+/** What a member may say about herself, from the request body. */
+export interface ProfileUpdate {
+  date_of_birth?: string;
+  personal_flags?: unknown;
+  /** True marks the welcome flow finished or skipped; the timestamp is set here. */
+  onboarded?: boolean;
 }
 
 /**
  * Only the fields a member may set about herself. The billing columns are
  * refused by column grants at the database as well; this keeps the request
- * body from ever naming them.
+ * body from ever naming them. personal_flags is sealed under her data key
+ * before it is written, and the plaintext lists it replaces are cleared in
+ * the same write.
  */
-const PROFILE_EDITABLE: (keyof UserProfile)[] = ['date_of_birth', 'green_flags', 'red_flags'];
-
-export async function upsertUserProfile(userId: string, email: string, updates: Partial<UserProfile>): Promise<UserProfile | null> {
+export async function upsertUserProfile(userId: string, email: string, updates: ProfileUpdate): Promise<UserProfile | null> {
   const sb = await getUserSupabase(userId);
-  const allowed: Partial<UserProfile> = {};
-  for (const k of PROFILE_EDITABLE) {
-    if (updates[k] === undefined) continue;
-    (allowed as Record<string, unknown>)[k] =
-      k === 'green_flags' || k === 'red_flags' ? cleanFlagList(updates[k]) : updates[k];
+  const row: Record<string, unknown> = { user_id: userId, email };
+  if (typeof updates.date_of_birth === 'string' && updates.date_of_birth) {
+    row.date_of_birth = updates.date_of_birth;
+    const starSign = getStarSign(updates.date_of_birth);
+    if (starSign) row.star_sign = starSign;
   }
-  const starSign = allowed.date_of_birth ? getStarSign(allowed.date_of_birth) : undefined;
-  const row = { user_id: userId, email, ...allowed, ...(starSign ? { star_sign: starSign } : {}) };
+  if (updates.personal_flags !== undefined) {
+    const key = await getDataKey(sb, userId, { create: true });
+    if (!key) throw new Error('Could not obtain a data key');
+    row.personal_flags = encryptValue(key, cleanPersonalFlags(updates.personal_flags));
+    row.green_flags = [];
+    row.red_flags = [];
+  }
+  if (updates.onboarded === true) row.onboarded_at = new Date().toISOString();
   const { data, error } = await sb.from('user_profiles').upsert(row, { onConflict: 'user_id' }).select().single();
   if (error) throw error;
-  if (data) for (const c of PROFILE_PRIVATE_COLUMNS) delete data[c];
-  return data ?? null;
+  return data ? presentProfile(sb, userId, data as UserProfile & Record<string, unknown>) : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import type { HisFile } from '@/lib/hisfile';
-import { ickText, type DateEntry, type Feeling } from '@/lib/journal';
+import { ickText, lovesText, type DateEntry, type Feeling } from '@/lib/journal';
 
 /**
  * What she reads in fifteen seconds before walking in.
@@ -49,7 +49,7 @@ export function HighlightsCard({ file, focus = false }: { file: HisFile; focus?:
   const last = [...dates].reverse().find(d => d.feeling || d.likedMore) ?? lastDated;
 
   const forget = [...(file.dont_forget ?? [])].reverse().slice(0, 5);
-  const loves = (file.he_loves ?? []).slice(0, 5);
+  const loves = (file.he_loves ?? []).slice(0, 5).map(lovesText);
   const icks = [...(file.icks ?? [])].reverse().slice(0, 2).map(ickText);
   const score = file.report_id && file.safety_score ? SCORE[file.safety_score] : null;
 

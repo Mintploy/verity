@@ -5,9 +5,10 @@ import { getServiceSupabase } from '@/lib/supabase';
 /**
  * The magic link lands here. It proves the address; that is all a session is.
  *
- * An address with no profile gets one, with no plan: a free account. Where
- * she lands depends on what she can do: a plan sends her to search, no plan
- * sends her to her journal. Nothing here asks Stripe.
+ * An address with no profile gets one, with no plan: a free account, sent
+ * to the welcome flow once. A returning member lands by what she can do: a
+ * plan sends her to search, no plan sends her to her journal. Nothing here
+ * asks Stripe.
  */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
     if (readErr) throw readErr;
 
     let plan: string | null = (existing?.plan as string | null) ?? null;
+    const brandNew = !existing;
     if (!existing) {
       const { error: insErr } = await sb.from('user_profiles').insert({ user_id: email, email });
       if (insErr && insErr.code !== '23505') throw insErr;
@@ -34,7 +36,9 @@ export async function GET(req: NextRequest) {
     }
 
     const sessionToken = await createSessionToken({ email });
-    const res = NextResponse.redirect(new URL(plan ? '/search' : '/hisfile', req.url));
+    // A brand-new account sees the welcome flow once. Everyone else lands
+    // where they can do the most: search with a plan, the journal without.
+    const res = NextResponse.redirect(new URL(brandNew ? '/welcome' : plan ? '/search' : '/hisfile', req.url));
     res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

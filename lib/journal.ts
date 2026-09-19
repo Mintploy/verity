@@ -81,6 +81,25 @@ export interface IckEntry {
   topic?: string;
 }
 
+/**
+ * One thing he loves, as a label and what it is: "His coffee order" and
+ * "black", "His team" and "Arsenal". Entries saved as plain strings before
+ * the value column existed still read; `lovesText` shows either.
+ */
+export interface LovesEntry {
+  label: string;
+  value?: string;
+}
+
+export function lovesText(e: string | LovesEntry): string {
+  if (typeof e === 'string') return e;
+  return e.value?.trim() ? `${e.label}: ${e.value.trim()}` : e.label;
+}
+
+export function lovesLabel(e: string | LovesEntry): string {
+  return typeof e === 'string' ? e : e.label;
+}
+
 /** Icks saved before the journal existed are plain strings; newer ones are entries. */
 export function ickText(i: string | IckEntry): string {
   return typeof i === 'string' ? i : i.text;

@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
 import { ChipListEditor } from '@/components/hisfile/ChipListEditor';
+import { LovesTable } from '@/components/hisfile/LovesTable';
 import { HighlightsCard } from '@/components/hisfile/HighlightsCard';
 import type { HisFile, FileType } from '@/lib/hisfile';
 import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry, type Milestone } from '@/lib/journal';
@@ -28,7 +29,7 @@ const WHERE_MET_SAFETY = ['Facebook Marketplace', 'Craigslist', 'OfferUp', 'eBay
 const STATUSES = ['talking', 'dating', 'met', 'ghosted', 'blocked', 'archived'];
 const STATUSES_SAFETY = ['met', 'ghosted', 'blocked', 'archived'];
 const GENEROSITY = ['cheap', 'average', 'generous', 'spoils me'];
-const HE_LOVES_SUGGESTIONS = ['His team', 'His dog', 'His coffee order', 'His favourite restaurant', 'Cooking', 'Running', 'His mom'];
+const HE_LOVES_SUGGESTIONS = ['His team', 'His coffee order', "His dog's name", 'His favourite restaurant', 'His go-to drink', 'His music', 'His mom'];
 const DONT_FORGET_SUGGESTIONS = ['Ask about his week', 'Mention his birthday', 'Bring up the trip', 'Do not text first'];
 const COMMON_ICKS = ['bad hygiene', 'late texter', 'love bombing', 'too intense', 'cheap on dates', 'talks over me', 'dismissive', 'no depth', 'all about looks', 'mommy issues', 'oversharing', 'flaky'];
 
@@ -90,8 +91,8 @@ export default function HisFileDetail() {
     fetch('/api/profile').then(r => r.json()).then(d => {
       setHasDob(!!d?.profile?.date_of_birth);
       setMyFlags({
-        green: Array.isArray(d?.profile?.green_flags) ? d.profile.green_flags : [],
-        red: Array.isArray(d?.profile?.red_flags) ? d.profile.red_flags : [],
+        green: Array.isArray(d?.profile?.personal_flags?.green) ? d.profile.personal_flags.green : [],
+        red: Array.isArray(d?.profile?.personal_flags?.red) ? d.profile.personal_flags.red : [],
       });
     }).catch(() => {});
     if (isNew) return;
@@ -232,7 +233,7 @@ export default function HisFileDetail() {
   const removeIck = (ick: string) => {
     setFile(f => ({ ...f, icks: (f.icks ?? []).filter(i => ickText(i) !== ick) }));
   };
-  type ListField = 'he_loves' | 'i_noticed' | 'dont_forget';
+  type ListField = 'i_noticed' | 'dont_forget';
   const addTo = (field: ListField, text: string) =>
     setFile(f => ({ ...f, [field]: [...(f[field] ?? []).filter(x => x.toLowerCase() !== text.toLowerCase()), text] }));
   const removeFrom = (field: ListField, text: string) =>
@@ -771,13 +772,10 @@ export default function HisFileDetail() {
             must not forget. The Highlights card at the top reads from these. */}
         {!isSafety && (
         <Section eyebrow="06" title="He loves">
-          <ChipListEditor
+          <LovesTable
             items={file.he_loves ?? []}
-            onAdd={t => addTo('he_loves', t)}
-            onRemove={t => removeFrom('he_loves', t)}
+            onChange={next => setFile(f => ({ ...f, he_loves: next }))}
             suggestions={HE_LOVES_SUGGESTIONS}
-            placeholder="His team, his dog's name, his coffee order..."
-            tone="sage"
           />
         </Section>
         )}
