@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { stripe, scheduleFoundingStepUp } from '@/lib/stripe';
-import { createMagicLinkToken } from '@/lib/auth';
+import { createMagicLinkToken, normalizeEmail } from '@/lib/auth';
 import { sendWelcomeEmail } from '@/lib/email';
 import { getServiceSupabase } from '@/lib/supabase';
 import type Stripe from 'stripe';
@@ -35,8 +35,10 @@ export async function POST(req: NextRequest) {
           const sb = getServiceSupabase();
           await sb.from('user_profiles').upsert(
             {
-              user_id: email,
+              user_id: normalizeEmail(email),
+              email: normalizeEmail(email),
               plan,
+              stripe_customer_id: customerId,
               searches_this_month: 0,
               searches_reset_at: new Date().toISOString(),
             },
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
             await scheduleFoundingStepUp(subId);
           }
 
-          const token = await createMagicLinkToken(email, customerId);
+          const token = await createMagicLinkToken(email);
           await sendWelcomeEmail(email, token);
           console.log(`✓ Welcome email sent to ${email} (plan: ${plan})`);
         }

@@ -119,6 +119,7 @@ function SearchContent() {
       })
         .then(async (r) => {
           const d = await r.json();
+          if (r.status === 402) { router.push(d.redirect ?? '/checkout'); return; }
           if (!r.ok) throw new Error(d.error ?? 'Could not build the report');
           sessionStorage.setItem(`report-${d.report.searchId}`, JSON.stringify(d.report));
           if (d.demoMode) sessionStorage.setItem('verity-demo', '1');
@@ -193,6 +194,8 @@ function SearchContent() {
       });
 
       const data = await res.json();
+      // No plan, no credits or no ID check: pricing, not an error.
+      if (res.status === 402) { router.push(data.redirect ?? '/checkout'); return; }
       if (!res.ok) throw new Error(data.error ?? 'Search failed');
 
       sessionStorage.setItem(`report-${data.report.searchId}`, JSON.stringify(data.report));

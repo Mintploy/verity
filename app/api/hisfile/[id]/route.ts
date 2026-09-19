@@ -1,12 +1,9 @@
 import type { NextRequest } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { readSession } from '@/lib/access';
 import { getHisFile, saveHisFile, deleteHisFile } from '@/lib/hisfile';
 
-async function auth(req: NextRequest) {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  try { return await verifySessionToken(token); } catch { return null; }
-}
+// Any signed-in member: the journal is free. Shared with every journal page.
+const auth = readSession;
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth(req);

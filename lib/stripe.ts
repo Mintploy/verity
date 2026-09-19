@@ -85,6 +85,36 @@ export async function hasVerifiedIdentity(
   return true;
 }
 
+/**
+ * Whether this address has completed Stripe Identity, with or without a
+ * customer. Customer metadata is the fast path when a customer is known;
+ * otherwise the recent verified sessions are matched by the email in their
+ * metadata. The caller caches a true answer on user_profiles.
+ */
+export async function hasVerifiedIdentityForEmail(email: string, customerId?: string | null): Promise<boolean> {
+  if (customerId) {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer.deleted && customer.metadata?.identity_verified === 'true') return true;
+  }
+  const wanted = normalizeEmail(email);
+  const sessions = await stripe.identity.verificationSessions.list({ limit: 100 });
+  return sessions.data.some(
+    (s) => s.status === 'verified' && s.metadata?.email && normalizeEmail(s.metadata.email) === wanted,
+  );
+}
+
+/**
+ * Her Stripe customer, created at first checkout and not before. A free
+ * account never has one.
+ */
+export async function findOrCreateCustomer(email: string, knownId?: string | null): Promise<string> {
+  if (knownId) return knownId;
+  const found = await stripe.customers.list({ email: normalizeEmail(email), limit: 1 });
+  if (found.data[0]) return found.data[0].id;
+  const created = await stripe.customers.create({ email: normalizeEmail(email), metadata: { app: 'verity' } });
+  return created.id;
+}
+
 // Record a completed verification against the customer, if one exists yet.
 // Returns false when there is no customer to write to, not an error: the
 // customer is created later at checkout, and the login fallback covers it.

@@ -33,8 +33,15 @@ These are every place the service role is used. Add to this list before adding a
 | `app/api/cron/reminders/route.ts` | Reads every member's due reminders. |
 | `lib/lookups.ts` (all functions) | `lookup_audit` and `account_flags` are written about an account, never by it, and have no policies by design. `hasJournalRelationship` reads a plaintext count from `his_files` for the flag rule. `anonymizeAuditTrail`, called last by account deletion, re-keys those rows from her email to a `deleted:` hash. |
 | `scripts/encrypt-journal.ts`, `scripts/rotate-master-key.ts` | Run locally, never on Vercel. Rewrite every member's rows, and call `his_files_snapshot()`. |
+| `app/api/auth/verify/route.ts` | Creates the `user_profiles` row for a first sign-in; there is no session yet to scope a client to. |
+| `lib/magic.ts` | Writes and counts `magic_link_requests` for the sign-in and sign-up limits; the caller is not signed in. |
+| `lib/access.ts` rememberOnProfile | Caches `identity_verified` and `stripe_customer_id` on the profile, columns a member may not write herself. |
 
 Everything else runs as the member: `lib/hisfile.ts`, `lib/quota.ts` (via `consume_search()` and `founding_count()`), the reminder, profile, hisfile, wrapped, report and account-delete routes.
+
+## Sessions and capability
+
+A session token carries the email and nothing else (`lib/auth.ts`). What she can do is decided per request by `lib/access.ts`: `requireJournal` for any signed-in member (His Files, and Milestones, Highlights and Patterns when they arrive), `requireLookups` for search, the picker and reports, which answers 402 with a redirect to pricing when she has no plan, no credits or no completed ID check. Plan comes from `user_profiles.plan`, written by the Stripe webhook; the Stripe customer is created at first checkout, never at sign-up.
 
 ## What breaks when the legacy HS256 secret is retired
 

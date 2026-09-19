@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { readSession } from '@/lib/access';
 import { getUserSupabase } from '@/lib/supabase';
 import { getDataKey } from '@/lib/hisfile';
 import { encryptFields } from '@/lib/crypto';
@@ -36,8 +36,7 @@ function asPhone(v: unknown): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const session = token ? await verifySessionToken(token).catch(() => null) : null;
+  const session = await readSession(req);
   if (!session) return Response.json({ error: 'Authentication required' }, { status: 401 });
 
   try {

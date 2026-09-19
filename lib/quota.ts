@@ -8,7 +8,9 @@ function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
+/** A free account has no lookups; a plan decides how many. */
 function limitForPlan(plan: string | null): number {
+  if (!plan) return 0;
   return plan === 'single' ? SINGLE_SEARCH_LIMIT : MONTHLY_SEARCH_LIMIT;
 }
 

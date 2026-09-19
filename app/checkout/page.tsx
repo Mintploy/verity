@@ -116,13 +116,20 @@ export default function CheckoutPage() {
   const [ready, setReady] = useState(false);
   const [foundingAvailable, setFoundingAvailable] = useState(false);
   const [slotsLeft, setSlotsLeft] = useState(0);
+  const [email, setEmail] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const email = getEmailFromCookie();
-    if (!email) {
-      window.location.replace('/verify');
-      return;
-    }
+    // Signed in: she pays as herself. Not signed in: the pre-account funnel
+    // left her email in a cookie; without either, start with a free account.
+    fetch('/api/auth/me').then(r => r.json()).then(me => {
+      if (me?.authenticated && me.email) { setEmail(me.email); return; }
+      const fromCookie = getEmailFromCookie();
+      if (fromCookie) { setEmail(fromCookie); return; }
+      window.location.replace('/signup');
+    }).catch(() => {
+      const fromCookie = getEmailFromCookie();
+      if (fromCookie) setEmail(fromCookie); else window.location.replace('/signup');
+    });
 
     fetch('/api/stripe/checkout')
       .then(r => r.json())
@@ -140,7 +147,7 @@ export default function CheckoutPage() {
   const startCheckout = async () => {
     setLoading(true);
     setError(null);
-    const email = getEmailFromCookie();
+    if (!email) return;
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',

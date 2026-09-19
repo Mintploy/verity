@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { readSession } from '@/lib/access';
+import { SESSION_COOKIE } from '@/lib/auth';
 import { getUserSupabase } from '@/lib/supabase';
 import { anonymizeAuditTrail } from '@/lib/lookups';
 
-async function auth(req: NextRequest) {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  try { return await verifySessionToken(token); } catch { return null; }
-}
+// Any signed-in member: the journal is free. Shared with every journal page.
+const auth = readSession;
 
 export async function DELETE(req: NextRequest) {
   const session = await auth(req);

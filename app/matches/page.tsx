@@ -44,7 +44,13 @@ function MatchesInner() {
       .then((me) => {
         if (!me.authenticated) {
           setPendingPhone(phone);
-          router.replace('/verify');
+          router.replace('/signup');
+          return Promise.reject(new Error('redirecting'));
+        }
+        // Signed in without lookups: keep his number, show her the plans.
+        if (me.lookups && me.lookups.allowed === false) {
+          setPendingPhone(phone);
+          router.replace(me.lookups.reason === 'not-verified' ? '/verify?reason=identity-required' : '/checkout');
           return Promise.reject(new Error('redirecting'));
         }
         return fetch('/api/matches', {
@@ -56,6 +62,7 @@ function MatchesInner() {
       .then(async (r) => {
         if (!r) return;
         const d = await r.json();
+        if (r.status === 402) { setPendingPhone(phone); router.replace(d.redirect ?? '/checkout'); return; }
         if (!r.ok) throw new Error(d.error ?? 'Search failed');
         clearPendingPhone();
         const found: Candidate[] = d.candidates ?? [];

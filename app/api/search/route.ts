@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { generateReport } from '@/lib/apis/index';
-import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { requireLookups } from '@/lib/access';
 import { verifyCandidate } from '@/lib/candidates';
 import { consumeSearch, getQuota } from '@/lib/quota';
 import { saveSearchReport } from '@/lib/hisfile';
@@ -26,15 +26,11 @@ import {
  * getQuota read is only there to refuse before spending on Enformion.
  */
 export async function POST(req: NextRequest) {
-  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!sessionToken) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 });
-  }
-  const session = await verifySessionToken(sessionToken).catch(() => null);
-  if (!session) {
-    return Response.json({ error: 'Session expired' }, { status: 401 });
-  }
-  const userId = session.email;
+  // Signed in with a plan, credits and a completed ID check, or a 402 that
+  // sends her to pricing.
+  const gate = await requireLookups(req);
+  if ('response' in gate) return gate.response;
+  const userId = gate.session.email;
   const ip = getClientIp(req);
 
   try {

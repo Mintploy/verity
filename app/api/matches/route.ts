@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { lookupCandidates } from '@/lib/apis/enformion';
-import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
+import { requireLookups } from '@/lib/access';
 import { toPublicCandidates } from '@/lib/candidates';
 import { withCallTally, summarize } from '@/lib/apis/callcount';
 import {
@@ -26,14 +26,9 @@ import {
  * 18 on the number is left off the list, so she cannot pick a child.
  */
 export async function POST(req: NextRequest) {
-  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
-  const session = sessionToken
-    ? await verifySessionToken(sessionToken).catch(() => null)
-    : null;
-  if (!session) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 });
-  }
-  const userId = session.email;
+  const gate = await requireLookups(req);
+  if ('response' in gate) return gate.response;
+  const userId = gate.session.email;
 
   try {
     const { phone } = await req.json();
