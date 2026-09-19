@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Sparkle } from '@/components/ui/Sparkle';
 import Link from 'next/link';
@@ -10,19 +11,24 @@ export default function VerifyPage() {
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<Step>('email');
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // The ID check belongs to an account. Signed out, she gets a free account
+  // first; signed in, the address is hers and cannot be typed.
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(me => {
+      if (!me?.authenticated) { router.replace('/signup'); return; }
+      if (me.identityVerified) { router.replace('/checkout'); return; }
+      setEmail(me.email);
+    }).catch(() => router.replace('/signup'));
+  }, [router]);
 
   const startVerification = async () => {
     if (!email.includes('@')) return;
     setStep('starting');
 
-    document.cookie = `verity-pending-email=${encodeURIComponent(email)}; path=/; max-age=3600; samesite=lax`;
-
     try {
-      const res = await fetch('/api/stripe/identity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      const res = await fetch('/api/stripe/identity', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to start verification');
       if (data.url) window.location.href = data.url;
@@ -55,9 +61,8 @@ export default function VerifyPage() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--mauve-deep)', display: 'block', marginBottom: 8 }}>Your email</label>
               <input
-                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && startVerification()}
-                placeholder="you@example.com" autoFocus
+                type="email" value={email} readOnly
+                placeholder="Loading your account..." 
                 style={{
                   width: '100%', padding: '15px 18px', borderRadius: 'var(--r-pill)',
                   border: '1.5px solid var(--ivory-deep)', background: 'var(--ivory)',

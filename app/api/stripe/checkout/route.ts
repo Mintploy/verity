@@ -1,5 +1,4 @@
 import type { NextRequest } from 'next/server';
-import { normalizeEmail } from '@/lib/auth';
 import { readSession, getAccess, rememberOnProfile } from '@/lib/access';
 import { createCheckoutSession, findOrCreateCustomer, isPaidPlan } from '@/lib/stripe';
 import { getFoundingCount, FOUNDING_MEMBER_CAP } from '@/lib/quota';
@@ -7,9 +6,10 @@ import { getServiceSupabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
+    // Whether founding places remain, never how many: the count is
+    // confidential so the cap can move later without anyone having watched it.
     const count = await getFoundingCount();
-    const slotsLeft = Math.max(0, FOUNDING_MEMBER_CAP - count);
-    return Response.json({ foundingAvailable: slotsLeft > 0, slotsLeft });
+    return Response.json({ foundingAvailable: count < FOUNDING_MEMBER_CAP });
   } catch (err: any) {
     console.error('Founding count error:', err);
     return Response.json({ error: err.message }, { status: 500 });
@@ -22,8 +22,14 @@ export async function POST(req: NextRequest) {
     const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: unknown; returnUrl?: string };
     // A signed-in member pays as herself; the body's email is only for the
     // pre-account funnel. Either way it is stored canonically.
+    // Checkout belongs to an account. The free account comes first, then the
+    // ID check, then payment; the body's email is ignored.
     const session = await readSession(req);
-    const email = session?.email ?? (rawEmail ? normalizeEmail(rawEmail) : undefined);
+    if (!session) {
+      return Response.json({ error: 'Create a free account first', code: 'signup', redirect: '/signup' }, { status: 401 });
+    }
+    void rawEmail;
+    const email = session.email;
 
     if (!isPaidPlan(plan)) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 });
@@ -52,6 +58,10 @@ export async function POST(req: NextRequest) {
     let customerId: string | undefined;
     if (session) {
       const access = await getAccess(session.email);
+      // Women only: no payment before the ID check has passed.
+      if (!access.identityVerified) {
+        return Response.json({ error: 'Please verify it is you first', code: 'verify', redirect: '/verify' }, { status: 403 });
+      }
       customerId = await findOrCreateCustomer(session.email, access.stripeCustomerId);
       if (!access.stripeCustomerId) await rememberOnProfile(session.email, { stripe_customer_id: customerId });
     }

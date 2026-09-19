@@ -18,6 +18,14 @@ export default function HisFilePage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // From the 30-day reminder email: ?report=<id> opens her card on that man.
+  useEffect(() => {
+    const reportId = new URLSearchParams(window.location.search).get('report');
+    if (!reportId || !files.length) return;
+    const hit = files.find(f => f.report_id === reportId);
+    if (hit?.id) router.replace(`/hisfile/${hit.id}?highlights=1`);
+  }, [files, router]);
+
   useEffect(() => {
     Promise.all([
       fetch('/api/hisfile').then(r => {
@@ -185,6 +193,19 @@ export default function HisFilePage() {
                       </button>
                     </span>
                   ) : (
+                    <>
+                    <button
+                      onClick={e => { e.stopPropagation(); router.push(`/hisfile/${file.id}?highlights=1`); }}
+                      title="Before you see him"
+                      style={{
+                        padding: '5px 11px', borderRadius: 'var(--r-pill)', flexShrink: 0,
+                        background: onDark ? 'rgba(240,176,187,0.18)' : 'var(--primary-mist)',
+                        border: 'none', color: 'inherit', fontFamily: 'var(--sans)', fontSize: 11,
+                        cursor: 'pointer', whiteSpace: 'nowrap', marginRight: 4,
+                      }}
+                    >
+                      Before you see him
+                    </button>
                     <button
                       onClick={e => deleteFile(file.id!, e)}
                       title="Delete file"
@@ -200,6 +221,7 @@ export default function HisFilePage() {
                     >
                       ✕
                     </button>
+                    </>
                   )}
                 </FileFolder>
               );

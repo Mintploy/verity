@@ -35,7 +35,7 @@ function VerifyCompleteContent() {
         if (data.verified) {
           setStatus('verified');
           router.push('/checkout');
-        } else if (data.status === 'requires_input' || data.status === 'canceled') {
+        } else if (data.status === 'requires_input' || data.status === 'canceled' || data.status === 'not_eligible') {
           setStatus('failed');
         } else {
           setTimeout(checkStatus, 2000);

@@ -10,7 +10,7 @@ export function Hero() {
 
   const handleSearch = async () => {
     if (!phone.trim()) {
-      router.push('/verify');
+      router.push('/signup');
       return;
     }
 
@@ -26,7 +26,7 @@ export function Hero() {
     router.push(
       me.authenticated
         ? `/matches?phone=${encodeURIComponent(phone.replace(/\D/g, ''))}`
-        : '/verify',
+        : '/signup',
     );
   };
 

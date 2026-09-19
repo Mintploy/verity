@@ -33,11 +33,12 @@ export function FinalCTA() {
             fontFamily: 'var(--sans)', fontSize: 17, opacity: 0.85, lineHeight: 1.6,
             margin: '24px auto 0', maxWidth: 540, fontWeight: 300,
           }}>
-            Your journal is free, always. When you want to know who he is, lookups start at $39
-            a month for 10 a month, or $19 for a single one. The first 100 women can take a
-            founding membership at $199 a year, a price that never goes up while they stay.
+            Free membership, always: unlimited dating journal, His File on every match, Verity
+            Wrapped, your year in review. Safety lookups from $39/month, 10 a month, or $19 for
+            a single lookup that never expires. Founding members lock in $199/year for every
+            year they stay subscribed.
           </p>
-          <Link href="/verify" style={{
+          <Link href="/signup" style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,
             marginTop: 40, padding: '20px 36px', borderRadius: 'var(--r-pill)',
             background: 'var(--blush)', color: 'var(--primary-deep)', textDecoration: 'none',

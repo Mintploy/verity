@@ -1,10 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
+import { ChipListEditor } from '@/components/hisfile/ChipListEditor';
+import { HighlightsCard } from '@/components/hisfile/HighlightsCard';
 import type { HisFile, FileType } from '@/lib/hisfile';
-import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry } from '@/lib/journal';
+import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry, type Milestone } from '@/lib/journal';
+import { MILESTONE_SUGGESTIONS, daysBetween, describeGap, describeSince } from '@/lib/milestones';
 import { BEFORE_MOODS, DEFAULT_GREEN_FLAGS, DEFAULT_RED_FLAGS, mergeFlags } from '@/lib/flags';
 import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionItem } from '@/lib/reflection';
 
@@ -25,6 +28,8 @@ const WHERE_MET_SAFETY = ['Facebook Marketplace', 'Craigslist', 'OfferUp', 'eBay
 const STATUSES = ['talking', 'dating', 'met', 'ghosted', 'blocked', 'archived'];
 const STATUSES_SAFETY = ['met', 'ghosted', 'blocked', 'archived'];
 const GENEROSITY = ['cheap', 'average', 'generous', 'spoils me'];
+const HE_LOVES_SUGGESTIONS = ['His team', 'His dog', 'His coffee order', 'His favourite restaurant', 'Cooking', 'Running', 'His mom'];
+const DONT_FORGET_SUGGESTIONS = ['Ask about his week', 'Mention his birthday', 'Bring up the trip', 'Do not text first'];
 const COMMON_ICKS = ['bad hygiene', 'late texter', 'love bombing', 'too intense', 'cheap on dates', 'talks over me', 'dismissive', 'no depth', 'all about looks', 'mommy issues', 'oversharing', 'flaky'];
 
 function starSignEmoji(sign?: string): string {
@@ -65,7 +70,9 @@ export default function HisFileDetail() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [ickInput, setIckInput] = useState('');
+  // ?highlights=1 shows only the card: the reminder email and the list page's
+  // "Before you see him" land here.
+  const focus = useSearchParams().get('highlights') === '1';
   const [ickDate, setIckDate] = useState<number | ''>('');
   const [ickTopic, setIckTopic] = useState('');
   const [hasDob, setHasDob] = useState<boolean | null>(null);
@@ -210,7 +217,7 @@ export default function HisFileDetail() {
   const addIck = (ick: string) => {
     const trimmed = ick.trim();
     if (!trimmed) return;
-    if ((file.icks ?? []).some(i => ickText(i) === trimmed)) { setIckInput(''); return; }
+    if ((file.icks ?? []).some(i => ickText(i) === trimmed)) return;
     // Stamped with the date and the subject, so she can see after how many
     // dates the icks start and what they tend to be about.
     const entry: IckEntry = {
@@ -219,13 +226,17 @@ export default function HisFileDetail() {
       ...(ickTopic ? { topic: ickTopic } : {}),
     };
     setFile(f => ({ ...f, icks: [...(f.icks ?? []), entry] }));
-    setIckInput('');
     setIckTopic('');
   };
 
   const removeIck = (ick: string) => {
     setFile(f => ({ ...f, icks: (f.icks ?? []).filter(i => ickText(i) !== ick) }));
   };
+  type ListField = 'he_loves' | 'i_noticed' | 'dont_forget';
+  const addTo = (field: ListField, text: string) =>
+    setFile(f => ({ ...f, [field]: [...(f[field] ?? []).filter(x => x.toLowerCase() !== text.toLowerCase()), text] }));
+  const removeFrom = (field: ListField, text: string) =>
+    setFile(f => ({ ...f, [field]: (f[field] ?? []).filter(x => x !== text) }));
 
   if (loading) {
     return (
@@ -233,6 +244,18 @@ export default function HisFileDetail() {
         <Nav />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
           <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 22, color: 'var(--dark-soft)' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // The card on its own: from the list page's "Before you see him", or the
+  // reminder email. One screen, nothing else, a link to the full file.
+  if (focus && !isNew) {
+    return (
+      <div style={{ minHeight: '100dvh', background: 'var(--ivory)', padding: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 480 }}>
+          <HighlightsCard file={file} focus />
         </div>
       </div>
     );
@@ -249,6 +272,12 @@ export default function HisFileDetail() {
             ← His File
           </Link>
         </div>
+
+        {!isNew && !isSafety && (
+          <div style={{ marginBottom: 20 }}>
+            <HighlightsCard file={file} />
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
           <div>
@@ -709,19 +738,6 @@ export default function HisFileDetail() {
               </div>
             );
           })()}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {(file.icks ?? []).map(ick => {
-              const text = ickText(ick);
-              const meta = typeof ick === 'string' ? '' : [ick.dateNumber ? `after date ${ick.dateNumber}` : '', ick.topic ?? ''].filter(Boolean).join(' · ');
-              return (
-                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 'var(--r-pill)', background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)', fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500 }}>
-                  {text}
-                  {meta && <span style={{ fontWeight: 300, opacity: 0.8 }}>· {meta}</span>}
-                  <button onClick={() => removeIck(text)} aria-label={`Remove ${text}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--deeprose-deep)', padding: '0 0 0 2px', fontSize: 14, lineHeight: 1 }}>×</button>
-                </div>
-              );
-            })}
-          </div>
           <TwoCol>
             <Field label="Noticed it after">
               <select value={ickDate || latestDate} onChange={e => setIckDate(Number(e.target.value))} style={inputStyle}>
@@ -735,20 +751,70 @@ export default function HisFileDetail() {
               </select>
             </Field>
           </TwoCol>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={ickInput} onChange={e => setIckInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIck(ickInput); } }} placeholder="Type an ick and press Enter" style={{ ...inputStyle, flex: 1 }} />
-            <button onClick={() => addIck(ickInput)} style={{ padding: '10px 16px', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: 'var(--ivory)', border: 'none', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>Add</button>
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {COMMON_ICKS.map(ick => {
-              const has = (file.icks ?? []).some(i => ickText(i) === ick);
-              return (
-                <button key={ick} onClick={() => addIck(ick)} disabled={has} style={{ padding: '5px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: has ? 'var(--deeprose-pale)' : 'var(--pearl)', color: has ? 'var(--deeprose-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer', opacity: has ? 0.5 : 1 }}>
-                  {ick}
-                </button>
-              );
-            })}
-          </div>
+          <ChipListEditor
+            items={(file.icks ?? []).map(ickText)}
+            onAdd={addIck}
+            onRemove={removeIck}
+            suggestions={COMMON_ICKS}
+            placeholder="Type an ick and press Enter"
+            tone="red"
+            meta={text => {
+              const ick = (file.icks ?? []).find(i => ickText(i) === text);
+              if (!ick || typeof ick === 'string') return '';
+              return [ick.dateNumber ? `after date ${ick.dateNumber}` : '', ick.topic ?? ''].filter(Boolean).join(' · ');
+            }}
+          />
+        </Section>
+        )}
+
+        {/* Her notes on him: what he loves, what she has noticed, what she
+            must not forget. The Highlights card at the top reads from these. */}
+        {!isSafety && (
+        <Section eyebrow="06" title="He loves">
+          <ChipListEditor
+            items={file.he_loves ?? []}
+            onAdd={t => addTo('he_loves', t)}
+            onRemove={t => removeFrom('he_loves', t)}
+            suggestions={HE_LOVES_SUGGESTIONS}
+            placeholder="His team, his dog's name, his coffee order..."
+            tone="sage"
+          />
+        </Section>
+        )}
+        {!isSafety && (
+        <Section eyebrow="07" title="I noticed">
+          <ChipListEditor
+            items={file.i_noticed ?? []}
+            onAdd={t => addTo('i_noticed', t)}
+            onRemove={t => removeFrom('i_noticed', t)}
+            placeholder="Something you want on record..."
+            tone="gold"
+          />
+        </Section>
+        )}
+        {!isSafety && (
+        <Section eyebrow="08" title="Don't forget">
+          <ChipListEditor
+            items={file.dont_forget ?? []}
+            onAdd={t => addTo('dont_forget', t)}
+            onRemove={t => removeFrom('dont_forget', t)}
+            suggestions={DONT_FORGET_SUGGESTIONS}
+            placeholder="Before you see him again..."
+            tone="rose"
+          />
+        </Section>
+        )}
+
+        {/* Milestones: the dates that matter, in her words. Inside Verity
+            only; nothing here touches her real calendar. */}
+        {!isSafety && (
+        <Section eyebrow="09" title="Milestones">
+          <MilestonesEditor
+            milestones={file.milestones ?? []}
+            dates={dates}
+            firstDateDate={dates.find(d => d.number === 1)?.date}
+            onChange={ms => setFile(f => ({ ...f, milestones: ms }))}
+          />
         </Section>
         )}
 
@@ -999,5 +1065,114 @@ function AnswerSlider({ item, value, onChange, onCommit }: {
         <span>5 · {item.high}</span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Add, list and remove milestones. Suggestions are shortcuts into the label
+ * box, not a fixed list. Timeline is oldest first, with how long ago each was
+ * and the gap from the one before.
+ */
+function MilestonesEditor({ milestones, dates, firstDateDate, onChange }: {
+  milestones: Milestone[];
+  dates: DateEntry[];
+  firstDateDate?: string;
+  onChange: (next: Milestone[]) => void;
+}) {
+  const [label, setLabel] = useState('');
+  const [date, setDate] = useState('');
+  const [note, setNote] = useState('');
+  const [dateNumber, setDateNumber] = useState<number | ''>('');
+
+  const sorted = [...milestones].sort((a, b) => a.date.localeCompare(b.date));
+  const hasFirstDate = milestones.some(m => m.label.trim().toLowerCase() === 'first date');
+  const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+  const add = () => {
+    const l = label.trim().replace(/\s+/g, ' ');
+    if (!l || !date) return;
+    const m: Milestone = { id: newId(), label: l, date, ...(note.trim() ? { note: note.trim() } : {}), ...(dateNumber !== '' ? { dateNumber: Number(dateNumber) } : {}) };
+    onChange([...milestones, m]);
+    setLabel(''); setDate(''); setNote(''); setDateNumber('');
+  };
+  const remove = (id: string) => onChange(milestones.filter(m => m.id !== id));
+  const addFirstDate = () => {
+    if (!firstDateDate) return;
+    onChange([...milestones, { id: newId(), label: 'First date', date: firstDateDate, dateNumber: 1 }]);
+  };
+
+  return (
+    <>
+      {firstDateDate && !hasFirstDate && (
+        <div style={{ padding: '12px 15px', borderRadius: 'var(--r-md)', background: 'var(--primary-mist)', border: '1px solid var(--primary-pale)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--serif)', fontSize: 14.5, color: 'var(--dark)' }}>
+            Your first date was {new Date(`${firstDateDate}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. Mark it?
+          </span>
+          <button onClick={addFirstDate} style={{ padding: '8px 14px', borderRadius: 'var(--r-pill)', border: '1.5px solid var(--primary)', background: 'transparent', color: 'var(--primary)', fontFamily: 'var(--sans)', fontSize: 12.5, cursor: 'pointer' }}>Add “First date”</button>
+        </div>
+      )}
+
+      {sorted.length > 0 ? (
+        <div style={{ position: 'relative', paddingLeft: 22 }}>
+          <div style={{ position: 'absolute', left: 6, top: 6, bottom: 6, width: 2, background: 'var(--gold-pale)' }} />
+          {sorted.map((m, i) => {
+            const prev = sorted[i - 1];
+            return (
+              <div key={m.id} style={{ position: 'relative', paddingBottom: i === sorted.length - 1 ? 0 : 18 }}>
+                <div style={{ position: 'absolute', left: -20, top: 5, width: 10, height: 10, borderRadius: '50%', background: 'var(--primary)', border: '2px solid var(--pearl)' }} />
+                {prev && (
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', marginBottom: 6 }}>{describeGap(daysBetween(prev.date, m.date))} later</div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                  <div>
+                    <span style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)' }}>{m.label}</span>
+                    {m.dateNumber ? <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)', marginLeft: 8 }}>{ordinal(m.dateNumber)} date</span> : null}
+                  </div>
+                  <button onClick={() => remove(m.id)} aria-label={`Remove ${m.label}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mauve-deep)', fontSize: 14 }}>×</button>
+                </div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 2 }}>
+                  {new Date(`${m.date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · {describeSince(m.date)}
+                </div>
+                {m.note && <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--dark-soft)', marginTop: 4, lineHeight: 1.45 }}>{m.note}</div>}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p style={{ margin: 0, fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--dark-soft)', fontWeight: 300 }}>
+          Nothing marked yet. The first kiss, the first time he cooked, the day you said it was exclusive: whatever mattered.
+        </p>
+      )}
+
+      <div style={{ padding: '14px 16px', borderRadius: 'var(--r-md)', background: 'var(--ivory)', border: '1px solid var(--gold-pale)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {MILESTONE_SUGGESTIONS.map(sg => (
+            <button key={sg} onClick={() => setLabel(sg)} style={{ padding: '5px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: label === sg ? 'var(--primary-mist)' : 'var(--pearl)', color: label === sg ? 'var(--primary-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer' }}>{sg}</button>
+          ))}
+        </div>
+        <TwoCol>
+          <Field label="What happened">
+            <input value={label} onChange={e => setLabel(e.target.value)} placeholder="In your words..." maxLength={80} style={inputStyle} />
+          </Field>
+          <Field label="When">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+          </Field>
+        </TwoCol>
+        <TwoCol>
+          <Field label="Note (optional)">
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Anything you want to remember" maxLength={280} style={inputStyle} />
+          </Field>
+          <Field label="Which date? (optional)">
+            <select value={dateNumber} onChange={e => setDateNumber(e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle}>
+              <option value="">Not tied to a date</option>
+              {dates.map(d => <option key={d.number} value={d.number}>{ordinal(d.number)} date</option>)}
+            </select>
+          </Field>
+        </TwoCol>
+        <button onClick={add} disabled={!label.trim() || !date} style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: 'var(--r-pill)', border: 'none', background: label.trim() && date ? 'var(--primary)' : 'var(--mauve)', color: 'var(--ivory)', fontFamily: 'var(--sans)', fontSize: 13, cursor: label.trim() && date ? 'pointer' : 'not-allowed' }}>
+          Add milestone
+        </button>
+      </div>
+    </>
   );
 }

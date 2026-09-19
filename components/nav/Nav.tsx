@@ -35,6 +35,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
   const navLinks = isLoggedIn
     ? [
         { label: 'His File', href: '/hisfile' },
+        { label: 'Timeline', href: '/timeline' },
         { label: 'Settings', href: '/settings' },
         { label: 'How it works', href: '/#how-it-works' },
         { label: 'What we check', href: '/stories' },
@@ -110,7 +111,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
               }}>
                 Sign in
               </Link>
-              <Link href="/verify" className="v-hide-mobile" style={{
+              <Link href="/signup" className="v-hide-mobile" style={{
                 padding: '10px 20px', borderRadius: 'var(--r-pill)',
                 background: 'var(--primary)', color: 'var(--ivory)',
                 textDecoration: 'none',
@@ -119,7 +120,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
                 boxShadow: 'var(--shadow-pop)',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
               }}>
-                Get started
+                Start free
               </Link>
             </>
           )}
@@ -220,13 +221,13 @@ export function Nav({ showCompare, onCompare }: NavProps) {
             </>
           ) : (
             <>
-              <Link href="/verify" onClick={close} style={{
+              <Link href="/signup" onClick={close} style={{
                 display: 'block', padding: '16px 24px', textAlign: 'center',
                 borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)',
                 textDecoration: 'none', fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500,
                 boxShadow: 'var(--shadow-pop)',
               }}>
-                Get started
+                Start free
               </Link>
               <Link href="/login" onClick={close} style={{
                 display: 'block', padding: '14px 24px', textAlign: 'center',

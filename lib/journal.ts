@@ -49,6 +49,21 @@ export interface DateEntry {
   likedLess?: string;
 }
 
+/**
+ * A date that matters, in her words. Lives inside Verity only; nothing here
+ * writes to her real calendar.
+ */
+export interface Milestone {
+  id: string;
+  /** Her words: "First date", "Met his sister". */
+  label: string;
+  /** ISO date, YYYY-MM-DD. */
+  date: string;
+  note?: string;
+  /** Optional link to a DateEntry by its number. */
+  dateNumber?: number;
+}
+
 export type FlagKind = 'green' | 'red';
 
 export interface DuringFlag {
