@@ -86,7 +86,9 @@ export async function offerAfterSave(email: string, file: HisFile, ctx: { dateNu
   const unsafeBefore = new Set((before?.dates ?? []).filter(d => allFlagsOn(d).includes(UNSAFE_FLAG)).map(d => d.number));
 
   const access = await getAccess(email);
-  const plan = (access.plan ?? 'free') as PlanLabel;
+  // An allowlisted test account has unlimited lookups and no plan on its
+  // profile; for the sheet it is a member, not a free user.
+  const plan = (access.plan ?? (access.lookups.allowed && access.lookups.unlimited ? 'annual' : 'free')) as PlanLabel;
   const store = dbStore(email, access.plan);
 
   // Safety first, on any date; then the first date that fires.
