@@ -63,15 +63,28 @@ export default function HisFilePage() {
               His <em style={{ color: 'var(--primary)' }}>File</em>
             </h1>
           </div>
-          <Link href="/search" style={{
-            padding: '12px 24px', borderRadius: 'var(--r-pill)',
-            background: 'var(--primary)', color: 'var(--ivory)',
-            fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 500,
-            textDecoration: 'none', boxShadow: 'var(--shadow-pop)',
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-          }}>
-            + New search
-          </Link>
+          {/* Two ways in. A file is hers to open by hand; a search is one way to fill it. */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Link href="/hisfile/new" style={{
+              padding: '12px 24px', borderRadius: 'var(--r-pill)',
+              background: 'var(--primary)', color: 'var(--ivory)',
+              fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 500,
+              textDecoration: 'none', boxShadow: 'var(--shadow-pop)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              + Add a man
+            </Link>
+            <Link href="/search" style={{
+              padding: '12px 24px', borderRadius: 'var(--r-pill)',
+              background: 'var(--pearl)', color: 'var(--primary-deep)',
+              border: '1.5px solid var(--primary-pale)',
+              fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 500,
+              textDecoration: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              Look him up
+            </Link>
+          </div>
         </div>
 
         {/* Status filter tabs */}
@@ -117,7 +130,7 @@ export default function HisFilePage() {
                   Add your birthday to see compatibility.
                 </div>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--dark-soft)', marginTop: 3, opacity: 0.75 }}>
-                  We'll show how your star sign lines up with each man in your files.
+                  We&rsquo;ll show how your star sign lines up with each man in your files.
                 </div>
               </div>
               <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--primary-deep)', fontWeight: 500, flexShrink: 0 }}>
@@ -143,12 +156,22 @@ export default function HisFilePage() {
           <div style={{ textAlign: 'center', padding: 'clamp(40px, 8vw, 80px) 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--blush-pale)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🗂️</div>
             <div style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--dark)', lineHeight: 1.2 }}>
-              {activeTab === 'all' ? <>No files yet.<br /><em style={{ color: 'var(--gold)' }}>Run your first search to get started.</em></> : `No one in "${activeTab}" yet.`}
+              {activeTab === 'all' ? <>No files yet.<br /><em style={{ color: 'var(--gold)' }}>Start with a man you&rsquo;re talking to.</em></> : `No one in "${activeTab}" yet.`}
             </div>
             {activeTab === 'all' && (
-              <Link href="/search" style={{ marginTop: 8, padding: '12px 28px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', fontFamily: 'var(--serif)', fontSize: 15, textDecoration: 'none', boxShadow: 'var(--shadow-pop)' }}>
-                Search a man
-              </Link>
+              <>
+                <p style={{ margin: 0, maxWidth: 380, fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark-soft)', fontWeight: 300, lineHeight: 1.6 }}>
+                  Open a file for anyone you&rsquo;re dating or talking to and keep his dates, icks and milestones in one place. A background check can be added to a file any time.
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                  <Link href="/hisfile/new" style={{ padding: '12px 28px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', fontFamily: 'var(--serif)', fontSize: 15, textDecoration: 'none', boxShadow: 'var(--shadow-pop)' }}>
+                    Add a man
+                  </Link>
+                  <Link href="/search" style={{ padding: '12px 28px', borderRadius: 'var(--r-pill)', background: 'var(--pearl)', color: 'var(--primary-deep)', border: '1.5px solid var(--primary-pale)', fontFamily: 'var(--serif)', fontSize: 15, textDecoration: 'none' }}>
+                    Look him up first
+                  </Link>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -243,7 +266,7 @@ export default function HisFilePage() {
                 Generate your <em style={{ color: 'var(--blush)' }}>Verity Wrapped</em>
               </div>
               <div style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ivory)', opacity: 0.75, marginTop: 6, fontWeight: 300 }}>
-                {files.length} men researched, see your year at a glance.
+                {files.length} men in your files, see your year at a glance.
               </div>
             </div>
             <Link href="/wrapped" style={{
