@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
+import { ChipListEditor } from '@/components/hisfile/ChipListEditor';
+import { HighlightsCard } from '@/components/hisfile/HighlightsCard';
 import type { HisFile, FileType } from '@/lib/hisfile';
 import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry, type Milestone } from '@/lib/journal';
 import { MILESTONE_SUGGESTIONS, daysBetween, describeGap, describeSince } from '@/lib/milestones';
@@ -26,6 +28,8 @@ const WHERE_MET_SAFETY = ['Facebook Marketplace', 'Craigslist', 'OfferUp', 'eBay
 const STATUSES = ['talking', 'dating', 'met', 'ghosted', 'blocked', 'archived'];
 const STATUSES_SAFETY = ['met', 'ghosted', 'blocked', 'archived'];
 const GENEROSITY = ['cheap', 'average', 'generous', 'spoils me'];
+const HE_LOVES_SUGGESTIONS = ['His team', 'His dog', 'His coffee order', 'His favourite restaurant', 'Cooking', 'Running', 'His mom'];
+const DONT_FORGET_SUGGESTIONS = ['Ask about his week', 'Mention his birthday', 'Bring up the trip', 'Do not text first'];
 const COMMON_ICKS = ['bad hygiene', 'late texter', 'love bombing', 'too intense', 'cheap on dates', 'talks over me', 'dismissive', 'no depth', 'all about looks', 'mommy issues', 'oversharing', 'flaky'];
 
 function starSignEmoji(sign?: string): string {
@@ -66,7 +70,9 @@ export default function HisFileDetail() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [ickInput, setIckInput] = useState('');
+  // ?highlights=1 shows only the card: the reminder email and the list page's
+  // "Before you see him" land here.
+  const focus = useSearchParams().get('highlights') === '1';
   const [ickDate, setIckDate] = useState<number | ''>('');
   const [ickTopic, setIckTopic] = useState('');
   const [hasDob, setHasDob] = useState<boolean | null>(null);
@@ -211,7 +217,7 @@ export default function HisFileDetail() {
   const addIck = (ick: string) => {
     const trimmed = ick.trim();
     if (!trimmed) return;
-    if ((file.icks ?? []).some(i => ickText(i) === trimmed)) { setIckInput(''); return; }
+    if ((file.icks ?? []).some(i => ickText(i) === trimmed)) return;
     // Stamped with the date and the subject, so she can see after how many
     // dates the icks start and what they tend to be about.
     const entry: IckEntry = {
@@ -220,13 +226,17 @@ export default function HisFileDetail() {
       ...(ickTopic ? { topic: ickTopic } : {}),
     };
     setFile(f => ({ ...f, icks: [...(f.icks ?? []), entry] }));
-    setIckInput('');
     setIckTopic('');
   };
 
   const removeIck = (ick: string) => {
     setFile(f => ({ ...f, icks: (f.icks ?? []).filter(i => ickText(i) !== ick) }));
   };
+  type ListField = 'he_loves' | 'i_noticed' | 'dont_forget';
+  const addTo = (field: ListField, text: string) =>
+    setFile(f => ({ ...f, [field]: [...(f[field] ?? []).filter(x => x.toLowerCase() !== text.toLowerCase()), text] }));
+  const removeFrom = (field: ListField, text: string) =>
+    setFile(f => ({ ...f, [field]: (f[field] ?? []).filter(x => x !== text) }));
 
   if (loading) {
     return (
@@ -234,6 +244,18 @@ export default function HisFileDetail() {
         <Nav />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
           <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 22, color: 'var(--dark-soft)' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // The card on its own: from the list page's "Before you see him", or the
+  // reminder email. One screen, nothing else, a link to the full file.
+  if (focus && !isNew) {
+    return (
+      <div style={{ minHeight: '100dvh', background: 'var(--ivory)', padding: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 480 }}>
+          <HighlightsCard file={file} focus />
         </div>
       </div>
     );
@@ -250,6 +272,12 @@ export default function HisFileDetail() {
             ← His File
           </Link>
         </div>
+
+        {!isNew && !isSafety && (
+          <div style={{ marginBottom: 20 }}>
+            <HighlightsCard file={file} />
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
           <div>
@@ -710,19 +738,6 @@ export default function HisFileDetail() {
               </div>
             );
           })()}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {(file.icks ?? []).map(ick => {
-              const text = ickText(ick);
-              const meta = typeof ick === 'string' ? '' : [ick.dateNumber ? `after date ${ick.dateNumber}` : '', ick.topic ?? ''].filter(Boolean).join(' · ');
-              return (
-                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 'var(--r-pill)', background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)', fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500 }}>
-                  {text}
-                  {meta && <span style={{ fontWeight: 300, opacity: 0.8 }}>· {meta}</span>}
-                  <button onClick={() => removeIck(text)} aria-label={`Remove ${text}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--deeprose-deep)', padding: '0 0 0 2px', fontSize: 14, lineHeight: 1 }}>×</button>
-                </div>
-              );
-            })}
-          </div>
           <TwoCol>
             <Field label="Noticed it after">
               <select value={ickDate || latestDate} onChange={e => setIckDate(Number(e.target.value))} style={inputStyle}>
@@ -736,27 +751,64 @@ export default function HisFileDetail() {
               </select>
             </Field>
           </TwoCol>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={ickInput} onChange={e => setIckInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIck(ickInput); } }} placeholder="Type an ick and press Enter" style={{ ...inputStyle, flex: 1 }} />
-            <button onClick={() => addIck(ickInput)} style={{ padding: '10px 16px', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: 'var(--ivory)', border: 'none', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>Add</button>
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {COMMON_ICKS.map(ick => {
-              const has = (file.icks ?? []).some(i => ickText(i) === ick);
-              return (
-                <button key={ick} onClick={() => addIck(ick)} disabled={has} style={{ padding: '5px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--gold-pale)', background: has ? 'var(--deeprose-pale)' : 'var(--pearl)', color: has ? 'var(--deeprose-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 12, cursor: 'pointer', opacity: has ? 0.5 : 1 }}>
-                  {ick}
-                </button>
-              );
-            })}
-          </div>
+          <ChipListEditor
+            items={(file.icks ?? []).map(ickText)}
+            onAdd={addIck}
+            onRemove={removeIck}
+            suggestions={COMMON_ICKS}
+            placeholder="Type an ick and press Enter"
+            tone="red"
+            meta={text => {
+              const ick = (file.icks ?? []).find(i => ickText(i) === text);
+              if (!ick || typeof ick === 'string') return '';
+              return [ick.dateNumber ? `after date ${ick.dateNumber}` : '', ick.topic ?? ''].filter(Boolean).join(' · ');
+            }}
+          />
+        </Section>
+        )}
+
+        {/* Her notes on him: what he loves, what she has noticed, what she
+            must not forget. The Highlights card at the top reads from these. */}
+        {!isSafety && (
+        <Section eyebrow="06" title="He loves">
+          <ChipListEditor
+            items={file.he_loves ?? []}
+            onAdd={t => addTo('he_loves', t)}
+            onRemove={t => removeFrom('he_loves', t)}
+            suggestions={HE_LOVES_SUGGESTIONS}
+            placeholder="His team, his dog's name, his coffee order..."
+            tone="sage"
+          />
+        </Section>
+        )}
+        {!isSafety && (
+        <Section eyebrow="07" title="I noticed">
+          <ChipListEditor
+            items={file.i_noticed ?? []}
+            onAdd={t => addTo('i_noticed', t)}
+            onRemove={t => removeFrom('i_noticed', t)}
+            placeholder="Something you want on record..."
+            tone="gold"
+          />
+        </Section>
+        )}
+        {!isSafety && (
+        <Section eyebrow="08" title="Don't forget">
+          <ChipListEditor
+            items={file.dont_forget ?? []}
+            onAdd={t => addTo('dont_forget', t)}
+            onRemove={t => removeFrom('dont_forget', t)}
+            suggestions={DONT_FORGET_SUGGESTIONS}
+            placeholder="Before you see him again..."
+            tone="rose"
+          />
         </Section>
         )}
 
         {/* Milestones: the dates that matter, in her words. Inside Verity
             only; nothing here touches her real calendar. */}
         {!isSafety && (
-        <Section eyebrow="06" title="Milestones">
+        <Section eyebrow="09" title="Milestones">
           <MilestonesEditor
             milestones={file.milestones ?? []}
             dates={dates}

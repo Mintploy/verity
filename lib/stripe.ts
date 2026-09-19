@@ -118,7 +118,7 @@ export async function hasVerifiedIdentityForEmail(email: string, customerId?: st
   return sessions.data.some((s) => {
     if (s.status !== 'verified' || !s.metadata?.email || normalizeEmail(s.metadata.email) !== wanted) return false;
     const sex = (s.verified_outputs as ({ sex?: string | null } | null))?.sex ?? null;
-    return sex !== 'male';
+    return sex === 'female';
   });
 }
 

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const sb = getServiceSupabase();
   const { data: due, error } = await sb
     .from('search_reminders')
-    .select('id, user_id, subject_name')
+    .select('id, user_id, subject_name, report_id')
     .is('sent_at', null)
     .lte('due_at', new Date().toISOString())
     .limit(100);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       const plain = key ? decryptFields(key, { subject_name: row.subject_name }, ['subject_name']) : { subject_name: row.subject_name };
       const name = typeof plain.subject_name === 'string' ? plain.subject_name : null;
 
-      await sendSearchReminder(row.user_id, name);
+      await sendSearchReminder(row.user_id, name, row.report_id ?? null);
       await sb.from('search_reminders').update({ sent_at: new Date().toISOString() }).eq('id', row.id);
       sent += 1;
     } catch (e) {

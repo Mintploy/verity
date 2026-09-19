@@ -95,9 +95,10 @@ export async function sendWelcomeEmail(email: string, token: string, plan: strin
   });
 }
 
-export async function sendSearchReminder(email: string, subjectName?: string | null) {
+export async function sendSearchReminder(email: string, subjectName?: string | null, reportId?: string | null) {
   const who = subjectName ? subjectName.split(' ')[0] : null;
-  const link = `${BASE}/search`;
+  // Opens her own card on him first; the search is one tap from there.
+  const link = reportId ? `${BASE}/hisfile?report=${encodeURIComponent(reportId)}` : `${BASE}/search`;
   await getResend().emails.send({
     from: FROM,
     to: email,

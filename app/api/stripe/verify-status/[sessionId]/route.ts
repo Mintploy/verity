@@ -5,11 +5,11 @@ import { readSession, rememberOnProfile } from '@/lib/access';
 /**
  * The result of an ID check, for the page that waits on it.
  *
- * Verity is for women. Stripe Identity reads the sex printed on the
- * document into verified_outputs.sex when the document carries it. A
- * document that says male is not accepted. A document that carries no sex
- * field is accepted and logged, so the rate of that case is visible; tighten
- * it here if it turns out to be common.
+ * Verity is for women, and the check fails closed. Stripe Identity reads the
+ * sex printed on the document into verified_outputs.sex when the document
+ * carries it. Only a document that says female is accepted; a document
+ * that says male, or carries no sex field at all, is not. The missing-field
+ * case is logged so its rate is visible.
  */
 export async function GET(
   req: NextRequest,
@@ -21,8 +21,8 @@ export async function GET(
 
     const outputs = (session.verified_outputs ?? null) as ({ sex?: string | null } | null);
     const sex = outputs?.sex ?? null;
-    const eligible = session.status === 'verified' && sex !== 'male';
-    if (session.status === 'verified' && !sex) console.warn('[identity] verified document carried no sex field');
+    const eligible = session.status === 'verified' && sex === 'female';
+    if (session.status === 'verified' && !sex) console.warn('[identity] verified document carried no sex field; not accepted');
 
     if (session.status === 'verified' && !eligible) {
       return Response.json({ status: 'not_eligible', verified: false });

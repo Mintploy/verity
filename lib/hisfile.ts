@@ -45,6 +45,12 @@ export interface HisFile {
   date_count?: number;
   /** Dates that matter, in her words. Encrypted like the journal. */
   milestones?: Milestone[];
+  /** Things he likes: his team, his dog's name, his coffee order. */
+  he_loves?: string[];
+  /** Observations she wants on record. */
+  i_noticed?: string[];
+  /** What she must not forget before seeing him again. */
+  dont_forget?: string[];
   accurate_salary?: string;
   generosity_rating?: string;
   his_finsta?: string;
@@ -89,7 +95,7 @@ export interface VerityWrapped {
  * array is one value, which covers likedMore, likedLess, duringNote and both
  * feelings. report_data is the stored report about him.
  */
-export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts', 'milestones', 'report_data'] as const;
+export const ENCRYPTED_FIELDS = ['notes', 'dates', 'icks', 'gifts', 'milestones', 'he_loves', 'i_noticed', 'dont_forget', 'report_data'] as const;
 
 /**
  * His identity. Encrypted on write only once HISFILE_IDENTITY_ENCRYPTION=on,
@@ -120,7 +126,8 @@ export const MEMBER_EDITABLE_FIELDS = [
   'file_type', 'nickname', 'full_name', 'phone', 'date_of_birth', 'status',
   'where_we_met', 'meetup_location', 'met_on_app', 'met_date',
   'first_date_location', 'first_date_date', 'first_date_paid',
-  'gifts', 'icks', 'dates', 'milestones', 'accurate_salary', 'generosity_rating', 'his_finsta', 'notes',
+  'gifts', 'icks', 'dates', 'milestones', 'he_loves', 'i_noticed', 'dont_forget',
+  'accurate_salary', 'generosity_rating', 'his_finsta', 'notes',
 ] as const satisfies readonly (keyof HisFile)[];
 
 // ---------------------------------------------------------------------------
