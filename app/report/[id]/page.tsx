@@ -707,7 +707,7 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         const plan = d?.profile?.plan;
-        setRemindable(plan !== 'annual' && plan !== 'founding');
+        setRemindable(!['annual', 'founding', 'monthly'].includes(plan));
       })
       .catch(() => setRemindable(false));
   }, []);

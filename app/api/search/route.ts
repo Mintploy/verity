@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Monthly search limit reached', remaining: 0 }, { status: 429 });
     }
 
-    const enrichHistorical = quotaBefore.plan === 'founding' || quotaBefore.plan === 'annual';
+    const enrichHistorical = ['founding', 'annual', 'monthly'].includes(quotaBefore.plan ?? '');
     const { report, subjectId } = await generateReport({
       phone: chosen?.phone || phone,
       name, email, address, location,

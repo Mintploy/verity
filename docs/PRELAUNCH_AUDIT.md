@@ -109,7 +109,9 @@ The Mintploy organization is on the Free plan, which as far as I can tell has no
 
 ### O4. Pricing change
 
-Decided, not built:
+Built 2026-09-19 (commit after f828120): free journal, $19 single, $39 monthly, $349 annual, $199 founding with a database-enforced cap of 100 and no step-up. Still needed in Stripe: a $39/month price and a $349/year price, and `STRIPE_PRICE_MONTHLY` plus the updated `STRIPE_PRICE_ANNUAL` in Vercel. Original notes kept below.
+
+Decided, now built:
 
 - A $39 monthly plan with 10 lookups a month. Today's plans are annual ($199 founding, $297 standard) and a $19 single report; `consume_search()` hard-codes 15 per month and 1 lifetime for `single`. The monthly count and reset live in that function and in `lib/quota.ts`; both need a per-plan table or a `plan_limits` lookup rather than constants.
 - A free journal tier: His File without lookups. Requires a profile without a Stripe subscription to sign in, which the magic-link flow currently refuses (P0 item 1 above is the same root cause). Sign-in must stop requiring an active subscription and lookups must check the plan instead.

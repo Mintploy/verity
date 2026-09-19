@@ -40,7 +40,7 @@ export default function TermsPage() {
             },
             {
               title: '6. Membership and payment',
-              body: 'Membership is billed annually at $199/year for founding members (first 100 members) and $297/year thereafter. Your membership renews automatically at the end of each billing period unless you cancel. You may cancel at any time; cancellation takes effect at the end of the current billing period. All payments are final and non-refundable except as required by law.',
+              body: 'A free account includes the journal and costs nothing. Lookups are sold as a monthly membership ($39 per month), an annual membership ($349 per year), a founding membership ($199 per year, limited to the first 100 members, at a price that does not increase for as long as the membership remains active), or a single lookup ($19, one-time). Memberships renew automatically at the end of each billing period unless you cancel. You may cancel at any time; cancellation takes effect at the end of the current billing period. All payments are final and non-refundable except as required by law.',
             },
             {
               title: '7. Privacy',

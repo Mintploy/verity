@@ -47,7 +47,7 @@ export default function CheckoutSuccessPage() {
             fontFamily: 'var(--sans)', fontSize: 16, color: 'var(--dark-soft)',
             lineHeight: 1.6, margin: '0 0 40px', fontWeight: 300,
           }}>
-            Your membership is active, with 15 safety lookups a month.
+            Your plan is active. Your lookups are ready when you are.
             {pending
               ? ' We kept the number you started with, it is ready when you are.'
               : ' Drop in a phone number and get the full picture, quietly, in seconds.'}

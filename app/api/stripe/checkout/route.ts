@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { normalizeEmail } from '@/lib/auth';
 import { readSession, getAccess, rememberOnProfile } from '@/lib/access';
-import { createCheckoutSession, findOrCreateCustomer, type Plan } from '@/lib/stripe';
+import { createCheckoutSession, findOrCreateCustomer, isPaidPlan } from '@/lib/stripe';
 import { getFoundingCount, FOUNDING_MEMBER_CAP } from '@/lib/quota';
+import { getServiceSupabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -18,20 +19,28 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: Plan; returnUrl?: string };
+    const { email: rawEmail, plan, returnUrl } = body as { email?: string; plan?: unknown; returnUrl?: string };
     // A signed-in member pays as herself; the body's email is only for the
     // pre-account funnel. Either way it is stored canonically.
     const session = await readSession(req);
     const email = session?.email ?? (rawEmail ? normalizeEmail(rawEmail) : undefined);
 
-    if (!plan || !['founding', 'annual', 'single'].includes(plan)) {
+    if (!isPaidPlan(plan)) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 });
     }
+    if (!email) {
+      return Response.json({ error: 'Sign in or enter your email first' }, { status: 400 });
+    }
 
+    // The founding cap is a table of 100 numbered slots. Claiming one takes a
+    // lock, so two checkouts started in the same second cannot both get the
+    // last place. The hold lasts 30 minutes; the webhook confirms it on
+    // payment, and an abandoned checkout gives the place back.
     if (plan === 'founding') {
-      const count = await getFoundingCount();
-      if (count >= FOUNDING_MEMBER_CAP) {
-        return Response.json({ error: 'Founding member slots are full', code: 'founding_full' }, { status: 409 });
+      const { data: slot, error: slotErr } = await getServiceSupabase().rpc('claim_founding_slot', { p_user_id: email });
+      if (slotErr) throw slotErr;
+      if (slot === null || slot === undefined) {
+        return Response.json({ error: 'All founding places are taken', code: 'founding_full' }, { status: 409 });
       }
     }
 

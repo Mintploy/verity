@@ -1,6 +1,6 @@
 import { getAnonSupabase, getUserSupabase } from './supabase';
 
-export const MONTHLY_SEARCH_LIMIT = 15;
+export const MONTHLY_SEARCH_LIMIT = 10;
 export const SINGLE_SEARCH_LIMIT = 1;
 export const FOUNDING_MEMBER_CAP = 100;
 
@@ -8,10 +8,15 @@ function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
-/** A free account has no lookups; a plan decides how many. */
-function limitForPlan(plan: string | null): number {
-  if (!plan) return 0;
-  return plan === 'single' ? SINGLE_SEARCH_LIMIT : MONTHLY_SEARCH_LIMIT;
+/**
+ * A free account has no lookups; a plan decides how many. A member who was
+ * on 15 a month when the limit dropped keeps 15 through grandfathered_limit
+ * until her next renewal, when the webhook clears it.
+ */
+function limitForPlan(plan: string | null, grandfathered?: number | null): number {
+  if (!plan || plan === 'free') return 0;
+  if (plan === 'single') return SINGLE_SEARCH_LIMIT;
+  return grandfathered ?? MONTHLY_SEARCH_LIMIT;
 }
 
 /**
@@ -43,14 +48,14 @@ export async function getQuota(userId: string): Promise<{ limit: number; used: n
   const sb = await getUserSupabase(userId);
   const { data: profile } = await sb
     .from('user_profiles')
-    .select('plan, searches_this_month, searches_reset_at')
+    .select('plan, grandfathered_limit, searches_this_month, searches_reset_at')
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (!profile) return { limit: MONTHLY_SEARCH_LIMIT, used: 0, remaining: 0, unlimited: false, plan: null };
+  if (!profile) return { limit: 0, used: 0, remaining: 0, unlimited: false, plan: null };
 
   const plan = (profile.plan ?? null) as string | null;
-  const limit = limitForPlan(plan);
+  const limit = limitForPlan(plan, profile.grandfathered_limit as number | null);
   // A new month resets the count, so what is on the row is not what she has used.
   const resets = plan !== 'single' && !isSameMonth(new Date(profile.searches_reset_at), new Date());
   const used = resets ? 0 : (profile.searches_this_month ?? 0);

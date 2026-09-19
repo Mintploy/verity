@@ -49,7 +49,7 @@ const faqs = [
     items: [
       {
         q: 'What does membership include?',
-        a: "One annual membership ($199 for a founding member's first year, $297 a year after that) gives you 15 safety lookups a month for 12 months, phone intelligence on any number, the Compare feature to evaluate multiple men side by side, PDF export, and 30-day re-run reminders when a report approaches a month old.",
+        a: "The journal is free for everyone: His Files, dates, flags and patterns, with no card. Lookups come with a plan: $39 a month or $349 a year for 10 lookups a month, or $19 for a single lookup that never expires. The first 100 members can take a founding membership at $199 a year for 10 lookups a month, with that price locked for as long as the membership stays active. Every plan includes phone intelligence on any number, Compare, PDF export and 30-day re-run reminders.",
       },
       {
         q: 'Can I cancel?',
