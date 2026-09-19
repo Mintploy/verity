@@ -14,6 +14,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -29,6 +30,15 @@ export function Nav({ showCompare, onCompare }: NavProps) {
 
   const close = () => setMenuOpen(false);
 
+  // The logout route only answers POST; a plain link to it was a 405 and
+  // she stayed signed in. Post, then reload from the top so every piece of
+  // the page forgets her.
+  const signOut = async () => {
+    setSigningOut(true);
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.assign('/');
+  };
+
   // Order follows who is reading. Signed out, the marketing pages lead because
   // she is still deciding. Signed in, she came back for her own things, her
   // drawer and her account, so those lead and the marketing pages fall behind.
@@ -36,6 +46,7 @@ export function Nav({ showCompare, onCompare }: NavProps) {
     ? [
         { label: 'His File', href: '/hisfile' },
         { label: 'Timeline', href: '/timeline' },
+        { label: 'Patterns', href: '/patterns' },
         { label: 'Settings', href: '/settings' },
         { label: 'How it works', href: '/#how-it-works' },
         { label: 'What we check', href: '/stories' },
@@ -210,14 +221,14 @@ export function Nav({ showCompare, onCompare }: NavProps) {
               }}>
                 New search
               </Link>
-              <Link href="/api/auth/logout" onClick={close} style={{
-                display: 'block', padding: '14px 24px', textAlign: 'center',
+              <button onClick={signOut} disabled={signingOut} style={{
+                display: 'block', width: '100%', padding: '14px 24px', textAlign: 'center',
                 borderRadius: 'var(--r-pill)', border: '1.5px solid var(--ivory-deep)',
-                color: 'var(--dark-soft)', textDecoration: 'none',
-                fontFamily: 'var(--sans)', fontSize: 15,
+                background: 'transparent', color: 'var(--dark-soft)',
+                fontFamily: 'var(--sans)', fontSize: 15, cursor: 'pointer',
               }}>
-                Sign out
-              </Link>
+                {signingOut ? 'Signing out...' : 'Sign out'}
+              </button>
             </>
           ) : (
             <>
