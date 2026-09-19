@@ -6,6 +6,7 @@ import {
   decryptFields, encryptFields, encryptValue, generateDataKey, unwrapDataKey, wrapDataKey,
 } from './crypto';
 import { hmacHisFile } from './lookups';
+import { cleanFlagList } from './flags';
 
 /** Why the file was opened. Decides which questionnaire the entry shows. */
 export type FileType = 'dating' | 'safety';
@@ -56,6 +57,9 @@ export interface UserProfile {
   email: string;
   date_of_birth?: string;
   star_sign?: string;
+  /** What she watches for on a date. Seeds the one-tap chips. See lib/flags.ts. */
+  green_flags?: string[];
+  red_flags?: string[];
 }
 
 export interface VerityWrapped {
@@ -195,13 +199,15 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
  * refused by column grants at the database as well; this keeps the request
  * body from ever naming them.
  */
-const PROFILE_EDITABLE: (keyof UserProfile)[] = ['date_of_birth'];
+const PROFILE_EDITABLE: (keyof UserProfile)[] = ['date_of_birth', 'green_flags', 'red_flags'];
 
 export async function upsertUserProfile(userId: string, email: string, updates: Partial<UserProfile>): Promise<UserProfile | null> {
   const sb = await getUserSupabase(userId);
   const allowed: Partial<UserProfile> = {};
   for (const k of PROFILE_EDITABLE) {
-    if (updates[k] !== undefined) (allowed as Record<string, unknown>)[k] = updates[k];
+    if (updates[k] === undefined) continue;
+    (allowed as Record<string, unknown>)[k] =
+      k === 'green_flags' || k === 'red_flags' ? cleanFlagList(updates[k]) : updates[k];
   }
   const starSign = allowed.date_of_birth ? getStarSign(allowed.date_of_birth) : undefined;
   const row = { user_id: userId, email, ...allowed, ...(starSign ? { star_sign: starSign } : {}) };

@@ -13,11 +13,17 @@ export interface DateEntry {
   paid?: string;
   /**
    * Before she goes. Logged while the date is still ahead of her, one tap.
-   * `beforeLoggedAt` is stamped on the first save and never moved.
+   * Moods are values from BEFORE_MOODS in lib/flags.ts; several can be true
+   * at once. `beforeLoggedAt` is stamped on the first save and never moved.
    */
-  beforeFeeling?: Feeling;
+  beforeMoods?: string[];
   beforeNote?: string;
   beforeLoggedAt?: string;
+  /**
+   * What she noticed while there, as green and red flags, each stamped when
+   * tapped. A red one is also added to the file's icks for that date.
+   */
+  duringFlags?: DuringFlag[];
   /**
    * Her answers to the before and after questions, 1 to 5, keyed by item id
    * from lib/reflection.ts. Optional; a date with none is still a date.
@@ -41,6 +47,15 @@ export interface DateEntry {
   duringLoggedAt?: string;
   likedMore?: string;
   likedLess?: string;
+}
+
+export type FlagKind = 'green' | 'red';
+
+export interface DuringFlag {
+  text: string;
+  kind: FlagKind;
+  /** When she tapped it. */
+  at: string;
 }
 
 export interface IckEntry {

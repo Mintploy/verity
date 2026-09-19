@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
 import type { HisFile, FileType } from '@/lib/hisfile';
-import { ickText, type DateEntry, type Feeling, type IckEntry } from '@/lib/journal';
+import { ickText, type DateEntry, type DuringFlag, type Feeling, type FlagKind, type IckEntry } from '@/lib/journal';
+import { BEFORE_MOODS, DEFAULT_GREEN_FLAGS, DEFAULT_RED_FLAGS, mergeFlags } from '@/lib/flags';
 import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionItem } from '@/lib/reflection';
 
 const APPS = ['Hinge', 'Tinder', 'Bumble', 'Raya', 'Coffee Meets Bagel', 'The League', 'Feeld', 'IRL', 'Instagram', 'Other'];
@@ -68,6 +69,8 @@ export default function HisFileDetail() {
   const [ickDate, setIckDate] = useState<number | ''>('');
   const [ickTopic, setIckTopic] = useState('');
   const [hasDob, setHasDob] = useState<boolean | null>(null);
+  // Her own green and red flags, from Settings. They lead the During chips.
+  const [myFlags, setMyFlags] = useState<{ green: string[]; red: string[] }>({ green: [], red: [] });
   const [quickSaving, setQuickSaving] = useState<number | null>(null);
   // Which of Before / During / After is open on each date card. Unset means
   // "whatever the date's timing suggests", see phaseDefaults.
@@ -77,7 +80,13 @@ export default function HisFileDetail() {
     setOpenPhases(o => ({ ...o, [phaseKey(number, phase)]: !(o[phaseKey(number, phase)] ?? fallback) }));
 
   useEffect(() => {
-    fetch('/api/profile').then(r => r.json()).then(d => setHasDob(!!d?.profile?.date_of_birth)).catch(() => {});
+    fetch('/api/profile').then(r => r.json()).then(d => {
+      setHasDob(!!d?.profile?.date_of_birth);
+      setMyFlags({
+        green: Array.isArray(d?.profile?.green_flags) ? d.profile.green_flags : [],
+        red: Array.isArray(d?.profile?.red_flags) ? d.profile.red_flags : [],
+      });
+    }).catch(() => {});
     if (isNew) return;
     fetch(`/api/hisfile/${id}`)
       .then(r => {
@@ -157,10 +166,11 @@ export default function HisFileDetail() {
    * of the page afterwards. The next state is computed here and posted
    * directly, because `file` in this closure would be a render behind.
    */
-  const quickLog = async (number: number, patch: Partial<DateEntry>, phase: 'before' | 'during' = 'during') => {
+  const quickLog = async (number: number, patch: Partial<DateEntry>, phase: 'before' | 'during' = 'during', extra: Partial<HisFile> = {}) => {
     const now = new Date().toISOString();
     const next: HisFile = {
       ...file,
+      ...extra,
       dates: datesOf(file).map(d => {
         if (d.number !== number) return d;
         // Before is stamped once, on the first save; during moves with every tap.
@@ -505,6 +515,22 @@ export default function HisFileDetail() {
                   quickLog(d.number, { beforeAnswers: { ...(d.beforeAnswers ?? {}), [id]: value } }, 'before');
                 const setAfter = (id: string, value: number) =>
                   updateAfter(d.number, { afterAnswers: { ...(d.afterAnswers ?? {}), [id]: value } });
+                // A red flag is also an ick on this date, so the Icks section
+                // and Wrapped see it. Un-tapping removes only the ick it added.
+                const toggleFlag = (text: string, kind: FlagKind) => {
+                  const cur = d.duringFlags ?? [];
+                  const has = cur.some(f => f.text === text && f.kind === kind);
+                  const nextFlags: DuringFlag[] = has
+                    ? cur.filter(f => !(f.text === text && f.kind === kind))
+                    : [...cur, { text, kind, at: new Date().toISOString() }];
+                  let icks = file.icks ?? [];
+                  if (kind === 'red') {
+                    const mine = (i: string | IckEntry) => typeof i !== 'string' && i.text === text && i.dateNumber === d.number;
+                    if (has) icks = icks.filter(i => !mine(i));
+                    else if (!icks.some(i => ickText(i) === text)) icks = [...icks, { text, dateNumber: d.number }];
+                  }
+                  quickLog(d.number, { duringFlags: nextFlags }, 'during', { icks });
+                };
                 return (
                   <>
                     {/* BEFORE. One tap, saved on the tap. Open until the date has
@@ -513,17 +539,23 @@ export default function HisFileDetail() {
                       title="Before"
                       hint={passed ? undefined : 'Saves the moment you tap'}
                       status={quickSaving === d.number ? 'Saving...' : d.beforeLoggedAt ? `Logged ${stamp(d.beforeLoggedAt)}` : undefined}
-                      summary={[feelingLabel(d.beforeFeeling), answered(d.beforeAnswers, beforeItems) ? `${answered(d.beforeAnswers, beforeItems)} of ${beforeItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
+                      summary={[moodLabels(d.beforeMoods), answered(d.beforeAnswers, beforeItems) ? `${answered(d.beforeAnswers, beforeItems)} of ${beforeItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
                       open={isOpen('before')}
                       onToggle={() => togglePhase(d.number, 'before', defaults.before)}
                       tone="soft"
                     >
-                      <FeelingRow value={d.beforeFeeling} onPick={v => quickLog(d.number, { beforeFeeling: v }, 'before')} strong />
+                      <MoodRow
+                        value={d.beforeMoods ?? []}
+                        onToggle={v => {
+                          const cur = d.beforeMoods ?? [];
+                          quickLog(d.number, { beforeMoods: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] }, 'before');
+                        }}
+                      />
                       <input
                         value={d.beforeNote ?? ''}
                         onChange={e => updateDate(d.number, { beforeNote: e.target.value })}
                         onBlur={e => { if (e.target.value.trim()) quickLog(d.number, { beforeNote: e.target.value }, 'before'); }}
-                        placeholder="Anything on your mind?"
+                        placeholder={(d.beforeMoods ?? []).includes('have-questions') ? 'What do you want to ask him?' : 'Questions to ask him, or anything on your mind...'}
                         style={{ ...inputStyle, background: 'var(--pearl)' }}
                       />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -544,12 +576,40 @@ export default function HisFileDetail() {
                       title="During"
                       hint="Saves the moment you tap"
                       status={quickSaving === d.number ? 'Saving...' : d.duringLoggedAt ? `Logged ${stamp(d.duringLoggedAt)}` : undefined}
-                      summary={feelingLabel(d.duringFeeling) ?? 'Not logged'}
+                      summary={flagSummary(d.duringFlags) ?? feelingLabel(d.duringFeeling) ?? 'Not logged'}
                       open={isOpen('during')}
                       onToggle={() => togglePhase(d.number, 'during', defaults.during)}
                       tone="strong"
                     >
-                      <FeelingRow value={d.duringFeeling} onPick={v => quickLog(d.number, { duringFeeling: v })} strong />
+                      {d.beforeNote?.trim() && (
+                        <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--dark-soft)', lineHeight: 1.45 }}>
+                          You wanted to ask: {d.beforeNote.trim()}
+                        </div>
+                      )}
+                      <FlagChips
+                        label="Green"
+                        kind="green"
+                        items={mergeFlags(myFlags.green, DEFAULT_GREEN_FLAGS)}
+                        chosen={d.duringFlags ?? []}
+                        onToggle={t => toggleFlag(t, 'green')}
+                      />
+                      <FlagChips
+                        label="Red"
+                        kind="red"
+                        items={mergeFlags(myFlags.red, DEFAULT_RED_FLAGS)}
+                        chosen={d.duringFlags ?? []}
+                        onToggle={t => toggleFlag(t, 'red')}
+                      />
+                      {myFlags.green.length + myFlags.red.length === 0 && (
+                        <Link href="/settings" style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--primary-deep)', textDecoration: 'underline' }}>
+                          Add your own flags in Settings, and they show up here.
+                        </Link>
+                      )}
+                      {d.duringFeeling && (
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)' }}>
+                          Felt: {feelingLabel(d.duringFeeling)}
+                        </div>
+                      )}
                       <input
                         value={d.duringNote ?? ''}
                         onChange={e => updateDate(d.number, { duringNote: e.target.value })}
@@ -794,6 +854,56 @@ type Phase = 'before' | 'during' | 'after';
 
 const stamp = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+const moodLabels = (values?: string[]) =>
+  (values ?? []).map(v => BEFORE_MOODS.find(m => m.value === v)?.label ?? v).join(', ') || undefined;
+
+const flagSummary = (flags?: DuringFlag[]) => {
+  if (!flags?.length) return undefined;
+  const g = flags.filter(f => f.kind === 'green').length;
+  const r = flags.filter(f => f.kind === 'red').length;
+  return [g ? `${g} green` : null, r ? `${r} red` : null].filter(Boolean).join(' · ');
+};
+
+/** Before she goes: several can be true at once, so these toggle. */
+function MoodRow({ value, onToggle }: { value: string[]; onToggle: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {BEFORE_MOODS.map(m => (
+        <button key={m.value} onClick={() => onToggle(m.value)} style={{ ...chipStyle(value.includes(m.value), true), textTransform: 'none' }}>
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Green or red flag chips for During. Hers first, then defaults. Save on the tap. */
+function FlagChips({ label, kind, items, chosen, onToggle }: {
+  label: string;
+  kind: FlagKind;
+  items: string[];
+  chosen: DuringFlag[];
+  onToggle: (text: string) => void;
+}) {
+  const has = (t: string) => chosen.some(f => f.kind === kind && f.text === t);
+  const on = kind === 'green'
+    ? { border: '1.5px solid var(--sage-deep)', background: 'var(--sage-pale)', color: 'var(--sage-deep)' }
+    : { border: '1.5px solid var(--deeprose-deep)', background: 'var(--deeprose-pale)', color: 'var(--deeprose-deep)' };
+  const off = { border: '1.5px solid var(--primary-pale)', background: 'var(--pearl)', color: 'var(--dark-soft)' };
+  return (
+    <div>
+      <div style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: kind === 'green' ? 'var(--sage-deep)' : 'var(--deeprose-deep)', letterSpacing: 0.2, textTransform: 'uppercase', marginBottom: 8 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {items.map(t => (
+          <button key={t} onClick={() => onToggle(t)} style={{ ...(has(t) ? on : off), padding: '10px 16px', borderRadius: 'var(--r-pill)', fontFamily: 'var(--sans)', fontSize: 13.5, cursor: 'pointer' }}>
+            {has(t) ? '✓ ' : ''}{t}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** A feeling chip. `strong` is the filled look used where one tap is the whole job. */
 function chipStyle(selected: boolean, strong: boolean): React.CSSProperties {
