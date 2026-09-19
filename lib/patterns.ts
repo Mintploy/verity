@@ -13,6 +13,7 @@
 import type { HisFile } from './hisfile';
 import { ickText, type DateEntry, type Feeling } from './journal';
 import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionDimension, type ReflectionItem } from './reflection';
+import { SECTION_LABEL, UNSAFE_FLAG, allFlagsOn, flagLabel, parseFlagId, personalFlagId } from './signals';
 
 export const PATTERNS_MIN_DATES = 4;
 export const PATTERNS_MIN_MEN = 2;
@@ -235,6 +236,78 @@ export function whatTheDatesSay(files: HisFile[], today: Date = new Date()): Dat
 }
 
 /* ------------------------------------------------------------------ */
+/* Section 1b: the flags she tags                                      */
+/* ------------------------------------------------------------------ */
+
+export interface FlagCount { id: string; label: string; men: number; dates: number }
+
+export interface FlagPatterns {
+  /** Red flags, hers and Verity's, by how many men she has tagged them on. Feeling unsafe is kept apart. */
+  redMostLogged: FlagCount[];
+  /** Her personal red flags that have shown up on a date, and the ones she has only pre-selected. */
+  personalRed: { showedUp: FlagCount[]; neverYet: string[] };
+  /** Strong signals she has tagged on a man with no report attached, and what would answer them. */
+  unanswered: Array<{ who: string; fileId: string; label: string; sections: string[] }>;
+  unsafe: Array<{ who: string; fileId: string; dateNumber: number }>;
+}
+
+export function flagPatterns(files: HisFile[], personalRed: readonly string[] = []): FlagPatterns {
+  const dating = files.filter(f => (f.file_type ?? 'dating') === 'dating' && f.id);
+  const counts = new Map<string, { men: Set<string>; dates: number }>();
+  const unsafe: FlagPatterns['unsafe'] = [];
+  const unanswered: FlagPatterns['unanswered'] = [];
+  const seenUnanswered = new Set<string>();
+
+  for (const f of dating) {
+    const who = nameOf(f);
+    for (const d of datesOf(f)) {
+      for (const id of allFlagsOn(d)) {
+        if (id === UNSAFE_FLAG) { unsafe.push({ who, fileId: f.id!, dateNumber: d.number }); continue; }
+        const p = parseFlagId(id);
+        if (!p) continue;
+        const g = counts.get(id) ?? { men: new Set<string>(), dates: 0 };
+        g.men.add(f.id!); g.dates += 1;
+        counts.set(id, g);
+        if (p.source === 'signal' && p.signal.tier === 'strong' && p.signal.answeredBy.length && !f.report_id) {
+          const key = `${f.id}:${id}`;
+          if (!seenUnanswered.has(key)) {
+            seenUnanswered.add(key);
+            unanswered.push({ who, fileId: f.id!, label: p.signal.label, sections: p.signal.answeredBy.map(sct => SECTION_LABEL[sct]) });
+          }
+        }
+      }
+    }
+  }
+
+  const toCount = (id: string): FlagCount => {
+    const g = counts.get(id)!;
+    return { id, label: flagLabel(id), men: g.men.size, dates: g.dates };
+  };
+  const byWeight = (a: FlagCount, b: FlagCount) => b.men - a.men || b.dates - a.dates || a.label.localeCompare(b.label);
+
+  const redMostLogged = [...counts.keys()]
+    .filter(id => parseFlagId(id)?.kind === 'red')
+    .map(toCount)
+    .sort(byWeight)
+    .slice(0, 5);
+
+  const showedUp: FlagCount[] = [];
+  const neverYet: string[] = [];
+  for (const text of personalRed) {
+    const id = personalFlagId('red', text);
+    if (counts.has(id)) showedUp.push(toCount(id)); else neverYet.push(text);
+  }
+  // Red flags of hers she tagged but has since removed from her list still showed up.
+  for (const id of counts.keys()) {
+    const p = parseFlagId(id);
+    if (p?.source === 'personal' && p.kind === 'red' && !showedUp.some(c => c.id === id)) showedUp.push(toCount(id));
+  }
+  showedUp.sort(byWeight);
+
+  return { redMostLogged, personalRed: { showedUp, neverYet }, unanswered, unsafe };
+}
+
+/* ------------------------------------------------------------------ */
 /* Section 2: her own answers, summarised back                         */
 /* ------------------------------------------------------------------ */
 
@@ -390,7 +463,7 @@ export function yourPatterns(files: HisFile[]): YourPatterns {
 
 export interface Suggestion { text: string; fileId?: string }
 
-export function whatToTryNext(say: DatesSay, you: YourPatterns, redFlags: readonly string[] = []): Suggestion[] {
+export function whatToTryNext(say: DatesSay, you: YourPatterns, redFlags: readonly string[] = [], flags?: FlagPatterns): Suggestion[] {
   const out: Suggestion[] = [];
   const has = (s: string) => redFlags.some(r => r.toLowerCase() === s.toLowerCase());
 
@@ -411,6 +484,15 @@ export function whatToTryNext(say: DatesSay, you: YourPatterns, redFlags: readon
       text: has(ick.text)
         ? `"${ick.text}" has come up with ${ick.men} men${when}. It is already one of your red flags: tap it during the date, while it is happening, rather than logging it after.`
         : `"${ick.text}" has come up with ${ick.men} men${when}. Add it to your red flags in Settings so it is one tap during the date.`,
+    });
+  }
+
+  // A strong signal she tagged that a report section can settle, on a man with no report.
+  const open = flags?.unanswered[0];
+  if (open && out.length < 2) {
+    out.push({
+      fileId: open.fileId,
+      text: `You tagged "${open.label}" on ${open.who}. That is one a report can settle: its ${open.sections.join(' and ')} would answer it either way.`,
     });
   }
 

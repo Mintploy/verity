@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav/Nav';
 import type { HisFile } from '@/lib/hisfile';
 import {
-  FEELING_LABEL, PATTERNS_MIN_DATES, PATTERNS_MIN_MEN, readiness, whatTheDatesSay, whatToTryNext, yourPatterns,
+  FEELING_LABEL, PATTERNS_MIN_DATES, PATTERNS_MIN_MEN, flagPatterns, readiness, whatTheDatesSay, whatToTryNext, yourPatterns,
   type Band, type DimensionRead, type Mover,
 } from '@/lib/patterns';
 
@@ -145,7 +145,8 @@ export default function PatternsPage() {
   const ready = useMemo(() => readiness(files ?? []), [files]);
   const say = useMemo(() => (ready.ready ? whatTheDatesSay(files ?? []) : null), [files, ready.ready]);
   const you = useMemo(() => (ready.ready ? yourPatterns(files ?? []) : null), [files, ready.ready]);
-  const next = useMemo(() => (say && you ? whatToTryNext(say, you, redFlags) : []), [say, you, redFlags]);
+  const flags = useMemo(() => (ready.ready ? flagPatterns(files ?? [], redFlags) : null), [files, ready.ready, redFlags]);
+  const next = useMemo(() => (say && you ? whatToTryNext(say, you, redFlags, flags ?? undefined) : []), [say, you, redFlags, flags]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ivory)' }}>
@@ -185,7 +186,7 @@ export default function PatternsPage() {
             </p>
             <Link href="/hisfile" style={{ display: 'inline-block', marginTop: 12, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--primary-deep)', textDecoration: 'underline' }}>Go to His File</Link>
           </div>
-        ) : say && you ? (
+        ) : say && you && flags ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
 
             {/* Section 1 */}
@@ -211,6 +212,36 @@ export default function PatternsPage() {
                       </span>
                     </div>
                   ))}
+                </Row>
+                <Row label="Red flags you tag most often, across men">
+                  {flags.redMostLogged.length === 0 ? <p style={quiet}>No red flags tagged on a date yet. They live under Before, During and After on each date.</p> : flags.redMostLogged.map(fc => (
+                    <div key={fc.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark)', padding: '3px 0' }}>
+                      <span>{fc.label}</span>
+                      <span style={{ color: 'var(--dark-soft)', textAlign: 'right', whiteSpace: 'nowrap' }}>{fc.men} {fc.men === 1 ? 'man' : 'men'}, {fc.dates} date{fc.dates === 1 ? '' : 's'}</span>
+                    </div>
+                  ))}
+                  {flags.unsafe.length > 0 && (
+                    <p style={{ ...quiet, marginTop: 6, color: 'var(--deeprose-deep)' }}>
+                      You logged feeling unsafe with {[...new Set(flags.unsafe.map(u => u.who))].join(', ')}. That is kept out of the counts above.
+                    </p>
+                  )}
+                </Row>
+                <Row label="Your own red flags: which show up, which you only pre-selected">
+                  {flags.personalRed.showedUp.length + flags.personalRed.neverYet.length === 0 ? (
+                    <p style={quiet}>Set your red flags in Settings and this fills in.</p>
+                  ) : (
+                    <>
+                      {flags.personalRed.showedUp.map(fc => (
+                        <div key={fc.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--dark)', padding: '3px 0' }}>
+                          <span>{fc.label}</span>
+                          <span style={{ color: 'var(--deeprose-deep)', textAlign: 'right', whiteSpace: 'nowrap' }}>showed up · {fc.men} {fc.men === 1 ? 'man' : 'men'}</span>
+                        </div>
+                      ))}
+                      {flags.personalRed.neverYet.length > 0 && (
+                        <p style={{ ...quiet, marginTop: 6 }}>Not seen on a date yet: {flags.personalRed.neverYet.join(', ')}.</p>
+                      )}
+                    </>
+                  )}
                 </Row>
                 <Row label="When feeling up beforehand turned into unsure or worse after">
                   {say.drops.compared === 0 ? (
