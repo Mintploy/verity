@@ -744,11 +744,9 @@ function ReportActionSidebar({ report, onCompare }: { report: Report; onCompare:
           nickname: report.subject.name,
           full_name: report.subject.name,
           phone: report.subject.phone,
-          safety_score: report.score,
+          // The server attaches the report and its score from its own copy
+          // of this search; the browser only names it.
           report_id: report.searchId,
-          // Without the body itself, "View report" from His File has nothing to
-          // open once this tab's sessionStorage is gone.
-          report_data: report,
         }),
       });
       if (res.status === 401) { router.push('/login'); return; }
