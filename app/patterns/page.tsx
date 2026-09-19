@@ -138,7 +138,7 @@ export default function PatternsPage() {
       .then(d => { if (d) setFiles((d.files ?? []) as HisFile[]); })
       .catch(() => setFiles([]));
     fetch('/api/profile').then(r => r.json())
-      .then(d => { if (Array.isArray(d?.profile?.red_flags)) setRedFlags(d.profile.red_flags); })
+      .then(d => { if (Array.isArray(d?.profile?.personal_flags?.red)) setRedFlags(d.profile.personal_flags.red); })
       .catch(() => {});
   }, [router]);
 

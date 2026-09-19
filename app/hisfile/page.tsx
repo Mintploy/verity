@@ -15,6 +15,8 @@ export default function HisFilePage() {
   const [activeTab, setActiveTab] = useState('all');
   const [error, setError] = useState<string | null>(null);
   const [hasDob, setHasDob] = useState<boolean | null>(null);
+  // Members from before the welcome flow existed see it once, from here.
+  const [showWelcome, setShowWelcome] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -36,6 +38,7 @@ export default function HisFilePage() {
     ]).then(([fileData, profileData]) => {
       if (fileData) setFiles(fileData.files ?? []);
       setHasDob(!!profileData?.profile?.date_of_birth);
+      setShowWelcome(!!profileData?.profile && !profileData.profile.onboarded_at);
     }).catch(() => setError('Could not load your files.')).finally(() => setLoading(false));
   }, [router]);
 
@@ -51,6 +54,13 @@ export default function HisFilePage() {
   };
 
   const filtered = activeTab === 'all' ? files : files.filter(f => f.status === activeTab);
+
+  const dismissWelcome = async () => {
+    setShowWelcome(false);
+    try {
+      await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ onboarded: true }) });
+    } catch {}
+  };
 
   return (
     <div style={{ background: 'var(--ivory)', minHeight: '100vh' }}>
@@ -116,8 +126,30 @@ export default function HisFilePage() {
           ))}
         </div>
 
+        {/* The welcome flow, once, for members who signed up before it existed. */}
+        {!loading && showWelcome && (
+          <div style={{
+            padding: '16px 20px', borderRadius: 'var(--r-lg)', marginBottom: 16,
+            background: 'var(--pearl)', border: '1px solid var(--gold-pale)', boxShadow: 'var(--shadow-sm)',
+            display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ fontFamily: 'var(--serif)', fontSize: 16, color: 'var(--dark)' }}>
+                Two quick questions, one minute.
+              </div>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', marginTop: 3, opacity: 0.8 }}>
+                Your birthday for your star sign, and what matters to you on a date.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <Link href="/welcome" style={{ padding: '9px 18px', borderRadius: 'var(--r-pill)', background: 'var(--primary)', color: 'var(--ivory)', fontFamily: 'var(--serif)', fontSize: 14, textDecoration: 'none' }}>Start</Link>
+              <button onClick={dismissWelcome} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--dark-soft)', textDecoration: 'underline' }}>Not now</button>
+            </div>
+          </div>
+        )}
+
         {/* Birthday prompt, shown once profile is loaded and DOB is missing */}
-        {!loading && hasDob === false && (
+        {!loading && hasDob === false && !showWelcome && (
           <Link href="/settings" style={{ textDecoration: 'none', display: 'block', marginBottom: 16 }}>
             <div style={{
               padding: '16px 20px', borderRadius: 'var(--r-lg)',

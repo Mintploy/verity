@@ -39,6 +39,43 @@ export const DEFAULT_RED_FLAGS: readonly string[] = [
   'Something feels off',
 ];
 
+/**
+ * Her personal standards: what she wants in a man and what she will not
+ * accept. Asked once at sign-up and editable in Settings. Stored encrypted
+ * on user_profiles.personal_flags under her data key. These are hers alone
+ * and are kept apart from anything a lookup or a report says about him.
+ */
+export interface PersonalFlags {
+  green: string[];
+  red: string[];
+  version: 1;
+}
+
+export const PERSONAL_FLAGS_VERSION = 1;
+/** Up to five picks plus one of her own, per group. */
+export const PERSONAL_FLAG_MAX_PICKS = 5;
+export const PERSONAL_FLAG_MAX_CUSTOM = 1;
+export const PERSONAL_FLAG_MAX = PERSONAL_FLAG_MAX_PICKS + PERSONAL_FLAG_MAX_CUSTOM;
+
+export const PERSONAL_GREEN_EXAMPLES: readonly string[] = [
+  'Plans the date', 'Asks about my life', 'Consistent texter', 'Kind to staff',
+  'Introduces me to friends', 'Clear about what he wants', 'Financially stable', 'Follows through',
+];
+
+export const PERSONAL_RED_EXAMPLES: readonly string[] = [
+  'Late without telling me', 'Rude to staff', 'Only talks about himself', 'Heavy drinking',
+  'Pushes physical pace', 'Vague about what he wants', 'Flaky plans', 'Disrespects boundaries',
+];
+
+export function cleanPersonalFlags(v: unknown): PersonalFlags {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  return {
+    green: cleanFlagList(o.green).slice(0, PERSONAL_FLAG_MAX),
+    red: cleanFlagList(o.red).slice(0, PERSONAL_FLAG_MAX),
+    version: PERSONAL_FLAGS_VERSION,
+  };
+}
+
 export const FLAG_MAX_ITEMS = 20;
 export const FLAG_MAX_LENGTH = 40;
 
