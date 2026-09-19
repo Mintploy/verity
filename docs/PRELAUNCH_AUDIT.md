@@ -77,3 +77,41 @@ Severity key: **P0** blocks launch or taking money. **P1** fix in the first week
 8. Address-level and relative-pivot mitigations, subject opt-out, abuse contact (#8).
 9. Strip PII from logs, make emails discreet, align sending domain (#16, #17).
 10. Session lifetime, picker metering, security headers (#10, #11, #20).
+
+## Open items added 2026-09-19 (not yet acted on)
+
+Recorded after the security pass (RLS, journal and identity encryption, audit log, caps and flags). None of these has been started.
+
+### O1. Dependency vulnerabilities: 8 reported by `npm audit` (1 critical, 6 high, 1 moderate)
+
+Reviewed read-only on 2026-09-19. Proposed fixes avoid `npm audit fix --force`. Only one package is in the production runtime; the rest are build-time or lint-time only.
+
+| Package | Severity | Reached through | In production runtime? | Proposed fix |
+|---|---|---|---|---|
+| `next` 16.2.6 | critical | direct dependency | Yes | `npm install next@16.3.5 eslint-config-next@16.3.5`, then `npm run build` and `npm run lint`, then a browser pass. Non-major. Covers eleven advisories, including two RCEs: one Windows-only (not applicable on Vercel), one in the Image Optimization API via AVIF. `next/image` is not used anywhere in the app, and Vercel serves Linux, so current exposure to both RCEs is low; the SSRF, proxy-bypass and cache-confusion advisories still apply. Read `node_modules/next/dist/docs/` for 16.3 changes first, per AGENTS.md. |
+| `postcss` 8.4.31 | high | nested under `next` | No, build only | Fixed by the `next` upgrade, which pulls `postcss` 8.5.23. The second copy under `@tailwindcss/postcss` (8.5.15) moves with `npm update postcss`. |
+| `sharp` 0.34.5 | high | optional dependency of `next` | Only if image optimization runs; `next/image` is unused | Fixed by the `next` upgrade (`sharp` ^0.35.4). |
+| `nanoid` 3.3.12 | high | `postcss` | No, build only | `npm update nanoid` after the above; both advisories concern non-secure generators, which nothing here calls. Verity's own tokens use `crypto.randomBytes`. |
+| `browserslist` 4.28.2 | high | `eslint-config-next` → `eslint-plugin-react-hooks` → `@babel/core` | No, lint only | `npm update browserslist baseline-browser-mapping`. If a parent pins below the fixed range, add an `overrides` entry in `package.json` for `browserslist` (>=4.28.7) rather than forcing. |
+| `baseline-browser-mapping` 2.10.32 | moderate | `browserslist` | No, lint only | Same as above. |
+| `brace-expansion` 5.0.6 and 1.x | high | `minimatch` under `typescript-eslint` and `eslint` | No, lint only | `npm update brace-expansion minimatch`. All three advisories are DoS on attacker-supplied glob patterns, which lint never receives. |
+| `js-yaml` 4.1.1 | high | `eslint` → `@eslint/eslintrc` | No, lint only | `npm update js-yaml`. DoS on attacker-supplied YAML; lint reads only our own config. |
+
+Order: `next` first (it is the only runtime exposure and the only non-trivial upgrade), verify, then the `npm update` batch, then re-run `npm audit` and expect zero. Commit `package-lock.json` with each step so a regression can be bisected.
+
+### O2. Upgrade Supabase to Pro before the first paying customer
+
+The Mintploy organization is on the Free plan, which as far as I can tell has no scheduled backups and no point-in-time recovery; verify at Database, Backups. The in-database snapshot function covers migrations, not a database loss. Pro adds daily backups. Also on the checklist at that time: apply the outstanding Postgres security patches the advisor reports, and consider the PITR add-on once there is revenue to protect.
+
+### O3. Privacy policy draft needs lawyer review before launch
+
+`docs/privacy-policy-draft-audit-and-flags.md` describes the lookup log, IP retention, review flags, and what survives account deletion. Two placeholders await a decision: the retention period is now implemented as 24 months with IP addresses cleared at 90 days, and the review time is unset. The existing published policy still contains the inaccurate statements listed under P1 item 13 above; the rewrite and the draft should go to counsel together.
+
+### O4. Pricing change
+
+Decided, not built:
+
+- A $39 monthly plan with 10 lookups a month. Today's plans are annual ($199 founding, $297 standard) and a $19 single report; `consume_search()` hard-codes 15 per month and 1 lifetime for `single`. The monthly count and reset live in that function and in `lib/quota.ts`; both need a per-plan table or a `plan_limits` lookup rather than constants.
+- A free journal tier: His File without lookups. Requires a profile without a Stripe subscription to sign in, which the magic-link flow currently refuses (P0 item 1 above is the same root cause). Sign-in must stop requiring an active subscription and lookups must check the plan instead.
+- Founding cap enforced by the database, not by a count in the checkout route. A `founding_count()` check at checkout still races; the cap belongs in a constraint or a definer function that claims a slot atomically at webhook time.
+- Remove the founding step-up schedule (`scheduleFoundingStepUp` in `lib/stripe.ts` and its call in the webhook). Existing founding subscriptions already converted to a schedule would need the schedule released by hand in Stripe.

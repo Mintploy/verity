@@ -18,7 +18,7 @@
  *               under her data key. After this, set
  *               HISFILE_IDENTITY_ENCRYPTION=on in Vercel and redeploy so new
  *               writes are sealed too, then apply
- *               supabase/his_files_drop_phone_normalized.sql.
+ *               supabase/his_files_drop_phone_normalized.sql (applied 2026-09-19).
  *   --rollback  Decrypts the three identity fields. Leaves the HMACs, which
  *               are harmless. Do this before restoring phone_normalized.
  *

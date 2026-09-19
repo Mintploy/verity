@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Nav } from '@/components/nav/Nav';
 import type { HisFile, FileType } from '@/lib/hisfile';
 import { ickText, type DateEntry, type Feeling, type IckEntry } from '@/lib/journal';
+import { REFLECTION_ITEMS_V1, REFLECTION_VERSION, asAnswer, type ReflectionItem } from '@/lib/reflection';
 
 const APPS = ['Hinge', 'Tinder', 'Bumble', 'Raya', 'Coffee Meets Bagel', 'The League', 'Feeld', 'IRL', 'Instagram', 'Other'];
 const FEELINGS: Array<{ value: Feeling; label: string }> = [
@@ -68,6 +69,12 @@ export default function HisFileDetail() {
   const [ickTopic, setIckTopic] = useState('');
   const [hasDob, setHasDob] = useState<boolean | null>(null);
   const [quickSaving, setQuickSaving] = useState<number | null>(null);
+  // Which of Before / During / After is open on each date card. Unset means
+  // "whatever the date's timing suggests", see phaseDefaults.
+  const [openPhases, setOpenPhases] = useState<Record<string, boolean>>({});
+  const phaseKey = (number: number, phase: Phase) => `${number}:${phase}`;
+  const togglePhase = (number: number, phase: Phase, fallback: boolean) =>
+    setOpenPhases(o => ({ ...o, [phaseKey(number, phase)]: !(o[phaseKey(number, phase)] ?? fallback) }));
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => setHasDob(!!d?.profile?.date_of_birth)).catch(() => {});
@@ -119,9 +126,9 @@ export default function HisFileDetail() {
   const dates = datesOf(file);
   const latestDate = dates[dates.length - 1]?.number ?? 1;
 
-  const updateDate = (number: number, patch: Partial<DateEntry>) => {
+  const updateDateWith = (number: number, fn: (d: DateEntry) => Partial<DateEntry>) => {
     setFile(f => {
-      const next = datesOf(f).map(d => (d.number === number ? { ...d, ...patch } : d));
+      const next = datesOf(f).map(d => (d.number === number ? { ...d, ...fn(d) } : d));
       const first = next.find(d => d.number === 1);
       return {
         ...f,
@@ -132,6 +139,16 @@ export default function HisFileDetail() {
       };
     });
   };
+  const updateDate = (number: number, patch: Partial<DateEntry>) => updateDateWith(number, () => patch);
+  /**
+   * The after section saves with the form, but its first fill is stamped so
+   * "when she wrote this" is known later. The stamp never moves.
+   */
+  const updateAfter = (number: number, patch: Partial<DateEntry>) => updateDateWith(number, d => ({
+    ...patch,
+    afterLoggedAt: d.afterLoggedAt ?? new Date().toISOString(),
+    reflectionVersion: d.reflectionVersion ?? REFLECTION_VERSION,
+  }));
   /**
    * An in-the-moment entry, saved on the tap rather than on the Save button.
    *
@@ -140,12 +157,18 @@ export default function HisFileDetail() {
    * of the page afterwards. The next state is computed here and posted
    * directly, because `file` in this closure would be a render behind.
    */
-  const quickLog = async (number: number, patch: Partial<DateEntry>) => {
+  const quickLog = async (number: number, patch: Partial<DateEntry>, phase: 'before' | 'during' = 'during') => {
+    const now = new Date().toISOString();
     const next: HisFile = {
       ...file,
-      dates: datesOf(file).map(d =>
-        d.number === number ? { ...d, ...patch, duringLoggedAt: new Date().toISOString() } : d,
-      ),
+      dates: datesOf(file).map(d => {
+        if (d.number !== number) return d;
+        // Before is stamped once, on the first save; during moves with every tap.
+        const stamp = phase === 'before'
+          ? { beforeLoggedAt: d.beforeLoggedAt ?? now, reflectionVersion: d.reflectionVersion ?? REFLECTION_VERSION }
+          : { duringLoggedAt: now };
+        return { ...d, ...patch, ...stamp };
+      }),
     };
     setFile(next);
     if (isNew) return; // Nothing to attach it to until the file is saved once.
@@ -446,7 +469,7 @@ export default function HisFileDetail() {
                   Your {ordinal(soon.number).toLowerCase()} date{file.nickname ? ` with ${file.nickname}` : ''} is {when}{soon.location ? `, at ${soon.location}` : ''}.
                 </div>
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', lineHeight: 1.55, marginTop: 5 }}>
-                  How is it going? Tap a feeling under &ldquo;During the date&rdquo; and it saves the moment you tap, no need to come back down here.
+                  Before you go, tap how you feel under &ldquo;Before&rdquo;. While you are there, tap under &ldquo;During&rdquo;. Both save the moment you tap, no need to come back down here.
                 </div>
               </div>
             );
@@ -467,67 +490,114 @@ export default function HisFileDetail() {
                   <input type="date" value={d.date ?? ''} onChange={e => updateDate(d.number, { date: e.target.value })} style={inputStyle} />
                 </Field>
               </TwoCol>
-              {/* Logged in the moment, and saved on the tap. Kept above the
-                  rest of the card because it is the one thing she opens this
-                  page to do while the date is still happening. */}
-              <div style={{ padding: '13px 15px', borderRadius: 'var(--r-md)', background: 'var(--blush-pale)', border: '1px solid var(--primary-pale)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--primary-deep)', letterSpacing: 0.2, textTransform: 'uppercase' }}>
-                    During the date
-                  </span>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)' }}>
-                    {quickSaving === d.number
-                      ? 'Saving...'
-                      : d.duringLoggedAt
-                        ? `Logged ${new Date(d.duringLoggedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                        : 'Saves the moment you tap'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {FEELINGS.map(fe => (
-                    <button
-                      key={fe.value}
-                      onClick={() => quickLog(d.number, { duringFeeling: fe.value })}
-                      style={{
-                        padding: '10px 18px', borderRadius: 'var(--r-pill)',
-                        border: d.duringFeeling === fe.value ? '1.5px solid var(--primary)' : '1.5px solid var(--primary-pale)',
-                        background: d.duringFeeling === fe.value ? 'var(--primary)' : 'var(--pearl)',
-                        color: d.duringFeeling === fe.value ? 'var(--pearl)' : 'var(--dark-soft)',
-                        fontFamily: 'var(--sans)', fontSize: 13.5, cursor: 'pointer',
-                      }}
+              {(() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const passed = !!d.date && d.date < today;
+                const isToday = d.date === today;
+                const defaults = { before: !passed, during: isToday || !d.date, after: passed };
+                const isOpen = (phase: Phase) => openPhases[phaseKey(d.number, phase)] ?? defaults[phase];
+                const feelingLabel = (v?: Feeling) => FEELINGS.find(fe => fe.value === v)?.label;
+                const beforeItems = REFLECTION_ITEMS_V1.before;
+                const afterItems = REFLECTION_ITEMS_V1.after;
+                const answered = (answers: Record<string, number> | undefined, items: readonly ReflectionItem[]) =>
+                  items.filter(it => asAnswer(answers?.[it.id]) !== undefined).length;
+                const setBefore = (id: string, value: number) =>
+                  quickLog(d.number, { beforeAnswers: { ...(d.beforeAnswers ?? {}), [id]: value } }, 'before');
+                const setAfter = (id: string, value: number) =>
+                  updateAfter(d.number, { afterAnswers: { ...(d.afterAnswers ?? {}), [id]: value } });
+                return (
+                  <>
+                    {/* BEFORE. One tap, saved on the tap. Open until the date has
+                        passed, then folded to a line she can reopen. */}
+                    <DatePhase
+                      title="Before"
+                      hint={passed ? undefined : 'Saves the moment you tap'}
+                      status={quickSaving === d.number ? 'Saving...' : d.beforeLoggedAt ? `Logged ${stamp(d.beforeLoggedAt)}` : undefined}
+                      summary={[feelingLabel(d.beforeFeeling), answered(d.beforeAnswers, beforeItems) ? `${answered(d.beforeAnswers, beforeItems)} of ${beforeItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
+                      open={isOpen('before')}
+                      onToggle={() => togglePhase(d.number, 'before', defaults.before)}
+                      tone="soft"
                     >
-                      {fe.label}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  value={d.duringNote ?? ''}
-                  onChange={e => updateDate(d.number, { duringNote: e.target.value })}
-                  onBlur={e => { if (e.target.value.trim()) quickLog(d.number, { duringNote: e.target.value }); }}
-                  placeholder="One line, just for you..."
-                  style={{ ...inputStyle, marginTop: 10, background: 'var(--pearl)' }}
-                />
-              </div>
-              <Field label="Who paid?">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {(['split', 'he paid', 'i paid', 'neither'] as const).map(opt => (
-                    <button key={opt} onClick={() => updateDate(d.number, { paid: opt })} style={{ padding: '7px 16px', borderRadius: 'var(--r-pill)', border: d.paid === opt ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)', background: d.paid === opt ? 'var(--primary-mist)' : 'var(--pearl)', color: d.paid === opt ? 'var(--primary-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer', textTransform: 'capitalize' }}>{opt}</button>
-                  ))}
-                </div>
-              </Field>
-              <Field label="How did you feel afterwards?">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {FEELINGS.map(fe => (
-                    <button key={fe.value} onClick={() => updateDate(d.number, { feeling: fe.value })} style={{ padding: '7px 16px', borderRadius: 'var(--r-pill)', border: d.feeling === fe.value ? '1.5px solid var(--primary)' : '1.5px solid var(--gold-pale)', background: d.feeling === fe.value ? 'var(--primary-mist)' : 'var(--pearl)', color: d.feeling === fe.value ? 'var(--primary-deep)' : 'var(--dark-soft)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>{fe.label}</button>
-                  ))}
-                </div>
-              </Field>
-              <Field label="What made you like him more?">
-                <textarea value={d.likedMore ?? ''} onChange={e => updateDate(d.number, { likedMore: e.target.value })} placeholder="He listened, he planned it, he was kind to the waiter..." rows={2} style={{ ...inputStyle, resize: 'vertical' as const }} />
-              </Field>
-              <Field label="What made you like him less?">
-                <textarea value={d.likedLess ?? ''} onChange={e => updateDate(d.number, { likedLess: e.target.value })} placeholder="He was late, he talked about his ex..." rows={2} style={{ ...inputStyle, resize: 'vertical' as const }} />
-              </Field>
+                      <FeelingRow value={d.beforeFeeling} onPick={v => quickLog(d.number, { beforeFeeling: v }, 'before')} strong />
+                      <input
+                        value={d.beforeNote ?? ''}
+                        onChange={e => updateDate(d.number, { beforeNote: e.target.value })}
+                        onBlur={e => { if (e.target.value.trim()) quickLog(d.number, { beforeNote: e.target.value }, 'before'); }}
+                        placeholder="Anything on your mind?"
+                        style={{ ...inputStyle, background: 'var(--pearl)' }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        {beforeItems.map(it => (
+                          <AnswerSlider
+                            key={it.id}
+                            item={it}
+                            value={asAnswer(d.beforeAnswers?.[it.id])}
+                            onChange={v => updateDate(d.number, { beforeAnswers: { ...(d.beforeAnswers ?? {}), [it.id]: v } })}
+                            onCommit={v => setBefore(it.id, v)}
+                          />
+                        ))}
+                      </div>
+                    </DatePhase>
+
+                    {/* DURING. Unchanged: logged in the moment, saved on the tap. */}
+                    <DatePhase
+                      title="During"
+                      hint="Saves the moment you tap"
+                      status={quickSaving === d.number ? 'Saving...' : d.duringLoggedAt ? `Logged ${stamp(d.duringLoggedAt)}` : undefined}
+                      summary={feelingLabel(d.duringFeeling) ?? 'Not logged'}
+                      open={isOpen('during')}
+                      onToggle={() => togglePhase(d.number, 'during', defaults.during)}
+                      tone="strong"
+                    >
+                      <FeelingRow value={d.duringFeeling} onPick={v => quickLog(d.number, { duringFeeling: v })} strong />
+                      <input
+                        value={d.duringNote ?? ''}
+                        onChange={e => updateDate(d.number, { duringNote: e.target.value })}
+                        onBlur={e => { if (e.target.value.trim()) quickLog(d.number, { duringNote: e.target.value }); }}
+                        placeholder="One line, just for you..."
+                        style={{ ...inputStyle, background: 'var(--pearl)' }}
+                      />
+                    </DatePhase>
+
+                    {/* AFTER. Longer, saved with the form. */}
+                    <DatePhase
+                      title="After"
+                      status={d.afterLoggedAt ? `Started ${stamp(d.afterLoggedAt)}` : undefined}
+                      summary={[feelingLabel(d.feeling), d.paid ? `${d.paid}` : null, answered(d.afterAnswers, afterItems) ? `${answered(d.afterAnswers, afterItems)} of ${afterItems.length} answered` : null].filter(Boolean).join(' · ') || 'Not logged'}
+                      open={isOpen('after')}
+                      onToggle={() => togglePhase(d.number, 'after', defaults.after)}
+                      tone="plain"
+                    >
+                      <Field label="How did you feel afterwards?">
+                        <FeelingRow value={d.feeling} onPick={v => updateAfter(d.number, { feeling: v })} />
+                      </Field>
+                      <Field label="Who paid?">
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {(['split', 'he paid', 'i paid', 'neither'] as const).map(opt => (
+                            <button key={opt} onClick={() => updateAfter(d.number, { paid: opt })} style={chipStyle(d.paid === opt, false)}>{opt}</button>
+                          ))}
+                        </div>
+                      </Field>
+                      <Field label="What made you like him more?">
+                        <textarea value={d.likedMore ?? ''} onChange={e => updateAfter(d.number, { likedMore: e.target.value })} placeholder="He listened, he planned it, he was kind to the waiter..." rows={2} style={{ ...inputStyle, resize: 'vertical' as const }} />
+                      </Field>
+                      <Field label="What made you like him less?">
+                        <textarea value={d.likedLess ?? ''} onChange={e => updateAfter(d.number, { likedLess: e.target.value })} placeholder="He was late, he talked about his ex..." rows={2} style={{ ...inputStyle, resize: 'vertical' as const }} />
+                      </Field>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        {afterItems.map(it => (
+                          <AnswerSlider
+                            key={it.id}
+                            item={it}
+                            value={asAnswer(d.afterAnswers?.[it.id])}
+                            onChange={v => setAfter(it.id, v)}
+                          />
+                        ))}
+                      </div>
+                    </DatePhase>
+                  </>
+                );
+              })()}
             </div>
           ))}
           <button onClick={addDate} style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: 'var(--r-pill)', border: '1.5px dashed var(--primary)', background: 'transparent', color: 'var(--primary)', fontFamily: 'var(--sans)', fontSize: 13, cursor: 'pointer' }}>
@@ -716,6 +786,108 @@ function TwoCol({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
       {children}
+    </div>
+  );
+}
+
+type Phase = 'before' | 'during' | 'after';
+
+const stamp = (iso: string) =>
+  new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+/** A feeling chip. `strong` is the filled look used where one tap is the whole job. */
+function chipStyle(selected: boolean, strong: boolean): React.CSSProperties {
+  return {
+    padding: strong ? '10px 18px' : '7px 16px', borderRadius: 'var(--r-pill)',
+    border: selected ? '1.5px solid var(--primary)' : strong ? '1.5px solid var(--primary-pale)' : '1.5px solid var(--gold-pale)',
+    background: selected ? (strong ? 'var(--primary)' : 'var(--primary-mist)') : 'var(--pearl)',
+    color: selected ? (strong ? 'var(--pearl)' : 'var(--primary-deep)') : 'var(--dark-soft)',
+    fontFamily: 'var(--sans)', fontSize: strong ? 13.5 : 13, cursor: 'pointer', textTransform: 'capitalize',
+  };
+}
+
+function FeelingRow({ value, onPick, strong = false }: { value?: Feeling; onPick: (v: Feeling) => void; strong?: boolean }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {FEELINGS.map(fe => (
+        <button key={fe.value} onClick={() => onPick(fe.value)} style={{ ...chipStyle(value === fe.value, strong), textTransform: 'none' }}>
+          {fe.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One of the three parts of a date card. Folded, it is a single line she can
+ * read at a glance and tap to open; open, it holds the fields. Nothing about
+ * folding changes what is saved.
+ */
+function DatePhase({ title, hint, status, summary, open, onToggle, tone, children }: {
+  title: string;
+  hint?: string;
+  status?: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  tone: 'soft' | 'strong' | 'plain';
+  children: React.ReactNode;
+}) {
+  const bg = tone === 'strong' ? 'var(--blush-pale)' : tone === 'soft' ? 'var(--primary-mist)' : 'var(--pearl)';
+  const border = tone === 'plain' ? '1px solid var(--gold-pale)' : '1px solid var(--primary-pale)';
+  return (
+    <div style={{ borderRadius: 'var(--r-md)', background: bg, border }}>
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 15px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+      >
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--primary-deep)', letterSpacing: 0.2, textTransform: 'uppercase' }}>{title}</span>
+          {!open && <span style={{ fontFamily: 'var(--sans)', fontSize: 12.5, color: 'var(--dark-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--mauve-deep)' }}>{status ?? (open ? hint : undefined)}</span>
+          <span aria-hidden style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--mauve-deep)', transform: open ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 120ms' }}>›</span>
+        </span>
+      </button>
+      {open && <div style={{ padding: '0 15px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * A 1 to 5 slider for one question. Optional: until she moves it, it reads
+ * as unanswered and is not stored. `onChange` follows the thumb; `onCommit`,
+ * when given, fires once when she lets go, for sections that save on the tap.
+ */
+function AnswerSlider({ item, value, onChange, onCommit }: {
+  item: ReflectionItem;
+  value?: number;
+  onChange: (v: number) => void;
+  onCommit?: (v: number) => void;
+}) {
+  const answered = value !== undefined;
+  const shown = value ?? 3;
+  const read = (e: { currentTarget: { value: string } }) => Number(e.currentTarget.value);
+  return (
+    <div>
+      <div style={{ fontFamily: 'var(--serif)', fontSize: 15, color: 'var(--dark)', lineHeight: 1.4, marginBottom: 6 }}>{item.prompt}</div>
+      <input
+        type="range" min={1} max={5} step={1}
+        value={shown}
+        aria-label={item.prompt}
+        aria-valuetext={answered ? `${value} of 5` : 'not answered'}
+        onChange={e => onChange(read(e))}
+        onPointerUp={e => onCommit?.(read(e))}
+        onKeyUp={e => onCommit?.(read(e))}
+        style={{ width: '100%', accentColor: 'var(--primary)', opacity: answered ? 1 : 0.55, cursor: 'pointer' }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--dark-soft)' }}>
+        <span>1 · {item.low}</span>
+        <span style={{ color: 'var(--mauve-deep)' }}>{answered ? value : 'slide to answer'}</span>
+        <span>5 · {item.high}</span>
+      </div>
     </div>
   );
 }
